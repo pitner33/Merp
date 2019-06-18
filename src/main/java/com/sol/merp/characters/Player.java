@@ -15,7 +15,7 @@ import java.util.Set;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Character {
+public class Player {
     @Id
     private String characterId;
 
@@ -49,8 +49,11 @@ public class Character {
     private Integer stealth; //lopakodas/rejtozkodes
 
 
+    public ArmorType getArmorType() {
+        return armorType;
+    }
 
-
-
-
+    public void setArmorType(ArmorType armorType) {
+        this.armorType = armorType;
+    }
 }
