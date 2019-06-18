@@ -1,11 +1,13 @@
 package com.sol.merp;
 
-import DiceRoll.D100Roll;
+
+import com.sol.merp.diceRoll.D100Roll;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class D100Test {
-    D100Roll test = new D100Roll();
+    public D100Roll test = new D100Roll();
 
     @Test
     public void d100FromRoll_GivesRightResults() {

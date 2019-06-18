@@ -1,14 +1,17 @@
 package com.sol.merp;
 
-import DiceRoll.D100Roll;
+import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class MerpApplication {
 
+
     public static void main(String[] args) {
         SpringApplication.run(MerpApplication.class, args);
+
+
 
         for (int i = 0; i < 25; i++) {
             System.out.print(new D100Roll().d100Random()  + ", ");
@@ -30,6 +33,8 @@ public class MerpApplication {
         System.out.println(new D100Roll().d100FromRoll("5", "15", "98", "10")); //-10
         System.out.println(new D100Roll().d100FromRoll("96", "15", "98", "10")); //111
     }
+
+
 
 
 }

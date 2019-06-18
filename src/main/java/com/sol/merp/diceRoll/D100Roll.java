@@ -1,6 +1,8 @@
-package DiceRoll;
+package com.sol.merp.diceRoll;
+
 
 import java.util.Random;
+
 
 public class D100Roll {
 
