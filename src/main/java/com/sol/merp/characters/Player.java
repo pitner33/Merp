@@ -49,6 +49,9 @@ public class Player {
     private Integer stealth; //lopakodas/rejtozkodes
 
 
+//    public Player() {
+//    }
+
     public ArmorType getArmorType() {
         return armorType;
     }

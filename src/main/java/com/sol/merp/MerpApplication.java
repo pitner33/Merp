@@ -1,5 +1,6 @@
 package com.sol.merp;
 
+import com.sol.merp.characters.Player;
 import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -8,8 +9,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class MerpApplication {
 
 
+
     public static void main(String[] args) {
         SpringApplication.run(MerpApplication.class, args);
+
+//        Player player = new Player();
+//        player.getArmorType();
 
 
 
@@ -32,6 +37,9 @@ public class MerpApplication {
         System.out.println(new D100Roll().d100FromRoll("5", "97", "98", "10")); //-200
         System.out.println(new D100Roll().d100FromRoll("5", "15", "98", "10")); //-10
         System.out.println(new D100Roll().d100FromRoll("96", "15", "98", "10")); //111
+
+
+
     }
 
 
