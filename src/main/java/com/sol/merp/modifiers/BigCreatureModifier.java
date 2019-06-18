@@ -4,27 +4,24 @@ import com.sol.merp.attributes.BigCreatureSize;
 import com.sol.merp.attributes.WeaponType;
 
 public class BigCreatureModifier {
-    private WeaponType weaponType;
-    private BigCreatureSize bigCreatureSize;
 
-
-    public Integer bigCreatureModifier(BigCreatureModifier bigCreatureModifier ) {
+    public Integer bigCreatureModifier(WeaponType weaponType, BigCreatureSize bigCreatureSize) {
         Integer bigCreatureModifierNum = 0;
 
-        if (bigCreatureModifier.bigCreatureSize.equals("giant")) {
+        if (bigCreatureSize.equals(BigCreatureSize.giant)) {
             bigCreatureModifierNum -= 10;
         }
 
-        if (bigCreatureModifier.weaponType.equals("normal")) {
+        if (weaponType.equals(WeaponType.normal)) {
             bigCreatureModifierNum -= 20;
-        } else if (bigCreatureModifier.weaponType.equals("magic")) {
+        } else if (weaponType.equals(WeaponType.magic)) {
             bigCreatureModifierNum -= 10;
-        } else if (bigCreatureModifier.weaponType.equals("holy")) {
+        } else if (weaponType.equals(WeaponType.holy)) {
             bigCreatureModifierNum += 10;
-        } else if (bigCreatureModifier.weaponType.equals("monsterKiller")) {
+        } else if (weaponType.equals(WeaponType.monsterKiller)) {
             bigCreatureModifierNum += 20;
         }
 
-        return  bigCreatureModifierNum;
+        return bigCreatureModifierNum;
     }
 }
