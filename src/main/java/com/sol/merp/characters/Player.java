@@ -17,11 +17,13 @@ import java.util.Set;
 @AllArgsConstructor
 public class Player {
     @Id
-    private String characterId;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
 
+    private String characterId;
     private String name;
     private Integer lvl;
-    private Set<AttackType> attackTypeSet;
+    private AttackType attackType;
     private Integer hpMax;
     private Integer hpActual;
     private Integer mm;
@@ -36,7 +38,7 @@ public class Player {
     private Integer mdLenyeg;
     private Integer mdKapcsolat;
     private ArmorType armorType;
-    private Boolean stunned;
+    private Boolean isStunned;
     private Integer penaltyForActivities;
     private Integer hpLossPerRound;
     private Integer perception;
