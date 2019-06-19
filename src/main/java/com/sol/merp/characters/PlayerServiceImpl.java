@@ -14,3 +14,6 @@
 //    }
 //}
 //TODO findAll lista MM szerint sorba rendezve a harchoz
+//TODO listabn ne legzen benne a halott, kabult
+//TODO kulon lista a kabultaknak
+//TODO kulon lista a halottaknak
