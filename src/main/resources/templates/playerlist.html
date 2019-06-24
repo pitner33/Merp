@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>MERP Player list</title>
+    <link rel="stylesheet" th:href="@{/style.css}"/>
+    <meta charset="utf-8"/>
+    <!-- Bootstrap CSS -->
+    <link href="/webjars/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"/>    <!--Plus dependecies!!!!-->
+    <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">-->
+</head>
+<body>
+<div>
+    <div class="row">
+        <div class="col-xl-12">
+            <h1>MERP - All players</h1>
+<!--            itt az összes eddig generált player látható. Meg lehet jelölni, hogy kik játszanak majd a kalandban, van egy START ADVENTURE gomb, ami átvisz a következő oldalra, ahol már csak -->
+<!--            a tényleges kalandban résztvevőket látjuk, cselekvési sorrendben listázva-->
+<!--            ehhez kell majd egy cselekvéslista (támad, védekezik, előkészít stb.), ami változtatható, hogy a sorrend dinamikus legyen-->
+        </div>
+    </div>
+
+<!--    <div>-->
+<!--        &lt;!&ndash;<button type="button" class="btn btn-primary" aria-label="Left Align">&ndash;&gt;-->
+<!--        &lt;!&ndash;<span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>&ndash;&gt;-->
+<!--        &lt;!&ndash;</button>&ndash;&gt;-->
+<!--        <a class="btn btn-success col-xl-2" th:href="@{add}" th:text="'Add new todo'"></a>-->
+<!--        &lt;!&ndash;        <p class="col-md-1"></p>&ndash;&gt;-->
+<!--        &lt;!&ndash;        <a class="btn btn-info col-md-2"  th:href="@{/todo/list?isActive=true}"  th:text="'Active Todos'"></a>&ndash;&gt;-->
+<!--        <p class="col-md-1"></p>-->
+<!--        <a class="btn btn-info col-xl-2" th:href="@{/todo/list}" th:text="'All Todos'"></a>-->
+<!--        <p class="col-md-1"></p>-->
+<!--        <a class="btn btn-warning col-xl-2" th:href="@{/todo/assignees}" th:text="'List of Assignees'"></a>-->
+
+<!--    </div>-->
+
+
+<!--    &lt;!&ndash;    <div class="container">&ndash;&gt;-->
+<!--    <div>-->
+<!--        <div class="row">-->
+<!--            <div class="col-xl-12">-->
+<!--                </br>-->
+<!--                <form th:action="@{/todo/list}" method="get">-->
+<!--                    <label for="search" th:text="Search"></label>-->
+<!--                    <input type="text" th:name="search" id="search" placeholder="search..." required>-->
+<!--                    <button class="btn btn-primary" type="submit" th:text="Search"></button>-->
+<!--                </form>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
+
+    <div>
+        <table class="table table-bordered">
+            <thead th:style="'background-color:gray'">
+            <tr>
+                <th>ID</th>
+                <th>Char ID</th>
+                <th>Name</th>
+                <th>Level</th>
+                <th>Attack type</th>
+                <th>Critical type</th>
+                <th>HP max</th>
+                <th>HP actual</th>
+                <th>MM</th>
+                <th>TB</th>
+                <th>TB for defense</th>
+                <th>Secondary TB</th>
+                <th>Base Magic TB</th>
+                <th>Target Magic TB</th>
+                <th>VB</th>
+                <th>Shield</th>
+                <th>AGI bonus</th>
+                <th>MD Lenyeg</th>
+                <th>MD Kapcsolat</th>
+                <th>Armor Type</th>
+                <th>isStunned</th>
+                <th>Penalty for Activities</th>
+                <th>HP loss/round</th>
+                <th>Perception</th>
+                <th>Tracking</th>
+                <th>Lockpicking</th>
+                <th>Disarm Traps</th>
+                <th>Object usage</th>
+                <th>Runes</th>
+                <th>Influence</th>
+                <th>Stealth</th>
+                <!--<th>DELETE</th>-->
+                <!--<th>EDIT</th>-->
+                <!--<th>Play in next adventure</th>-->
+            </tr>
+            </thead>
+            <tbody>
+                        <tr th:each="player : ${players}" th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:green' :  'background-color:red'">
+                            <td th:text="${player.getId()}"></td>
+                            <td th:text="${player.getCharacterId()}"></td>
+                            <td th:text="${player.getName()}"></td>
+                            <td th:text="${player.getLvl()}"></td>
+                            <td th:text="${player.getAttackType()}"></td>
+                            <td th:text="${player.getCritType()}"></td>
+                            <td th:text="${player.getHpMax()}"></td>
+                            <td th:text="${player.getHpActual()}"></td>
+                            <td th:text="${player.getMm()}"></td>
+                            <td th:text="${player.getTb()}"></td>
+                            <td th:text="${player.getTbUsedForDefense()}"></td>
+                            <td th:text="${player.getSecondaryTB()}"></td>
+                            <td th:text="${player.getBaseMagicTB()}"></td>
+                            <td th:text="${player.getTargetMagicTB()}"></td>
+                            <td th:text="${player.getVb()}"></td>
+                            <td th:text="${player.getShield()}"></td>
+                            <td th:text="${player.getAgilityBonus()}"></td>
+                            <td th:text="${player.getMdLenyeg()}"></td>
+                            <td th:text="${player.getMdKapcsolat()}"></td>
+                            <td th:text="${player.getArmorType()}"></td>
+                            <td th:text="${player.getIsStunned()}"></td>
+                            <td th:text="${player.getPenaltyForActivities()}"></td>
+                            <td th:text="${player.getHpLossPerRound()}"></td>
+                            <td th:text="${player.getPerception()}"></td>
+                            <td th:text="${player.getTracking()}"></td>
+                            <td th:text="${player.getLockPicking()}"></td>
+                            <td th:text="${player.getDisarmTraps()}"></td>
+                            <td th:text="${player.getObjectUsage()}"></td>
+                            <td th:text="${player.getRunes()}"></td>
+                            <td th:text="${player.getInfluence()}"></td>
+                            <td th:text="${player.getStealth()}"></td>
+            <!--                <td ><a class="btn btn-info btn-sm" th:href="@{'/todo/' + ${todo.getId()} + '/details'}" th:text="${todo.getTitle()}"> </a></td>-->
+
+            <!--                &lt;!&ndash;<td th:text="${todo.getDone()}" ><i th:class="${todo.done} ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-remove'"></i></td>&ndash;&gt;-->
+            <!--                <td th:if="${todo.done}"><i class="glyphicon glyphicon-ok"></i></td>-->
+            <!--                <td th:unless="${todo.done}"><i class="glyphicon glyphicon-remove"></i></td>-->
+
+            <!--                &lt;!&ndash;<td th:text="${todo.getUrgent()}"></td>&ndash;&gt;-->
+            <!--                <td th:if="${todo.getUrgent()}"><i class="glyphicon glyphicon-ok"></i></td>-->
+            <!--                <td th:unless="${todo.getUrgent()}"><i class="glyphicon glyphicon-remove"></i></td>-->
+
+            <!--                <td th:if="${todo.getAssignee() != null} " th:text="${todo.getAssignee().getName()}"></td>-->
+            <!--                <td th:unless="${todo.getAssignee() != null} " th:text="'No Assignee assigned'"></td>-->
+
+            <!--                <td id="date" th:text="${#dates.format(todo.getDate(), 'dd/MM/yyyy HH:mm:ss')}"></td>-->
+            <!--                <td><a class="btn btn-danger btn-sm" th:href="@{${todo.getId()} + '/delete'}" th:text="Delete"></a></td>-->
+            <!--                <td><a class="btn btn-warning btn-sm" th:href="@{${todo.getId()} + '/edit'}" th:text="Edit"></a></td>-->
+            <!--            </tr>-->
+            </tbody>
+        </table>
+    </div>
+
+
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+        integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+        integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+        crossorigin="anonymous"></script>
+</body>
+</html>

@@ -90,11 +90,15 @@ public class Player {
         this.stealth = stealth;
     }
 
-    public ArmorType getArmorType() {
-        return armorType;
-    }
-
-    public void setArmorType(ArmorType armorType) {
-        this.armorType = armorType;
-    }
+//    public ArmorType getArmorType() {
+//        return armorType;
+//    }
+//
+//    public void setArmorType(ArmorType armorType) {
+//        this.armorType = armorType;
+//    }
+//
+//    public String getCharacterId() {
+//        return characterId;
+//    }
 }

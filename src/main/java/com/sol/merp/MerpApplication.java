@@ -54,7 +54,7 @@ public class MerpApplication implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         playerRepository.save(new Player("JK1", "Törp harcos", 4, AttackType.twoHanded, CritType.slashing, 86, 25, 101, 0, -5, -15, 15, false, 15, 40, -5, ArmorType.chainmail, -35, 19, 20, 30, -30, -25, 5, 10));
-        playerRepository.save(new Player("NJK1", "Erős troll", 12, AttackType.blunt, CritType.blunt, 134, 15, 0, 0, -45, -45, 30, false, 30, 12, 21, ArmorType.heavyLeather, 31, 6, 6, 6, -45, -45, -45, -45));
+        playerRepository.save(new Player("NJK1", "Erös troll", 12, AttackType.blunt, CritType.blunt, 134, 15, 0, 0, -45, -45, 30, false, 30, 12, 21, ArmorType.heavyLeather, 31, 6, 6, 6, -45, -45, -45, -45));
 
     }
 }
