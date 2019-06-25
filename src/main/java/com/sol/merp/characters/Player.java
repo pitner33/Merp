@@ -23,7 +23,9 @@ public class Player {
 
     private String characterId;
     private String name;
+    private Boolean isPlaying;
     private Integer lvl;
+    private Integer xp;
     private AttackType attackType;
     private CritType critType;
     private Integer hpMax;
@@ -60,7 +62,9 @@ public class Player {
     public Player(String characterId, String name, Integer lvl, AttackType attackType, CritType critType, Integer hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
+        this.isPlaying = false;
         this.lvl = lvl;
+        this.xp = lvl * 1000;
         this.attackType = attackType;
         this.critType = critType;
         this.hpMax = hpMax;

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>MERP Player list</title>
+    <link rel="stylesheet" th:href="@{/style.css}"/>
+    <meta charset="utf-8"/>
+    <!-- Bootstrap CSS -->
+    <link href="/webjars/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"/>    <!--Plus dependecies!!!!-->
+    <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">-->
+</head>
+<body>
+<div>
+    <div class="row">
+        <div class="col-xl-12">
+            <h1>MERP - Edit player</h1>
+        </div>
+    </div>
+
+    <div>
+        <form th:action="@{'/merp/edit/'+${player.getId()}}" th:object="${player}" method="post">
+
+            <div class="form-group">
+
+                <table class="table table-bordered">
+                    <thead th:style="'background-color:gray'">
+                    <tr>
+                        <th>ID</th>
+                        <th>Char ID</th>
+                        <th>Name</th>
+                        <th></th>
+                        <th>Play in next adventure</th>
+                        <th>Level</th>
+                        <th>XP</th>
+                        <th>Attack type</th>
+                        <th>Critical type</th>
+                        <th>HP max</th>
+                        <th>HP actual</th>
+                        <th>MM</th>
+                        <th>TB</th>
+                        <th>TB for defense</th>
+                        <th>Secondary TB</th>
+                        <th>Base Magic TB</th>
+                        <th>Target Magic TB</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{id}" th:text="*{id}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{characterId}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{name}">
+                        </td>
+                        <td></td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{isPlaying}" th:text="*{isPlaying}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{lvl}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{xp}">
+                        </td>
+                        <td style="width: 8%">
+                            <select class="form-control" th:field="*{{attackType}}">
+                                <option th:each="attackType : ${T(com.sol.merp.attributes.AttackType).values()}"
+                                        th:value="${{attackType}}"
+                                        th:text="${{attackType}}"
+                                        th:selected="${{attackType}}">
+                                </option>
+                            </select>
+                        </td>
+                        <td style="width: 10%">
+                            <select class="form-control" th:field="*{{critType}}">
+                                <option th:each="critType : ${T(com.sol.merp.attributes.CritType).values()}"
+                                        th:value="${{critType}}"
+                                        th:text="${{critType}}"
+                                        th:selected="${{critType}}">
+                                </option>
+                            </select>
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{hpMax}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{hpActual}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{mm}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{tb}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{tbUsedForDefense}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{secondaryTB}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{baseMagicTB}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{targetMagicTB}">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <table class="table table-bordered">
+                    <thead th:style="'background-color:gray'">
+                    <tr>
+                        <th>VB</th>
+                        <th>Shield</th>
+                        <th>AGI bonus</th>
+                        <th>MD Lenyeg</th>
+                        <th>MD Kapcsolat</th>
+                        <th>Armor Type</th>
+                        <th>isStunned</th>
+                        <th>Penalty for Activities</th>
+                        <th>HP loss/round</th>
+                        <th>Perception</th>
+                        <th>Tracking</th>
+                        <th>Lockpicking</th>
+                        <th>Disarm Traps</th>
+                        <th>Object usage</th>
+                        <th>Runes</th>
+                        <th>Influence</th>
+                        <th>Stealth</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{vb}">
+                        </td>
+                        <td style="width: 5%">
+                            <select class="form-control" th:field="*{shield}">
+                                <option th:value="true" th:text="true"></option>
+                                <option th:value="false" th:text="false"></option>
+                            </select>
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{agilityBonus}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{mdLenyeg}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{mdKapcsolat}">
+                        </td>
+                        <td style="width: 8%">
+                            <select class="form-control" th:field="*{{armorType}}">
+                                <option th:each="armorType : ${T(com.sol.merp.attributes.ArmorType).values()}"
+                                        th:value="${{armorType}}"
+                                        th:text="${{armorType}}"
+                                        th:selected="${{armorType}}">
+                                </option>
+                            </select>
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{isStunned}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{penaltyForActivities}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{hpLossPerRound}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{perception}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{tracking}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{lockPicking}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{lockPicking}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{objectUsage}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{runes}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{influence}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="text" th:field="*{stealth}">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div>
+                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
+                    <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+                </div>
+            </div>
+        </form>
+        <!-- Optional JavaScript -->
+        <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+                integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+                crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+                integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+                crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+                integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+                crossorigin="anonymous"></script>
+    </div>
+</div>
+</body>
+</html>
