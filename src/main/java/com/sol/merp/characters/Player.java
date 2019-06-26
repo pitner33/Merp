@@ -1,8 +1,6 @@
 package com.sol.merp.characters;
 
-import com.sol.merp.attributes.ArmorType;
-import com.sol.merp.attributes.AttackType;
-import com.sol.merp.attributes.CritType;
+import com.sol.merp.attributes.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,13 +21,17 @@ public class Player {
 
     private String characterId;
     private String name;
+    private Gender gender;
+    private Race race;
+    private PlayerClass playerClass;
     private Boolean isPlaying;
+    private Boolean isActive; //capable for actions
     private Integer lvl;
-    private Integer xp;
+    private Double xp;
     private AttackType attackType;
     private CritType critType;
-    private Integer hpMax;
-    private Integer hpActual;
+    private Double hpMax;
+    private Double hpActual;
     private Integer mm;
     private Integer tb;
     private Integer tbUsedForDefense;
@@ -55,16 +57,18 @@ public class Player {
     private Integer stealth; //lopakodas/rejtozkodes
 
 
-//    public Player() {
-//    }
 
 
-    public Player(String characterId, String name, Integer lvl, AttackType attackType, CritType critType, Integer hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
+        this.gender = gender;
+        this.race = race;
+        this.playerClass = playerClass;
         this.isPlaying = false;
+        this.isActive = true;
         this.lvl = lvl;
-        this.xp = lvl * 1000;
+        this.xp = Double.valueOf(lvl * 1000);
         this.attackType = attackType;
         this.critType = critType;
         this.hpMax = hpMax;
@@ -94,15 +98,4 @@ public class Player {
         this.stealth = stealth;
     }
 
-//    public ArmorType getArmorType() {
-//        return armorType;
-//    }
-//
-//    public void setArmorType(ArmorType armorType) {
-//        this.armorType = armorType;
-//    }
-//
-//    public String getCharacterId() {
-//        return characterId;
-//    }
 }

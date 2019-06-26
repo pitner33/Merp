@@ -12,42 +12,13 @@
 <div>
     <div class="row">
         <div class="col-xl-12">
-            <h1>MERP - All players</h1>
-            <!--            itt az összes eddig generált player látható. Meg lehet jelölni, hogy kik játszanak majd a kalandban, van egy START ADVENTURE gomb, ami átvisz a következő oldalra, ahol már csak -->
-            <!--            a tényleges kalandban résztvevőket látjuk, cselekvési sorrendben listázva-->
-            <!--            ehhez kell majd egy cselekvéslista (támad, védekezik, előkészít stb.), ami változtatható, hogy a sorrend dinamikus legyen-->
+            <h1>MERP - ADVENTURE</h1>
         </div>
     </div>
-
-    <!--    <div>-->
-    <!--        &lt;!&ndash;<button type="button" class="btn btn-primary" aria-label="Left Align">&ndash;&gt;-->
-    <!--        &lt;!&ndash;<span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>&ndash;&gt;-->
-    <!--        &lt;!&ndash;</button>&ndash;&gt;-->
-    <!--        <a class="btn btn-success col-xl-2" th:href="@{add}" th:text="'Add new todo'"></a>-->
-    <!--        &lt;!&ndash;        <p class="col-md-1"></p>&ndash;&gt;-->
-    <!--        &lt;!&ndash;        <a class="btn btn-info col-md-2"  th:href="@{/todo/list?isActive=true}"  th:text="'Active Todos'"></a>&ndash;&gt;-->
-    <!--        <p class="col-md-1"></p>-->
-    <!--        <a class="btn btn-info col-xl-2" th:href="@{/todo/list}" th:text="'All Todos'"></a>-->
-    <!--        <p class="col-md-1"></p>-->
-    <!--        <a class="btn btn-warning col-xl-2" th:href="@{/todo/assignees}" th:text="'List of Assignees'"></a>-->
-
-    <!--    </div>-->
-
-
-    <!--    &lt;!&ndash;    <div class="container">&ndash;&gt;-->
-    <!--    <div>-->
-    <!--        <div class="row">-->
-    <!--            <div class="col-xl-12">-->
-    <!--                </br>-->
-    <!--                <form th:action="@{/todo/list}" method="get">-->
-    <!--                    <label for="search" th:text="Search"></label>-->
-    <!--                    <input type="text" th:name="search" id="search" placeholder="search..." required>-->
-    <!--                    <button class="btn btn-primary" type="submit" th:text="Search"></button>-->
-    <!--                </form>-->
-    <!--            </div>-->
-    <!--        </div>-->
-    <!--    </div>-->
-
+    <div th:align="center">
+        <a class="btn btn-lg btn-success"  th:href="@{/merp/round}" th:text="'START ROUND'"></a>
+        <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+    </div>
     <div>
         <table class="table table-bordered">
             <thead th:style="'background-color:gray'">
@@ -55,9 +26,6 @@
                 <th>ID</th>
                 <th>Char ID</th>
                 <th>Name</th>
-                <th>Gender</th>
-                <th>Race</th>
-                <th>Class</th>
                 <th></th>
                 <th>Play in next adventure</th>
                 <th>Level</th>
@@ -89,19 +57,15 @@
                 <th>Runes</th>
                 <th>Influence</th>
                 <th>Stealth</th>
-                <th>EDIT</th>
-                <th>DEL</th>
+
             </tr>
             </thead>
             <tbody>
-            <tr th:each="player : ${players}"
+            <tr th:each="player : ${adventurers}"
                 th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:green' :  'background-color:red'">
                 <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
-                <td th:text="${player.getGender()}"></td>
-                <td th:text="${player.getRace()}"></td>
-                <td th:text="${player.getPlayerClass()}"></td>
 
                 <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Don'+'\\'+'t Play'"> </a></td>
                 <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Play'"> </a></td>
@@ -136,8 +100,8 @@
                 <td th:text="${player.getRunes()}"></td>
                 <td th:text="${player.getInfluence()}"></td>
                 <td th:text="${player.getStealth()}"></td>
-                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
-                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
+<!--                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>-->
+<!--                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>-->
                 <td th:value="${player.getIsActive()}" type="hidden"></td>
                 <!--                <td ><a class="btn btn-info btn-sm" th:href="@{'/todo/' + ${todo.getId()} + '/details'}" th:text="${todo.getTitle()}"> </a></td>-->
 
@@ -158,13 +122,7 @@
                 <!--            </tr>-->
             </tbody>
         </table>
-        <div>
-            <a class="btn btn-lg btn-info" th:href="@{/merp/addplayer}" th:text="'ADD NEW PLAYER'"></a>
-        </div>
-        <div  align="center">
-            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure}" th:text="'START ADVENTURE'"></a>
-        </div>
-    </div>
+
 
 
 </div>

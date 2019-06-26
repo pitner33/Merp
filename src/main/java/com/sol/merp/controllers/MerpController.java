@@ -54,4 +54,10 @@ public class MerpController {
         playerRepository.deleteById(id);
         return "redirect:/merp/allplayers";
     }
+
+    @GetMapping("/adventure")
+    public String adventureMain(Model model) {
+        model.addAttribute("adventurers", playerService.adventurersOrderedList());
+        return "adventureMain";
+    }
 }

@@ -11,5 +11,6 @@ public enum CritType {
     crushing,
     grab,
     bigCreaturePhisical,
-    bigCreatureMagic
+    bigCreatureMagic,
+    none
 }

@@ -27,6 +27,9 @@
                         <th>ID</th>
                         <th>Char ID</th>
                         <th>Name</th>
+                        <th>Gender</th>
+                        <th>Race</th>
+                        <th>Class</th>
                         <th></th>
                         <th>Play in next adventure</th>
                         <th>Level</th>
@@ -53,6 +56,15 @@
                         </td>
                         <td>
                             <input class="form-control" type="text" th:field="*{name}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{gender}" th:text="*{gender}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{race}" th:text="*{race}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{playerClass}" th:text="*{playerClass}">
                         </td>
                         <td></td>
                         <td>
@@ -161,7 +173,7 @@
                             </select>
                         </td>
                         <td>
-                            <input class="form-control" type="hidden" th:field="*{isStunned}">
+                            <input class="form-control" type="text" th:field="*{isStunned}">
                         </td>
                         <td>
                             <input class="form-control" type="hidden" th:field="*{penaltyForActivities}">
@@ -192,6 +204,9 @@
                         </td>
                         <td>
                             <input class="form-control" type="text" th:field="*{stealth}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:field="*{isActive}">
                         </td>
                     </tr>
                     </tbody>
