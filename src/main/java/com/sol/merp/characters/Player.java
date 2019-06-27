@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import javax.persistence.*;
-import java.util.Set;
 
 @Entity
 @Getter
@@ -28,6 +27,7 @@ public class Player {
     private Boolean isActive; //capable for actions
     private Integer lvl;
     private Double xp;
+    private PlayerActivity activity;
     private AttackType attackType;
     private CritType critType;
     private Double hpMax;
@@ -69,6 +69,7 @@ public class Player {
         this.isActive = true;
         this.lvl = lvl;
         this.xp = Double.valueOf(lvl * 1000);
+        this.activity = PlayerActivity._5DoNothing;
         this.attackType = attackType;
         this.critType = critType;
         this.hpMax = hpMax;

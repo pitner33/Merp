@@ -34,6 +34,7 @@
                         <th>Play in next adventure</th>
                         <th>Level</th>
                         <th>XP</th>
+                        <th>Activity</th>
                         <th>Attack type</th>
                         <th>Critical type</th>
                         <th>HP max</th>
@@ -75,6 +76,16 @@
                         </td>
                         <td>
                             <input class="form-control" type="text" th:field="*{xp}">
+                        </td>
+                        <td style="width: 8%">
+                            <select class="form-control" th:field="*{{activity}}">
+                                <option th:each="activity : ${T(com.sol.merp.attributes.PlayerActivity).values()}"
+                                        th:value="${{activity}}"
+                                        th:text="${{activity}}"
+                                        th:selected="${{activity}}">
+                                </option>
+                            </select>
+<!--                            <input class="form-control" type="hidden" th:field="*{activity}" th:text="*{activity}">-->
                         </td>
                         <td style="width: 8%">
                             <select class="form-control" th:field="*{{attackType}}">
@@ -191,7 +202,7 @@
                             <input class="form-control" type="text" th:field="*{lockPicking}">
                         </td>
                         <td>
-                            <input class="form-control" type="text" th:field="*{lockPicking}">
+                            <input class="form-control" type="text" th:field="*{disarmTraps}">
                         </td>
                         <td>
                             <input class="form-control" type="text" th:field="*{objectUsage}">
@@ -206,7 +217,7 @@
                             <input class="form-control" type="text" th:field="*{stealth}">
                         </td>
                         <td>
-                            <input class="form-control" type="hidden" th:field="*{isActive}">
+                            <input class="form-control" type="text" th:field="*{isActive}">
                         </td>
                     </tr>
                     </tbody>

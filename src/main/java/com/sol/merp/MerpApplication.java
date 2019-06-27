@@ -45,7 +45,6 @@ public class MerpApplication implements CommandLineRunner {
         System.out.println(new D100Roll().d100FromRoll("96", "15", "98", "10")); //111
 
 
-
     }
 
 

@@ -8,6 +8,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+
 @Controller
 @RequestMapping("/merp")
 public class MerpController {
@@ -26,6 +28,8 @@ public class MerpController {
 
     @GetMapping("/allplayers")
     public String playerlist(Model model) {
+        playerService.playerActivitySwitch();
+        playerService.doNothingWhenStunned();
         model.addAttribute("players", playerRepository.findAll());
         return "playerlist";
     }
@@ -39,12 +43,15 @@ public class MerpController {
 
     @GetMapping("/edit/{id}")
     public String editPlayer(@PathVariable Long id, Model model) {
+        playerService.playerActivitySwitch();
+        playerService.doNothingWhenStunned();
         model.addAttribute("player", playerRepository.findById(id).get());
         return "playeredit";
     }
 
     @PostMapping("/edit/{id}")
     public String editPlayerSubmit(@ModelAttribute(value = "player") Player player) {
+//        playerService.playerActivitySwitch(player);
         playerRepository.save(player);
         return "redirect:/merp/allplayers";
     }

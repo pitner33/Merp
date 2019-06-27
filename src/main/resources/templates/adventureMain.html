@@ -26,10 +26,14 @@
                 <th>ID</th>
                 <th>Char ID</th>
                 <th>Name</th>
+                <th>Gender</th>
+                <th>Race</th>
+                <th>Class</th>
                 <th></th>
                 <th>Play in next adventure</th>
                 <th>Level</th>
                 <th>XP</th>
+                <th>Activity</th>
                 <th>Attack type</th>
                 <th>Critical type</th>
                 <th>HP max</th>
@@ -57,7 +61,9 @@
                 <th>Runes</th>
                 <th>Influence</th>
                 <th>Stealth</th>
-
+                <th>EDIT</th>
+                <th>DEL</th>
+                <th>isactive</th>
             </tr>
             </thead>
             <tbody>
@@ -66,6 +72,9 @@
                 <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
+                <td th:text="${player.getGender()}"></td>
+                <td th:text="${player.getRace()}"></td>
+                <td th:text="${player.getPlayerClass()}"></td>
 
                 <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Don'+'\\'+'t Play'"> </a></td>
                 <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Play'"> </a></td>
@@ -73,6 +82,7 @@
                 <td th:text="${player.getIsPlaying()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
+                <td th:text="${player.getActivity()}"></td>
                 <td th:text="${player.getAttackType()}"></td>
                 <td th:text="${player.getCritType()}"></td>
                 <td th:text="${player.getHpMax()}"></td>
@@ -100,9 +110,9 @@
                 <td th:text="${player.getRunes()}"></td>
                 <td th:text="${player.getInfluence()}"></td>
                 <td th:text="${player.getStealth()}"></td>
-<!--                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>-->
-<!--                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>-->
-                <td th:value="${player.getIsActive()}" type="hidden"></td>
+                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
+                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
+                <td th:text="${player.getIsActive()}" type="text"></td>
                 <!--                <td ><a class="btn btn-info btn-sm" th:href="@{'/todo/' + ${todo.getId()} + '/details'}" th:text="${todo.getTitle()}"> </a></td>-->
 
                 <!--                &lt;!&ndash;<td th:text="${todo.getDone()}" ><i th:class="${todo.done} ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-remove'"></i></td>&ndash;&gt;-->
@@ -122,10 +132,7 @@
                 <!--            </tr>-->
             </tbody>
         </table>
-
-
-
-</div>
+        <div>
 <!-- Optional JavaScript -->
 <!-- jQuery first, then Popper.js, then Bootstrap JS -->
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"

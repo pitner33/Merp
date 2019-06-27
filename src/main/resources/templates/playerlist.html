@@ -62,6 +62,7 @@
                 <th>Play in next adventure</th>
                 <th>Level</th>
                 <th>XP</th>
+                <th>Activity</th>
                 <th>Attack type</th>
                 <th>Critical type</th>
                 <th>HP max</th>
@@ -109,6 +110,7 @@
                 <td th:text="${player.getIsPlaying()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
+                <td th:text="${player.getActivity()}"></td>
                 <td th:text="${player.getAttackType()}"></td>
                 <td th:text="${player.getCritType()}"></td>
                 <td th:text="${player.getHpMax()}"></td>
@@ -138,7 +140,7 @@
                 <td th:text="${player.getStealth()}"></td>
                 <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
                 <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
-                <td th:value="${player.getIsActive()}" type="hidden"></td>
+                <td th:text="${player.getIsActive()}" type="text"></td>
                 <!--                <td ><a class="btn btn-info btn-sm" th:href="@{'/todo/' + ${todo.getId()} + '/details'}" th:text="${todo.getTitle()}"> </a></td>-->
 
                 <!--                &lt;!&ndash;<td th:text="${todo.getDone()}" ><i th:class="${todo.done} ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-remove'"></i></td>&ndash;&gt;-->
