@@ -30,6 +30,7 @@ public class Player {
     private PlayerActivity activity;
     private AttackType attackType;
     private CritType critType;
+    private PlayerTarget target;
     private Double hpMax;
     private Double hpActual;
     private Integer mm;
@@ -72,6 +73,7 @@ public class Player {
         this.activity = PlayerActivity._5DoNothing;
         this.attackType = attackType;
         this.critType = critType;
+        this.target = PlayerTarget.none;
         this.hpMax = hpMax;
         this.hpActual = hpMax;
         this.mm = mm;

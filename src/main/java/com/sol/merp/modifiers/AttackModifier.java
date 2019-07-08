@@ -1,15 +1,21 @@
 package com.sol.merp.modifiers;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class AttackModifier {
+@Entity
+public class AttackModifier{
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
     private Boolean attackFromWeakSide;
     private Boolean attackFromBehind;
     private Boolean defenderSurprised;
@@ -18,30 +24,40 @@ public class AttackModifier {
     private Boolean attackerHPBelow50Percent;
     private Boolean attackerMoreThan3MetersMovement;
 
-    public Integer attackModifier(AttackModifier attackModifier) {
+    public Integer countAttackModifier() {
         Integer attackModifierNum = 0;
-        if (attackModifier.attackFromWeakSide) {
+        if (attackFromWeakSide) {
             attackModifierNum += 15;
         }
-        if (attackModifier.attackFromBehind) {
+        if (attackFromBehind) {
             attackModifierNum += 20;
         }
-        if (attackModifier.defenderSurprised) {
+        if (defenderSurprised) {
             attackModifierNum += 20;
         }
-        if (attackModifier.defenderStunned) {
+        if (defenderStunned) {
             attackModifierNum += 20;
         }
-        if (attackModifier.attackFromWeakSide) {
+        if (attackFromWeakSide) {
             attackModifierNum -= 30;
         }
-        if (attackModifier.attackerHPBelow50Percent) {
+        if (attackerHPBelow50Percent) {
             attackModifierNum -= 20;
         }
-        if (attackModifier.attackerMoreThan3MetersMovement) {
+        if (attackerMoreThan3MetersMovement) {
             attackModifierNum -= 10;
         }
 
         return attackModifierNum;
+    }
+
+    public AttackModifier(Boolean attackFromWeakSide, Boolean attackFromBehind, Boolean defenderSurprised, Boolean defenderStunned, Boolean attackerWeaponChange, Boolean attackerHPBelow50Percent, Boolean attackerMoreThan3MetersMovement) {
+        this.attackFromWeakSide = attackFromWeakSide;
+        this.attackFromBehind = attackFromBehind;
+        this.defenderSurprised = defenderSurprised;
+        this.defenderStunned = defenderStunned;
+        this.attackerWeaponChange = attackerWeaponChange;
+        this.attackerHPBelow50Percent = attackerHPBelow50Percent;
+        this.attackerMoreThan3MetersMovement = attackerMoreThan3MetersMovement;
     }
 }

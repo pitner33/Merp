@@ -96,7 +96,7 @@
             </thead>
             <tbody>
             <tr th:each="player : ${players}"
-                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:green' :  'background-color:red'">
+                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
                 <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
@@ -141,6 +141,7 @@
                 <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
                 <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
                 <td th:text="${player.getIsActive()}" type="text"></td>
+                <td th:value="${player.getTarget()}" type="text"></td>
                 <!--                <td ><a class="btn btn-info btn-sm" th:href="@{'/todo/' + ${todo.getId()} + '/details'}" th:text="${todo.getTitle()}"> </a></td>-->
 
                 <!--                &lt;!&ndash;<td th:text="${todo.getDone()}" ><i th:class="${todo.done} ? 'glyphicon glyphicon-ok' : 'glyphicon glyphicon-remove'"></i></td>&ndash;&gt;-->

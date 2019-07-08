@@ -33,11 +33,56 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public Integer attackerTBWithAllModifiers(Player attacker) {
+/*TODO
+      magical attack:
+        attacktype:
+            baseMagic: UTANANEZNI
+            magicBall: UTANANEZNI
+            magicProjectile:
+                d100 open roll (--> success/fail)
+                    IF success:
+                        TB = attacker tb -TBforDefense - penaltyForActions KULON METHOD?
+                        attackmodifier
+                        RANGEMODIFIER
+                        MAGICMODIFIER
+                        IF bigcreature --> bigCreature modifier
+                        special modifier
+                    IF fail:
+                        failmodifier
+      phisical attack:
+        ranged:
+            attacktype(ranged)/crittype
+            d100 open roll (--> success/fail)
+                IF success:
+                    TB = attacker tb -TBforDefense - penaltyForActions KULON METHOD?
+                    attackmodifier
+                    RANGEMODIFIER
+                    IF bigcreature --> bigCreature modifier
+                    special modifier
+                IF fail:
+                    failmodifier
+        melee:
+            attacktype(slashing/blunt/twohand/piercing/clawsFangs/grabBalance)/crittype
+            d100 open roll (--> success/fail)
+                IF success:
+                     TB = attacker tb -TBforDefense - penaltyForActions KULON METHOD?
+                    + attackmodifier
+                    + IF bigcreature --> bigCreature modifier
+                    + special modifier
+                IF fail:
+                    failmodifier
+TODO      */
         return null;
     }
 
     @Override
     public Integer defenderVBWithAllModifiers(Player defender) {
+/* TODO
+        VB=defenderVB + shield - penaltyForActions
+        ...
+        Magia MD ide vagy kulon??? merthogz ay roll!
+
+ TODO     */
         return null;
     }
 

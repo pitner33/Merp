@@ -12,3 +12,6 @@ spring:
     properties:
       hibernate:
         dialect: ${HIBERNATE_DIALECT}
+
+sheet:
+  sheetId: ${SHEET_ID}

@@ -4,6 +4,8 @@ import com.sol.merp.attributes.*;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.modifiers.AttackModifier;
+import com.sol.merp.modifiers.AttackModifierRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -13,6 +15,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class MerpApplication implements CommandLineRunner {
     @Autowired
     public PlayerRepository playerRepository;
+    @Autowired
+    public AttackModifierRepository attackModifierRepository;
 
 
 
@@ -64,6 +68,6 @@ public class MerpApplication implements CommandLineRunner {
         playerRepository.save(new Player("NJK5", "Ar-Gular", Gender.male, Race.human, PlayerClass.mage, 9, AttackType.magicBall, CritType.heat, 73d, 25, 45, 0, 18, -72, 55, false, 15, 15, 5, ArmorType.none, 40, 35, 25, 25, 28, 38, 70, 25));
         playerRepository.save(new Player("NJK6", "Medve", Gender.male, Race.animal, PlayerClass.warrior, 3, AttackType.clawsAndFangs, CritType.crushing, 150d, 30, 70, 0, -45, -45, 30, false, 15, 0, 0, ArmorType.leather, 40, 60, 0, 0, -45, -45, -45, 10));
 
-
+        attackModifierRepository.save(new AttackModifier(true, false, false, false, false, false, false));
     }
 }

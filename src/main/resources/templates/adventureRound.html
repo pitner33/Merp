@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>MERP Adventure - ROUND</title>
+    <link rel="stylesheet" th:href="@{/style.css}"/>
+    <meta charset="utf-8"/>
+    <!-- Bootstrap CSS -->
+    <link href="/webjars/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"/>    <!--Plus dependecies!!!!-->
+    <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">-->
+</head>
+<body>
+<div>
+    <div class="row">
+        <div class="col-xl-12">
+            <h1>MERP - ADVENTURE - ROUND</h1>
+        </div>
+    </div>
+    <div th:align="center">
+        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/round}" th:text="'START ROUND'"></a>
+        <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+    </div>
+
+    <form th:action="@{'/merp/adventure/round'}" th:object="${attackmodifier}" method="post">
+
+
+        <div class="form-group">
+
+            <div>
+                <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
+                <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+            </div>
+
+<!--    TODO ez mukodik-->
+<!--            <div>-->
+<!--                <table class="table table-bordered">-->
+<!--                    <thead>-->
+<!--                    <tr>-->
+<!--                        <th></th>-->
+<!--                    </tr>-->
+<!--                    </thead>-->
+<!--                    <tbody>-->
+<!--&lt;!&ndash;                    <tr th:each="attackmo : ${attackmodifier}">&ndash;&gt;-->
+<!--                    <tr th:value="attackmodifier">-->
+<!--                        <td th:text="*{attackmodifier.get().attackFromWeakSide}"></td>-->
+<!--                        <td th:text="*{attackmodifier.get().defenderSurprised}"></td>-->
+<!--                    </tr>-->
+<!--                    </tbody>-->
+<!--                </table>-->
+<!--            </div>-->
+<!--    TODO idaig-->
+
+            <div>
+                <ul>
+                    <li>
+                        <input id="weaksideattack" name="weaksideattack" type="checkbox" th:value="*{attackFromWeakSide}" />
+<!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="weaksideattack">Attackfrom weak side</label>
+                    </li>
+                    <li>
+                        <input id="backstab" name="backstab" type="checkbox" th:value="*{attackFromBehind}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="backstab">Backstab</label>
+                    </li>
+                    <li>
+                        <input id="surprised" name="surprised" type="checkbox" th:value="*{defenderSurprised}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="surprised">Target is surprised</label>
+                    </li>
+                    <li>
+                        <input id="stunned" name="stunned" type="checkbox" th:value="*{defenderStunned}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="stunned">Target is stunned</label>
+                    </li>
+                    <li>
+                        <input id="weaponchange" name="weaponchange" type="checkbox" th:value="*{attackerWeaponChange}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="weaponchange">Attacker weapon change</label>
+                    </li>
+                    <li>
+                        <input id="below50" name="below50" type="checkbox" th:value="*{attackerHPBelow50Percent}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="below50">Attacker HP below 50%</label>
+                    </li>
+                    <li>
+                        <input id="morethan3meters" name="morethan3meters" type="checkbox" th:value="*{attackerMoreThan3MetersMovement}" />
+                        <!--                        <input name="_features" type="hidden" value="on" />-->
+                        <label for="morethan3meters">Attacker moves more than 3 meters</label>
+                    </li>
+
+                </ul>
+            </div>
+
+<!--            <table>-->
+<!--                <thead>-->
+<!--                <tr>-->
+<!--                    <th> Title</th>-->
+<!--                    <th> Author</th>-->
+<!--                </tr>-->
+<!--                </thead>-->
+<!--                <tbody>-->
+<!--                <tr th:each="player, itemStat : *{players}">-->
+<!--                    <td><input th:field="${player[__${itemStat.index}__].name}"/></td>-->
+<!--                    &lt;!&ndash;                    <td><input th:field="*{player[__${itemStat.index}__].lvl}" /></td>&ndash;&gt;-->
+<!--                </tr>-->
+<!--                </tbody>-->
+<!--            </table>-->
+        </div>
+    </form>
+
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+            integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+            integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+            crossorigin="anonymous"></script>
+</div>
+</body>
+</html>
