@@ -4,9 +4,12 @@ import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.characters.Player;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.googlesheetloader.SheetReader;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.persistence.criteria.CriteriaBuilder;
+import java.util.List;
 
 @Service
 public class FightServiceImpl implements FightService {
@@ -21,6 +24,9 @@ public class FightServiceImpl implements FightService {
     private String roll3;
     private String roll4;
 
+    @Autowired
+    private SheetReader sheetReader;
+
     @Override
     public void attack(Player attacker, Player defender) {
         Integer fullTB = attackerTBWithAllModifiers(attacker);
@@ -28,7 +34,13 @@ public class FightServiceImpl implements FightService {
         Integer rollTB = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4);
         Integer rollResult = (fullTB + rollTB) - fullVB;
         //TODO táblázatból kikeresni a damageDone-t, crit eredményeket, levonogatni a Def statjaiból + KIIRATNI a kepernyore (Logic, a controllerben!!!
-
+        List<String> attackResultRow = sheetReader.mapSlashing.get(rollResult); //TODO az attackType-na megfelelo mapbol vegye az adatokat
+        //TODO List<String> attackResultRow: a rollResult alapjan a megfelelo tablazatbol vett lista
+        //TODO String attackResult: ay attackResultRow alapjan az adott panceltipushoz tartozo tenyleges eredmeny (pl 25E)
+        //TODO Integer attackResultDamage: az attackResult szam resze atparse-olva
+        //TODO Integer attackResultCritType: az attackResult utolso karaktere
+        //TODO az attackResultCritType alapjan CRIT dobas es crit ertekek (szoveges, HPadditional, HP/round, Stunned?/round, PenaltyforActions/round)
+        //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
     }
 
     @Override
