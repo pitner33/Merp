@@ -4,6 +4,7 @@ import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.characters.Player;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.googlesheetloader.SheetReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class FightServiceImpl implements FightService {
     private String roll4;
 
     @Autowired
-    private SheetReader sheetReader;
+    private MapsFromTabs mapsFromTabs;
 
     @Override
     public void attack(Player attacker, Player defender) {
@@ -34,7 +35,7 @@ public class FightServiceImpl implements FightService {
         Integer rollTB = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4);
         Integer rollResult = (fullTB + rollTB) - fullVB;
         //TODO táblázatból kikeresni a damageDone-t, crit eredményeket, levonogatni a Def statjaiból + KIIRATNI a kepernyore (Logic, a controllerben!!!
-        List<String> attackResultRow = sheetReader.mapSlashing.get(rollResult); //TODO az attackType-na megfelelo mapbol vegye az adatokat
+        List<String> attackResultRow = mapsFromTabs.getMapSlashing().get(rollResult); //TODO az attackType-na megfelelo mapbol vegye az adatokat
         //TODO List<String> attackResultRow: a rollResult alapjan a megfelelo tablazatbol vett lista
         //TODO String attackResult: ay attackResultRow alapjan az adott panceltipushoz tartozo tenyleges eredmeny (pl 25E)
         //TODO Integer attackResultDamage: az attackResult szam resze atparse-olva

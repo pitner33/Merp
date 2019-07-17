@@ -3,6 +3,7 @@ package com.sol.merp.controllers;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
+import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.googlesheetloader.SheetReader;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
@@ -24,7 +25,7 @@ public class MerpController {
     @Autowired
     private AttackModifierRepository attackModifierRepository;
     @Autowired
-    private SheetReader sheetReader; //TODO csak azert benne hogy mukodik-e - kivenni
+    private MapsFromTabs mapsFromTabs; //TODO csak azert benne hogy mukodik-e - kivenni
 
 
 
@@ -39,7 +40,7 @@ public class MerpController {
 
     @GetMapping("/allplayers")
     public String playerlist(Model model) {
-        System.out.println(sheetReader.mapSlashing.get(149).toString()); //TODO csak azert benne hogy mukodik-e - kivenni
+        System.out.println(mapsFromTabs.getMapSlashing().get(149).toString()); //TODO csak azert benne hogy mukodik-e - kivenni
         playerService.playerActivitySwitch();
         playerService.doNothingWhenStunned();
         model.addAttribute("players", playerRepository.findAll());
@@ -85,7 +86,7 @@ public class MerpController {
         for (Player player:allWhoPlays) {
             playerRepository.save(player);
         }
-        return "adventureMain";
+        return "redirect:/adventure";
     }
 
     @GetMapping("/adventure/round")
