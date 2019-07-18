@@ -5,6 +5,8 @@ import com.sol.merp.attributes.CritType;
 import com.sol.merp.characters.Player;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public interface FightService {
 
@@ -13,6 +15,20 @@ public interface FightService {
     Integer attackerTBWithAllModifiers(Player attacker);
 
     Integer defenderVBWithAllModifiers(Player defender);
+
+    List<String> getAttackResultRowByAttackType(Player attacker, Integer rollResult);
+
+    String getAttackResultFromRowByDefenderArmor(List<String> attackResultRow, Player defender);
+
+    void failRoll(String attackResult);
+
+    Integer getBaseDamageFromAttackResult(String attackResult);
+
+    String getCritFromAttackResult(String attackResult);
+
+    Integer getModifiedCritRoll(Integer critRoll, String crit);
+
+    List<String> getCritResultRow(Player attacker, Integer critRollModified);
 
     AttackType attackerWhichTBToUse(Player attacker);
 
