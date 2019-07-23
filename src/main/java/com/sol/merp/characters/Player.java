@@ -46,7 +46,7 @@ public class Player {
     private Integer mdKapcsolat;
     private ArmorType armorType;
     private Boolean isStunned;
-    private Integer penaltyForActivities;
+    private Integer penaltyOfActions;
     private Integer hpLossPerRound;
     private Integer perception;
     private Integer tracking; //nyomolvasas
@@ -89,7 +89,7 @@ public class Player {
         this.mdKapcsolat = mdKapcsolat;
         this.armorType = armorType;
         this.isStunned = false;
-        this.penaltyForActivities = 0;
+        this.penaltyOfActions = 0;
         this.hpLossPerRound = 0;
         this.perception = perception;
         this.tracking = tracking;
