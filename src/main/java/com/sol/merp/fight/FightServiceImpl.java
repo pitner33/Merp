@@ -7,13 +7,13 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.dto.DamageAndCritDTO;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -23,24 +23,18 @@ public class FightServiceImpl implements FightService {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private Player attacker;
-    private Player defender;
-    private String attackResult;
-    private Integer baseDamage;
-    private String crit;
-    private String critResultText = "none";
-    private Integer critResultAdditionalDamage = 0;
-    private Integer critResultHPLossPerRound = 0;
-    private Integer critResultStunnedForRounds = 0;
-    private Integer critResultPenaltyOfActions = 0;
-    private Integer fullDamage;
-    private String failResultText = "none";
-
     private D100Roll d100Roll;
     private String roll1;
     private String roll2;
     private String roll3;
     private String roll4;
+    private Player attacker;
+    private Player defender;
+
+    private String failResultText = "none";
+
+    @Autowired
+    DamageAndCritDTO damageAndCritDTO;
 
     @Autowired
     private MapsFromTabs mapsFromTabs;
@@ -60,10 +54,10 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackBaseMagic(Player attacker, Player defender) {
-        attackResult = getAttackResultString(attacker, defender);
+        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
-        if (attackResult.equals("Fail")) {
+        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
             return;
         }
@@ -71,10 +65,10 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackMagicBall(Player attacker, Player defender) {
-        attackResult = getAttackResultString(attacker, defender);
+        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
-        if (attackResult.equals("Fail")) {
+        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
             return;
         }
@@ -82,37 +76,47 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
-        attackResult = getAttackResultString(attacker, defender);
+        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results
-        if (attackResult.equals("Fail")) {
+        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
             return;
         }
 
         //ge the Damage as Integer and crit as String from attackResult String
-        baseDamage = getBaseDamageFromAttackResult(attackResult);
-        crit = getCritFromAttackResult(attackResult);
-        logger.info("BaseDamage : {}", baseDamage);
-        logger.info("Crit : {}", crit);
+        damageAndCritDTO.setBaseDamage(getBaseDamageFromAttackResult(damageAndCritDTO.getAttackResult()));
+        damageAndCritDTO.setCrit(getCritFromAttackResult(damageAndCritDTO.getAttackResult()));
+        logger.info("BaseDamage : {}", damageAndCritDTO.getBaseDamage());
+        logger.info("Crit : {}", damageAndCritDTO.getCrit());
 
-        if (!crit.equals("X")) {
-            critRoll(crit);
+        if (!damageAndCritDTO.getCrit().equals("X")) {
+            critRoll(damageAndCritDTO.getCrit());
         }
 
-        fullDamage = baseDamage - critResultAdditionalDamage;
-        logger.info("CRIT: effect: {}", critResultText);
-        logger.info("CRIT: Full damage: {}", fullDamage);
-        defender.setHpLossPerRound(defender.getHpLossPerRound() + critResultHPLossPerRound);
-        logger.info("CRIT: Hp loss per round: {}", critResultHPLossPerRound);
-        defender.setHpActual(defender.getHpActual() - fullDamage - defender.getHpLossPerRound()); //TODO HP/round??? + setHPactual methodba beletenni h nem halott-e
-        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + critResultPenaltyOfActions);
-        logger.info("CRIT: Penalty of actions: {}", critResultPenaltyOfActions);
-        if (critResultStunnedForRounds != 0) {
+        damageAndCritDTO.setFullDamageWithoutBleeding(damageAndCritDTO.getBaseDamage() + damageAndCritDTO.getCritResultAdditionalDamage());
+        logger.info("ATTACK: Full damage without bleeding: {}", damageAndCritDTO.getFullDamageWithoutBleeding());
+
+        logger.info("CRIT: effect: {}", damageAndCritDTO.getCritResultText());
+        logger.info("CRIT: Hp loss per round: {}", damageAndCritDTO.getCritResultHPLossPerRound());
+
+        defender.setHpLossPerRound(defender.getHpLossPerRound() + damageAndCritDTO.getCritResultHPLossPerRound());
+        damageAndCritDTO.setFullDamage(damageAndCritDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
+        logger.info("ATTACK: Full damage: {}", damageAndCritDTO.getFullDamage());
+
+        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + damageAndCritDTO.getCritResultPenaltyOfActions());
+        logger.info("CRIT: Penalty of actions: {}", damageAndCritDTO.getCritResultPenaltyOfActions());
+
+        if (damageAndCritDTO.getCritResultStunnedForRounds() != 0) {
+            defender.setStunnedForRounds(defender.getStunnedForRounds() + damageAndCritDTO.getCritResultStunnedForRounds());
             defender.setIsStunned(true);
             defender.setActivity(PlayerActivity._5DoNothing);
+            logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
             //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
         }
+
+        defender.setHpActual(defender.getHpActual() - damageAndCritDTO.getFullDamage()); //TODO HP/round??? + setHPactual methodba beletenni h nem halott-e
+        logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
         //TODO defender stats modify befor saving
         playerRepository.save(defender);
@@ -289,13 +293,11 @@ TODO      */
         //ctitRoll Results
         List<String> critResultRow = getCritResultRow(attacker, critRollModified);
 
-        //TODO az attackResultCritType alapjan CRIT dobas es crit ertekek (szoveges, HPadditional, HP/round, Stunned?/round, PenaltyforActions/round)
-        critResultText = critResultRow.get(0);
-        critResultAdditionalDamage = Integer.parseInt(critResultRow.get(1));
-        critResultHPLossPerRound = Integer.parseInt(critResultRow.get(2));
-        critResultStunnedForRounds = Integer.parseInt(critResultRow.get(3));
-        critResultPenaltyOfActions = Integer.parseInt(critResultRow.get(4));
-
+        damageAndCritDTO.setCritResultText(critResultRow.get(0));
+        damageAndCritDTO.setCritResultAdditionalDamage(Integer.parseInt(critResultRow.get(1)));
+        damageAndCritDTO.setCritResultHPLossPerRound(Integer.parseInt(critResultRow.get(2)));
+        damageAndCritDTO.setCritResultStunnedForRounds(Integer.parseInt(critResultRow.get(3)));
+        damageAndCritDTO.setCritResultPenaltyOfActions(Integer.parseInt(critResultRow.get(4)));
     }
 
     @Override

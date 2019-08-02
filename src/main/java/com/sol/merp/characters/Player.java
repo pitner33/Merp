@@ -32,7 +32,7 @@ public class Player {
     private CritType critType;
     private PlayerTarget target;
     private Double hpMax;
-    private Double hpActual;
+    private Double hpActual; //TODO setter cannot go below 0 - in case of dead character
     private Integer mm;
     private Integer tb;
     private Integer tbUsedForDefense;
@@ -46,6 +46,7 @@ public class Player {
     private Integer mdKapcsolat;
     private ArmorType armorType;
     private Boolean isStunned;
+    private Integer stunnedForRounds;
     private Integer penaltyOfActions;
     private Integer hpLossPerRound;
     private Integer perception;
@@ -89,6 +90,7 @@ public class Player {
         this.mdKapcsolat = mdKapcsolat;
         this.armorType = armorType;
         this.isStunned = false;
+        this.stunnedForRounds = 0;
         this.penaltyOfActions = 0;
         this.hpLossPerRound = 0;
         this.perception = perception;
