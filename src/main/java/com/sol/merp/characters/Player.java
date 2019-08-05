@@ -103,4 +103,23 @@ public class Player {
         this.stealth = stealth;
     }
 
+    public void setHpActual(Double hpActual) {
+        if (hpActual <= 0d) {
+            this.hpActual = 0d;
+            this.isActive = false;
+            this.activity = PlayerActivity._5DoNothing;
+        } else this.hpActual = hpActual;
+    }
+
+    public void setActive(Boolean active) {
+        if (this.hpActual <= 0) {
+            isActive = false;
+        } else isActive = active;
+    }
+
+    public void setActivity(PlayerActivity activity) {
+        if (this.hpActual <= 0) {
+            this.activity = PlayerActivity._5DoNothing;
+        } else this.activity = activity;
+    }
 }
