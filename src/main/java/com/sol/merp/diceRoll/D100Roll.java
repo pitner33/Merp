@@ -1,9 +1,12 @@
 package com.sol.merp.diceRoll;
 
 
+import org.springframework.stereotype.Component;
+
 import java.util.Random;
 
 
+@Component
 public class D100Roll {
 
     public Integer d100Random() {

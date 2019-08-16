@@ -3,6 +3,7 @@ package com.sol.merp.fight;
 import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.characters.Player;
+import com.sol.merp.dto.AttackResultsDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,7 +17,7 @@ public interface FightService {
 
     void attackMagicBall(Player attacker, Player defender);
 
-    void attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender);
+    AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender);
 
     String getAttackResultString(Player attacker, Player defender);
 
@@ -32,7 +33,7 @@ public interface FightService {
 
     List<String> getFailRollResultRow();
 
-    void critRoll(String crit);
+    void critRoll(Player attacker, String crit);
 
     Integer getBaseDamageFromAttackResult(String attackResult);
 

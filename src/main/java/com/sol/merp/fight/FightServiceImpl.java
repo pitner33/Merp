@@ -7,7 +7,7 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
-import com.sol.merp.dto.DamageAndCritDTO;
+import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +23,7 @@ public class FightServiceImpl implements FightService {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private D100Roll d100Roll;
+//    private D100Roll d100Roll;
     private String roll1;
     private String roll2;
     private String roll3;
@@ -31,16 +31,19 @@ public class FightServiceImpl implements FightService {
     private Player attacker;
     private Player defender;
 
-    private String failResultText = "none";
+
 
     @Autowired
-    DamageAndCritDTO damageAndCritDTO;
+    AttackResultsDTO attackResultsDTO;
 
     @Autowired
     private MapsFromTabs mapsFromTabs;
 
     @Autowired
     PlayerRepository playerRepository;
+
+    @Autowired
+    D100Roll d100Roll;
 
     @Override
     public void attack(Player attacker, Player defender) {
@@ -54,10 +57,10 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackBaseMagic(Player attacker, Player defender) {
-        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
-        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
+        if (attackResultsDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
             return;
         }
@@ -65,68 +68,73 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackMagicBall(Player attacker, Player defender) {
-        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
-        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
+        if (attackResultsDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
             return;
         }
     }
 
     @Override
-    public void attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
-        damageAndCritDTO.setAttackResult(getAttackResultString(attacker, defender));
+    public AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
 
-        //check if the attackresult is "Fail" and TODO do the Fail roll and results
-        if (damageAndCritDTO.getAttackResult().equals("Fail")) {
+        //check if the attackresult is "Fail" and TODO do the Fail roll and results Failrollba
+        if (attackResultsDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker);
-            return;
+            return attackResultsDTO;
+        } else {
+            //ge the Damage as Integer and crit as String from attackResult String
+            attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResultsDTO.getAttackResult()));
+            attackResultsDTO.setCrit(getCritFromAttackResult(attackResultsDTO.getAttackResult()));
+            logger.info("BaseDamage : {}", attackResultsDTO.getBaseDamage());
+            logger.info("Crit : {}", attackResultsDTO.getCrit());
+
+            if (!attackResultsDTO.getCrit().equals("X")) {
+                critRoll(attacker, attackResultsDTO.getCrit());
+            }
+
+            attackResultsDTO.setFullDamageWithoutBleeding(attackResultsDTO.getBaseDamage() + attackResultsDTO.getCritResultAdditionalDamage());
+            logger.info("CRIT: additional damage from crit: {}", attackResultsDTO.getCritResultAdditionalDamage());
+            logger.info("ATTACK: Full damage without bleeding: {}", attackResultsDTO.getFullDamageWithoutBleeding());
+
+            logger.info("CRIT: effect: {}", attackResultsDTO.getCritResultText());
+            logger.info("CRIT: Hp loss per round: {}", attackResultsDTO.getCritResultHPLossPerRound());
+
+            defender.setHpLossPerRound(defender.getHpLossPerRound() + attackResultsDTO.getCritResultHPLossPerRound());
+            attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
+            logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
+
+            defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+            logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
+
+            if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
+                defender.setStunnedForRounds(defender.getStunnedForRounds() + attackResultsDTO.getCritResultStunnedForRounds());
+                defender.setIsStunned(true);
+                defender.setActivity(PlayerActivity._5DoNothing);
+                logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
+                //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
+            }
+
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO HP/round??? + setHPactual methodba beletenni h nem halott-e
+            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+
+            //TODO defender stats modify befor saving
+            playerRepository.save(defender);
+
+            return attackResultsDTO;
         }
 
-        //ge the Damage as Integer and crit as String from attackResult String
-        damageAndCritDTO.setBaseDamage(getBaseDamageFromAttackResult(damageAndCritDTO.getAttackResult()));
-        damageAndCritDTO.setCrit(getCritFromAttackResult(damageAndCritDTO.getAttackResult()));
-        logger.info("BaseDamage : {}", damageAndCritDTO.getBaseDamage());
-        logger.info("Crit : {}", damageAndCritDTO.getCrit());
-
-        if (!damageAndCritDTO.getCrit().equals("X")) {
-            critRoll(damageAndCritDTO.getCrit());
-        }
-
-        damageAndCritDTO.setFullDamageWithoutBleeding(damageAndCritDTO.getBaseDamage() + damageAndCritDTO.getCritResultAdditionalDamage());
-        logger.info("ATTACK: Full damage without bleeding: {}", damageAndCritDTO.getFullDamageWithoutBleeding());
-
-        logger.info("CRIT: effect: {}", damageAndCritDTO.getCritResultText());
-        logger.info("CRIT: Hp loss per round: {}", damageAndCritDTO.getCritResultHPLossPerRound());
-
-        defender.setHpLossPerRound(defender.getHpLossPerRound() + damageAndCritDTO.getCritResultHPLossPerRound());
-        damageAndCritDTO.setFullDamage(damageAndCritDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
-        logger.info("ATTACK: Full damage: {}", damageAndCritDTO.getFullDamage());
-
-        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + damageAndCritDTO.getCritResultPenaltyOfActions());
-        logger.info("CRIT: Penalty of actions: {}", damageAndCritDTO.getCritResultPenaltyOfActions());
-
-        if (damageAndCritDTO.getCritResultStunnedForRounds() != 0) {
-            defender.setStunnedForRounds(defender.getStunnedForRounds() + damageAndCritDTO.getCritResultStunnedForRounds());
-            defender.setIsStunned(true);
-            defender.setActivity(PlayerActivity._5DoNothing);
-            logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
-            //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
-        }
-
-        defender.setHpActual(defender.getHpActual() - damageAndCritDTO.getFullDamage()); //TODO HP/round??? + setHPactual methodba beletenni h nem halott-e
-        logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
-
-        //TODO defender stats modify befor saving
-        playerRepository.save(defender);
     }
 
     @Override
     public String getAttackResultString(Player attacker, Player defender) {
         Integer fullTB = attackerTBWithAllModifiers(attacker);
         Integer fullVB = defenderVBWithAllModifiers(defender);
-        Integer rollTB = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4);
+//        Integer rollTB = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4); Todo kesobb megoldani a kockavel dobast es a beirast
+        Integer rollTB = d100Roll.d100RandomOpen();
         Integer rollResult = (fullTB + rollTB) - fullVB;
         //TODO táblázatból kikeresni a damageDone-t, crit eredményeket, levonogatni a Def statjaiból + KIIRATNI a kepernyore (Logic, a controllerben!!!
 
@@ -181,7 +189,7 @@ public class FightServiceImpl implements FightService {
                 IF fail:
                     failmodifier
 TODO      */
-        return null;
+        return attacker.getTb();
     }
 
     @Override
@@ -192,7 +200,7 @@ TODO      */
         Magia MD ide vagy kulon??? merthogz ay roll!
 
  TODO     */
-        return null;
+        return defender.getVb();
     }
 
     @Override
@@ -259,12 +267,12 @@ TODO      */
         if (attacker.getAttackType().equals(AttackType.baseMagic) ||
                 attacker.getAttackType().equals(AttackType.magicBall) ||
                 attacker.getAttackType().equals(AttackType.magicProjectile)) {
-            failResultText = failRollResultRow.get(2);
+            attackResultsDTO.setFailResultText(failRollResultRow.get(2));
         } else if (attacker.getAttackType().equals(AttackType.ranged)) {
-            failResultText = failRollResultRow.get(1);
-        } else failResultText = failRollResultRow.get(0);
+            attackResultsDTO.setFailResultText(failRollResultRow.get(1));
+        } else attackResultsDTO.setFailResultText(failRollResultRow.get(0));
 
-        logger.info("Fail effect: {}", failResultText);
+        logger.info("Fail effect: {}", attackResultsDTO.getFailResultText());
     }
 
     @Override
@@ -283,26 +291,26 @@ TODO      */
 
 
     @Override
-    public void critRoll(String crit) {
+    public void critRoll(Player attacker, String crit) {
         //crit roll between 0-100
         Integer critRoll = d100Roll.d100Random();
         Integer critRollModified = getModifiedCritRoll(critRoll, crit);
-        logger.info("CritRoll : {}", critRoll);
-        logger.info(" Modified CritRoll : {}", critRollModified);
+        logger.info("CRIT: CritRoll : {}", critRoll);
+        logger.info("CRIT: Modified CritRoll : {}", critRollModified);
 
         //ctitRoll Results
         List<String> critResultRow = getCritResultRow(attacker, critRollModified);
 
-        damageAndCritDTO.setCritResultText(critResultRow.get(0));
-        damageAndCritDTO.setCritResultAdditionalDamage(Integer.parseInt(critResultRow.get(1)));
-        damageAndCritDTO.setCritResultHPLossPerRound(Integer.parseInt(critResultRow.get(2)));
-        damageAndCritDTO.setCritResultStunnedForRounds(Integer.parseInt(critResultRow.get(3)));
-        damageAndCritDTO.setCritResultPenaltyOfActions(Integer.parseInt(critResultRow.get(4)));
+        attackResultsDTO.setCritResultText(critResultRow.get(0));
+        attackResultsDTO.setCritResultAdditionalDamage(Integer.parseInt(critResultRow.get(1)));
+        attackResultsDTO.setCritResultHPLossPerRound(Integer.parseInt(critResultRow.get(2)));
+        attackResultsDTO.setCritResultStunnedForRounds(Integer.parseInt(critResultRow.get(3)));
+        attackResultsDTO.setCritResultPenaltyOfActions(Integer.parseInt(critResultRow.get(4)));
     }
 
     @Override
     public Integer getBaseDamageFromAttackResult(String attackResult) {
-        return Integer.parseInt(attackResult.substring(0, attackResult.length() - 2));
+        return Integer.parseInt(attackResult.substring(0, attackResult.length() - 1));
     }
 
     @Override

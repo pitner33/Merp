@@ -6,6 +6,8 @@ import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -38,17 +40,17 @@ public class MerpApplication implements CommandLineRunner {
         }
         System.out.println("");
 
-        System.out.println(new D100Roll().d100FromRoll("10", "10", "10", "10")); //10
-        System.out.println(new D100Roll().d100FromRoll("96", "10", "10", "10")); //106
-        System.out.println(new D100Roll().d100FromRoll("96", "99", "10", "10")); //205
-        System.out.println(new D100Roll().d100FromRoll("96", "99", "97", "10")); //302
-        System.out.println(new D100Roll().d100FromRoll("5", "10", "10", "10")); //-5
-        System.out.println(new D100Roll().d100FromRoll("5", "97", "10", "10")); //-102
-        System.out.println(new D100Roll().d100FromRoll("5", "97", "98", "10")); //-200
-        System.out.println(new D100Roll().d100FromRoll("5", "15", "98", "10")); //-10
-        System.out.println(new D100Roll().d100FromRoll("96", "15", "98", "10")); //111
+//        System.out.println(new D100Roll().d100FromRoll("10", "10", "10", "10")); //10
+//        System.out.println(new D100Roll().d100FromRoll("96", "10", "10", "10")); //106
+//        System.out.println(new D100Roll().d100FromRoll("96", "99", "10", "10")); //205
+//        System.out.println(new D100Roll().d100FromRoll("96", "99", "97", "10")); //302
+//        System.out.println(new D100Roll().d100FromRoll("5", "10", "10", "10")); //-5
+//        System.out.println(new D100Roll().d100FromRoll("5", "97", "10", "10")); //-102
+//        System.out.println(new D100Roll().d100FromRoll("5", "97", "98", "10")); //-200
+//        System.out.println(new D100Roll().d100FromRoll("5", "15", "98", "10")); //-10
+//        System.out.println(new D100Roll().d100FromRoll("96", "15", "98", "10")); //111
 
-
+        System.out.println("NOW YOU CAN GO!");
     }
 
 

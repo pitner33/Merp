@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>MERP Player list</title>
+    <link rel="stylesheet" th:href="@{/style.css}"/>
+    <meta charset="utf-8"/>
+    <!-- Bootstrap CSS -->
+    <link href="/webjars/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet"/>    <!--Plus dependecies!!!!-->
+    <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">-->
+</head>
+<body>
+<div>
+    <div class="row">
+        <div class="col-xl-12">
+            <h1>MERP - ADVENTURE - FIGHT</h1>
+        </div>
+    </div>
+    <div>
+        <table class="table table-bordered">
+            <thead th:style="'background-color:gray'">
+            <tr>
+                <th>ID</th>
+                <th>Char ID</th>
+                <th>Name</th>
+                <th>Gender</th>
+                <th>Race</th>
+                <th>Class</th>
+                <th></th>
+                <th>Play in next adventure</th>
+                <th>Level</th>
+                <th>XP</th>
+                <th>Activity</th>
+                <th>Attack type</th>
+                <th>Critical type</th>
+                <th>HP max</th>
+                <th>HP actual</th>
+                <th>MM</th>
+                <th>TB</th>
+                <th>TB for defense</th>
+                <th>Secondary TB</th>
+                <th>Base Magic TB</th>
+                <th>Target Magic TB</th>
+                <th>VB</th>
+                <th>Shield</th>
+                <th>AGI bonus</th>
+                <th>MD Lenyeg</th>
+                <th>MD Kapcsolat</th>
+                <th>Armor Type</th>
+                <th>isStunned</th>
+                <th>Penalty for Activities</th>
+                <th>HP loss/round</th>
+                <th>Perception</th>
+                <th>Tracking</th>
+                <th>Lockpicking</th>
+                <th>Disarm Traps</th>
+                <th>Object usage</th>
+                <th>Runes</th>
+                <th>Influence</th>
+                <th>Stealth</th>
+                <th>EDIT</th>
+                <th>DEL</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="player : ${players}"
+                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                <td th:text="${player.getId()}"></td>
+                <td th:text="${player.getCharacterId()}"></td>
+                <td th:text="${player.getName()}"></td>
+                <td th:text="${player.getGender()}"></td>
+                <td th:text="${player.getRace()}"></td>
+                <td th:text="${player.getPlayerClass()}"></td>
+
+                <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Don'+'\\'+'t Play'"> </a></td>
+                <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Play'"> </a></td>
+
+                <td th:text="${player.getIsPlaying()}"></td>
+                <td th:text="${player.getLvl()}"></td>
+                <td th:text="${player.getXp()}"></td>
+                <td th:text="${player.getActivity()}"></td>
+                <td th:text="${player.getAttackType()}"></td>
+                <td th:text="${player.getCritType()}"></td>
+                <td th:text="${player.getHpMax()}"></td>
+                <td th:text="${player.getHpActual()}"></td>
+                <td th:text="${player.getMm()}"></td>
+                <td th:text="${player.getTb()}"></td>
+                <td th:text="${player.getTbUsedForDefense()}"></td>
+                <td th:text="${player.getSecondaryTB()}"></td>
+                <td th:text="${player.getBaseMagicTB()}"></td>
+                <td th:text="${player.getTargetMagicTB()}"></td>
+                <td th:text="${player.getVb()}"></td>
+                <td th:text="${player.getShield()}"></td>
+                <td th:text="${player.getAgilityBonus()}"></td>
+                <td th:text="${player.getMdLenyeg()}"></td>
+                <td th:text="${player.getMdKapcsolat()}"></td>
+                <td th:text="${player.getArmorType()}"></td>
+                <td th:text="${player.getIsStunned()}"></td>
+                <td th:text="${player.getPenaltyOfActions()}"></td>
+                <td th:text="${player.getHpLossPerRound()}"></td>
+                <td th:text="${player.getPerception()}"></td>
+                <td th:text="${player.getTracking()}"></td>
+                <td th:text="${player.getLockPicking()}"></td>
+                <td th:text="${player.getDisarmTraps()}"></td>
+                <td th:text="${player.getObjectUsage()}"></td>
+                <td th:text="${player.getRunes()}"></td>
+                <td th:text="${player.getInfluence()}"></td>
+                <td th:text="${player.getStealth()}"></td>
+                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
+                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
+                <td th:text="${player.getIsActive()}" type="text"></td>
+                <td th:value="${player.getTarget()}" type="text"></td>
+            </tbody>
+        </table>
+        <div  align="center">
+            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure}" th:text="'START ADVENTURE'"></a>
+        </div>
+        <div>
+            <p>fuck</p>
+        </div>
+        <div>
+            <p th:object="resultDTO" th:text="${resultDTO.getAttackResult()}"></p>
+            <p th:object="resultDTO" th:text="${resultDTO.getBaseDamage()}"></p>
+            <p th:object="resultDTO" th:text="${resultDTO.getCrit()}"></p>
+
+        </div>
+    </div>
+
+
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+        integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+        integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+        crossorigin="anonymous"></script>
+</body>
+</html>

@@ -3,21 +3,26 @@ package com.sol.merp.controllers;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
+import com.sol.merp.dto.AttackResultsDTO;
+import com.sol.merp.fight.FightService;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
-import com.sol.merp.googlesheetloader.SheetReader;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @Controller
 @RequestMapping("/merp")
 public class MerpController {
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
+
     @Autowired
     private PlayerRepository playerRepository;
     @Autowired
@@ -26,6 +31,8 @@ public class MerpController {
     private AttackModifierRepository attackModifierRepository;
     @Autowired
     private MapsFromTabs mapsFromTabs; //TODO csak azert benne hogy mukodik-e - kivenni
+    @Autowired
+    FightService fightService;
 
 
 
@@ -104,5 +111,21 @@ public class MerpController {
 
         System.out.println(attackModifier.countAttackModifier());
         return "adventureMain";
+    }
+
+    @GetMapping("/adventure/fight")
+    public String fight(Model model, Model model2) {
+        List<Player> playersFight = new ArrayList<>();
+        Player attacker = playerRepository.findById(1L).get();
+        Player defender = playerRepository.findById(7L).get();
+        playersFight.add(attacker);
+        playersFight.add(defender);
+
+        AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker,defender);
+
+        model.addAttribute("players", playersFight);
+        model2.addAttribute("resultDTO", attackResultsDTO);
+
+        return "adventureFight";
     }
 }
