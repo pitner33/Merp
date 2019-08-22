@@ -25,8 +25,6 @@
                 <th>Gender</th>
                 <th>Race</th>
                 <th>Class</th>
-                <th></th>
-                <th>Play in next adventure</th>
                 <th>Level</th>
                 <th>XP</th>
                 <th>Activity</th>
@@ -49,14 +47,6 @@
                 <th>isStunned</th>
                 <th>Penalty for Activities</th>
                 <th>HP loss/round</th>
-                <th>Perception</th>
-                <th>Tracking</th>
-                <th>Lockpicking</th>
-                <th>Disarm Traps</th>
-                <th>Object usage</th>
-                <th>Runes</th>
-                <th>Influence</th>
-                <th>Stealth</th>
                 <th>EDIT</th>
                 <th>DEL</th>
             </tr>
@@ -70,11 +60,6 @@
                 <td th:text="${player.getGender()}"></td>
                 <td th:text="${player.getRace()}"></td>
                 <td th:text="${player.getPlayerClass()}"></td>
-
-                <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Don'+'\\'+'t Play'"> </a></td>
-                <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm" th:href="@{'/merp/edit_isplay/' + ${player.getId()}}" th:text="'Play'"> </a></td>
-
-                <td th:text="${player.getIsPlaying()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
                 <td th:text="${player.getActivity()}"></td>
@@ -97,31 +82,68 @@
                 <td th:text="${player.getIsStunned()}"></td>
                 <td th:text="${player.getPenaltyOfActions()}"></td>
                 <td th:text="${player.getHpLossPerRound()}"></td>
-                <td th:text="${player.getPerception()}"></td>
-                <td th:text="${player.getTracking()}"></td>
-                <td th:text="${player.getLockPicking()}"></td>
-                <td th:text="${player.getDisarmTraps()}"></td>
-                <td th:text="${player.getObjectUsage()}"></td>
-                <td th:text="${player.getRunes()}"></td>
-                <td th:text="${player.getInfluence()}"></td>
-                <td th:text="${player.getStealth()}"></td>
-                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
-                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
+                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}"
+                       th:text="'EDIT'"> </a></td>
+                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}"
+                       th:text="'DEL'"> </a></td>
                 <td th:text="${player.getIsActive()}" type="text"></td>
                 <td th:value="${player.getTarget()}" type="text"></td>
+            </tr>
             </tbody>
         </table>
-        <div  align="center">
-            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure}" th:text="'START ADVENTURE'"></a>
+        <div align="center">
+            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>
         </div>
-        <div>
-            <p>fuck</p>
-        </div>
-        <div>
-            <p th:object="resultDTO" th:text="${resultDTO.getAttackResult()}"></p>
-            <p th:object="resultDTO" th:text="${resultDTO.getBaseDamage()}"></p>
-            <p th:object="resultDTO" th:text="${resultDTO.getCrit()}"></p>
 
+        <div>
+            <table class="table table-bordered">
+                <thead th:style="'background-color:gray'">
+                <tr>
+                    <th>Attack Result</th>
+                    <th>Base damage</th>
+                    <th>Crit type</th>
+                    <th>Crit result</th>
+                    <th>Crit additional damage</th>
+                    <th>Crit HPloss/round</th>
+                    <th>Crit Stunned/round</th>
+                    <th>Crit Penalty of actions</th>
+                    <th>Full damage without bleeding</th>
+                    <th>Full damage</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td th:text="${resultDTO.getAttackResult()}"></td>
+                    <td th:text="${resultDTO.getBaseDamage()}"></td>
+                    <td th:text="${resultDTO.getCrit()}"></td>
+                    <td th:text="${resultDTO.getCritResultText()}"></td>
+                    <td th:text="${resultDTO.getCritResultAdditionalDamage()}"></td>
+                    <td th:text="${resultDTO.getCritResultHPLossPerRound()}"></td>
+                    <td th:text="${resultDTO.getCritResultStunnedForRounds()}"></td>
+                    <td th:text="${resultDTO.getCritResultPenaltyOfActions()}"></td>
+                    <td th:text="${resultDTO.getFullDamageWithoutBleeding()}"></td>
+                    <td th:text="${resultDTO.getFullDamage()}"></td>
+                </tr>
+                </tbody>
+            </table>
+
+        </div>
+        <div>
+            <div>
+                <table class="table table-bordered">
+                    <thead th:style="'background-color:gray'">
+                    <tr>
+                        <th>Fail Result</th>
+
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td th:text="${resultDTO.getFailResultText()}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
