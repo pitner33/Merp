@@ -19,7 +19,7 @@ public interface FightService {
 
     AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender);
 
-    String getAttackResultString(Player attacker, Player defender);
+    String getAttackResultString(Player attacker, Player defender, AttackResultsDTO attackResultsDTO);
 
     Integer attackerTBWithAllModifiers(Player attacker);
 
@@ -29,11 +29,11 @@ public interface FightService {
 
     String getAttackResultFromRowByDefenderArmor(List<String> attackResultRow, Player defender);
 
-    void failRoll(Player attacker);
+    void failRoll(Player attacker, AttackResultsDTO attackResultsDTO);
 
     List<String> getFailRollResultRow();
 
-    void critRoll(Player attacker, String crit);
+    void critRoll(Player attacker, String crit, AttackResultsDTO attackResultsDTO);
 
     Integer getBaseDamageFromAttackResult(String attackResult);
 

@@ -146,6 +146,24 @@
             </div>
         </div>
     </div>
+    <div class="alert alert-info" role="alert">
+        <strong th:text="${resultDTO.getD100OpenRoll()}"></strong>
+    </div>
+    <div class="alert alert-info" role="alert">
+        <strong th:text="${resultDTO.getRollResult()}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert">
+        <strong th:text="${resultDTO.getAttackResult()}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert">
+        <strong th:text="${resultDTO.getCritResultText()}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert">
+        <strong th:text="'Full damage: ' + ${resultDTO.getFullDamage()}"></strong>
+    </div>
+    <div class="alert alert-danger" role="alert">
+        <strong th:text="${resultDTO.getFailResultText()}"></strong>
+    </div>
 
 
 </div>

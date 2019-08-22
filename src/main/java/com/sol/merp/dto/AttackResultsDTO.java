@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 public class AttackResultsDTO {
+    private Integer d100OpenRoll;
+    private Integer rollResult;
     private String attackResult;
     private Integer baseDamage;
     private String crit;

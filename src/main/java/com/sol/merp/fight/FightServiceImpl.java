@@ -33,8 +33,8 @@ public class FightServiceImpl implements FightService {
 
 
 
-    @Autowired
-    AttackResultsDTO attackResultsDTO;
+//    @Autowired
+//    AttackResultsDTO attackResultsDTO;
 
     @Autowired
     private MapsFromTabs mapsFromTabs;
@@ -57,35 +57,45 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackBaseMagic(Player attacker, Player defender) {
-        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
-            failRoll(attacker);
+            failRoll(attacker, attackResultsDTO);
             return;
         }
     }
 
     @Override
     public void attackMagicBall(Player attacker, Player defender) {
-        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
-            failRoll(attacker);
+            failRoll(attacker, attackResultsDTO);
             return;
         }
     }
 
     @Override
     public AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
-        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender));
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
         //check if the attackresult is "Fail" and TODO do the Fail roll and results Failrollba
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
-            failRoll(attacker);
+            //even in case of Fail, the defender suffers damage from bleeding in the given round
+            attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+            playerRepository.save(defender);
+
+            failRoll(attacker, attackResultsDTO);
             return attackResultsDTO;
         } else {
+//            attackResultsDTO.setFailResultText("none"); //from previous rounds it should not stay in
             //ge the Damage as Integer and crit as String from attackResult String
             attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResultsDTO.getAttackResult()));
             attackResultsDTO.setCrit(getCritFromAttackResult(attackResultsDTO.getAttackResult()));
@@ -93,7 +103,7 @@ public class FightServiceImpl implements FightService {
             logger.info("Crit : {}", attackResultsDTO.getCrit());
 
             if (!attackResultsDTO.getCrit().equals("X")) {
-                critRoll(attacker, attackResultsDTO.getCrit());
+                critRoll(attacker, attackResultsDTO.getCrit(), attackResultsDTO);
             }
 
             attackResultsDTO.setFullDamageWithoutBleeding(attackResultsDTO.getBaseDamage() + attackResultsDTO.getCritResultAdditionalDamage());
@@ -130,22 +140,35 @@ public class FightServiceImpl implements FightService {
     }
 
     @Override
-    public String getAttackResultString(Player attacker, Player defender) {
+    public String getAttackResultString(Player attacker, Player defender, AttackResultsDTO attackResultsDTO) {
         Integer fullTB = attackerTBWithAllModifiers(attacker);
         Integer fullVB = defenderVBWithAllModifiers(defender);
-//        Integer rollTB = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4); Todo kesobb megoldani a kockavel dobast es a beirast
-        Integer rollTB = d100Roll.d100RandomOpen();
-        Integer rollResult = (fullTB + rollTB) - fullVB;
-        //TODO táblázatból kikeresni a damageDone-t, crit eredményeket, levonogatni a Def statjaiból + KIIRATNI a kepernyore (Logic, a controllerben!!!
+//        Integer d100OpenRoll = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4); Todo kesobb megoldani a kockavel dobast es a beirast
+        Integer d100OpenRoll = d100Roll.d100RandomOpen();
+        Integer rollResult = (fullTB + d100OpenRoll) - fullVB;
 
-        //based on attack type and rollResult get the attack resultrow from the corresponding map
-        List<String> attackResultRow = getAttackResultRowByAttackType(attacker, rollResult);
-        logger.info("AttackResultRow : {}", attackResultRow);
+        attackResultsDTO.setD100OpenRoll(d100OpenRoll);
+        attackResultsDTO.setRollResult(rollResult);
 
-        //from the resultRow get the actual result (eg. 25E) as String by defender's armor
-        String attackResult = getAttackResultFromRowByDefenderArmor(attackResultRow, defender);
-        logger.info("AttackResult : {}", attackResult);
-        return attackResult;
+//check if D100 roll gives Fail result - that's the only way for Fail
+        List<String> attackResultRowD100 = getAttackResultRowByAttackType(attacker, d100OpenRoll);
+        String attackResultD100 = getAttackResultFromRowByDefenderArmor(attackResultRowD100, defender);
+
+        if (attackResultD100.equals("Fail")) {
+            return  attackResultD100;
+        } else {
+//based on attack type and rollResult get the attack resultrow from the corresponding map
+            List<String> attackResultRow = getAttackResultRowByAttackType(attacker, rollResult);
+            logger.info("AttackResultRow : {}", attackResultRow);
+
+            //from the resultRow get the actual result (eg. 25E) as String by defender's armor
+            String attackResult = getAttackResultFromRowByDefenderArmor(attackResultRow, defender);
+            logger.info("AttackResult : {}", attackResult);
+//check if attackresult gives Fail - in which case it must be overwrite to 0X, because fail is not possible in this level
+            if (attackResult.equals("Fail")) {
+                return "0X";
+            } else return attackResult;
+        }
     }
 
     @Override
@@ -260,8 +283,7 @@ TODO      */
     }
 
     @Override
-    public void failRoll(Player attacker) {
-
+    public void failRoll(Player attacker, AttackResultsDTO attackResultsDTO) {
         List<String> failRollResultRow = getFailRollResultRow();
 
         if (attacker.getAttackType().equals(AttackType.baseMagic) ||
@@ -291,7 +313,8 @@ TODO      */
 
 
     @Override
-    public void critRoll(Player attacker, String crit) {
+    public void critRoll(Player attacker, String crit, AttackResultsDTO attackResultsDTO) {
+        //TODO Manage 'if' type and 'instant death' results
         //crit roll between 0-100
         Integer critRoll = d100Roll.d100Random();
         Integer critRollModified = getModifiedCritRoll(critRoll, crit);
@@ -388,11 +411,6 @@ TODO      */
     public String critEffect(Integer rollResult) {
         return null;
     }
-
-//    @Override
-//    public Integer critRoll(String critEffect) {
-//        return null;
-//    }
 
     @Override
     public String critDescription(Integer critRoll) {
