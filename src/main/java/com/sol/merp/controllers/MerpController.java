@@ -1,6 +1,11 @@
 package com.sol.merp.controllers;
 
+import com.sol.merp.attributes.AttackType;
+import com.sol.merp.attributes.CritType;
+import com.sol.merp.attributes.PlayerActivity;
+import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.characters.Player;
+import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
 import com.sol.merp.dto.AttackResultsDTO;
@@ -105,24 +110,29 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/round")
-    public String round(Model orderedListModel, Model modifierModel, Model roundCountModel) {
+    public String round(Model modelOrderedList, Model modelModifiers, Model modelRoundCount, Model modelPlayerActivity, Model modelAttackType, Model modelCritType, Model modelPlayerTarget) {
         fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
         round.setRoundCount(round.getRoundCount() + 1);
-        roundCountModel.addAttribute("roundCount", round.getRoundCount());
-        modifierModel.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
-        orderedListModel.addAttribute("orderedList", playerService.adventurersOrderedList());
+
+        PlayerListObject playerListObject = new PlayerListObject();
+        playerListObject.setPlayerList(playerService.adventurersOrderedList());
+
+        modelRoundCount.addAttribute("modelRoundCount", round.getRoundCount());
+        modelModifiers.addAttribute("modelModifiers", attackModifierRepository.findById(13L).get());
+        modelOrderedList.addAttribute("modelOrderedList", playerListObject);
+        modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
+        modelAttackType.addAttribute("modelAttackType", AttackType.values());
+        modelCritType.addAttribute("modelCritType", CritType.values());
+        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
         return  "adventureRound";
     }
 
     @PostMapping("/adventure/round")
-    public String roundPost(@ModelAttribute(value = "attackmodifier") AttackModifier attackModifier) {
-        attackModifierRepository.save(attackModifier);
-        System.out.println(attackModifier.getAttackerHPBelow50Percent());
-        System.out.println(attackModifier.getAttackFromBehind());
-        System.out.println(attackModifier.getDefenderStunned());
-
-        System.out.println(attackModifier.countAttackModifier());
-        return "adventureMain";
+    public String roundPost(@ModelAttribute(value = "modelOrderedList") PlayerListObject playerListObject) {
+        playerListObject.getPlayerList().forEach(player -> {
+            playerRepository.save(player);
+        });
+        return "redirect:/merp/adventure/round";
     }
 
     @GetMapping("/adventure/prefight")

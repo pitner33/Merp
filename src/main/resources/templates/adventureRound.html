@@ -9,114 +9,320 @@
     <!--<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">-->
 </head>
 <body>
+<div class="row">
+    <div class="col-xl-12">
+        <h1 th:text="'MERP - ADVENTURE - Round: ' + ${modelRoundCount}"></h1>
+    </div>
+</div>
+
 <div>
-    <div class="row">
-        <div class="col-xl-12">
-            <h1 th:text="'MERP - ADVENTURE - Round: ' + ${roundCount}"></h1>
-        </div>
-    </div>
+    <form th:action="@{'/merp/adventure/round'}" th:object="${modelOrderedList}" method="post">
+        <div class="form-group">
+            <div>
+                <table class="table table-bordered">
+                    <thead th:style="'background-color:gray'">
+                    <tr>
+                        <th>ID</th>
+                        <th>Char ID</th>
+                        <th>Name</th>
+                        <th>Gender</th>
+                        <th>Race</th>
+                        <th>Class</th>
+                        <th>Level</th>
+                        <th>XP</th>
+                        <th>Activity</th>
+                        <th>Target</th>
+                        <th>Attack type</th>
+                        <th>Critical type</th>
+                        <th>HP max</th>
+                        <th>HP actual</th>
+                        <th>MM</th>
+                        <th>TB</th>
+                        <th>TB for defense</th>
+                        <th>Secondary TB</th>
+                        <th>Base Magic TB</th>
+                        <th>Target Magic TB</th>
+                        <th>VB</th>
+                        <th>Shield</th>
+                        <th>AGI bonus</th>
+                        <th>MD Lenyeg</th>
+                        <th>MD Kapcsolat</th>
+                        <th>Armor Type</th>
+                        <th>isStunned</th>
+                        <th>Stunned for rounds</th>
+                        <th>Penalty for Activities</th>
+                        <th>HP loss/round</th>
+                        <th>Is Active</th>
 
+
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="player, i : ${modelOrderedList.playerList}"
+                        th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].id}"
+                                   th:field="*{playerList[__${i.index}__].id}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].characterId}"
+                                   th:field="*{playerList[__${i.index}__].characterId}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].name}"
+                                   th:field="*{playerList[__${i.index}__].name}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].gender}"
+                                   th:field="*{playerList[__${i.index}__].gender}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].race}"
+                                   th:field="*{playerList[__${i.index}__].race}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].playerClass}"
+                                   th:field="*{playerList[__${i.index}__].playerClass}">
+                        </td>
+
+
+
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].lvl}"
+                                   th:field="*{playerList[__${i.index}__].lvl}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].xp}"
+                                   th:field="*{playerList[__${i.index}__].xp}">
+                        </td>
+
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <select class="form-control" th:field="*{playerList[__${i.index}__].playerActivity}">
+                                <option th:each="playerActivityElement : ${modelPlayerActivity}"
+                                        th:value="${playerActivityElement}"
+                                        th:text="${playerActivityElement}"
+                                        th:selected="${playerActivityElement}">
+                                </option>
+                            </select>
+                        </td>
+                        <!--########################################-->
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <select class="form-control" th:field="*{playerList[__${i.index}__].target}">
+                                <option th:each="playerTargetElement : ${modelPlayerTarget}"
+                                        th:value="${playerTargetElement}"
+                                        th:text="${playerTargetElement}"
+                                        th:selected="${playerTargetElement}">
+                                </option>
+                            </select>
+                        </td>
+                        <!--########################################-->
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <select class="form-control" th:field="*{playerList[__${i.index}__].attackType}">
+                                <option th:each="attackTypeElement : ${modelAttackType}"
+                                        th:value="${attackTypeElement}"
+                                        th:text="${attackTypeElement}"
+                                        th:selected="${attackTypeElement}">
+                                </option>
+                            </select>
+                        </td>
+                        <!--########################################-->
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <select class="form-control" th:field="*{playerList[__${i.index}__].critType}">
+                                <option th:each="critTypeElement : ${modelCritType}"
+                                        th:value="${critTypeElement}"
+                                        th:text="${critTypeElement}"
+                                        th:selected="${critTypeElement}">
+                                </option>
+                            </select>
+                        </td>
+                        <!--########################################-->
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].hpMax}"
+                                   th:field="*{playerList[__${i.index}__].hpMax}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].hpActual}"
+                                   th:field="*{playerList[__${i.index}__].hpActual}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].mm}"
+                                   th:field="*{playerList[__${i.index}__].mm}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].tb}"
+                                   th:field="*{playerList[__${i.index}__].tb}">
+                        </td>
+
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <input class="form-control" type="text"
+                                   th:field="*{playerList[__${i.index}__].tbUsedForDefense}">
+                        </td>
+                        <!--########################################-->
+
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].secondaryTB}"
+                                   th:field="*{playerList[__${i.index}__].secondaryTB}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].baseMagicTB}"
+                                   th:field="*{playerList[__${i.index}__].baseMagicTB}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].targetMagicTB}"
+                                   th:field="*{playerList[__${i.index}__].targetMagicTB}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].vb}"
+                                   th:field="*{playerList[__${i.index}__].vb}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden" th:text="*{playerList[__${i.index}__].shield}"
+                                   th:field="*{playerList[__${i.index}__].shield}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].agilityBonus}"
+                                   th:field="*{playerList[__${i.index}__].agilityBonus}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].mdLenyeg}"
+                                   th:field="*{playerList[__${i.index}__].mdLenyeg}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].mdKapcsolat}"
+                                   th:field="*{playerList[__${i.index}__].mdKapcsolat}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].armorType}"
+                                   th:field="*{playerList[__${i.index}__].armorType}">
+                        </td>
+
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <input class="form-control" type="text"
+                                   th:field="*{playerList[__${i.index}__].isStunned}">
+                        </td>
+<!--                        <td>-->
+<!--                            <input class="form-control" type="checkbox"-->
+<!--                                   th:value="*{playerList[__${i.index}__].isStunned}"-->
+<!--                                   th:checked="*{playerList[__${i.index}__].isStunned}">-->
+<!--                        </td>-->
+                        <!--########################################-->
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <input class="form-control" type="text"
+                                   th:field="*{playerList[__${i.index}__].stunnedForRounds}">
+                        </td>
+                        <!--########################################-->
+
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].penaltyOfActions}"
+                                   th:field="*{playerList[__${i.index}__].penaltyOfActions}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:text="*{playerList[__${i.index}__].hpLossPerRound}"
+                                   th:field="*{playerList[__${i.index}__].hpLossPerRound}">
+                        </td>
+
+
+                        <!--########################################-->
+                        <td style="width: 10%">
+                            <input class="form-control" type="text"
+                                   th:field="*{playerList[__${i.index}__].isActive}">
+                        </td>
+                        <!--                            <td style="width: 10%">-->
+                        <!--                                <input class="form-control" type="checkbox"-->
+                        <!--                                       th:checked="*{playerList[__${i.index}__].isActive}"-->
+                        <!--                                       th:value="*{playerList[__${i.index}__].isActive}"-->
+                        <!--                                        th:field="*{playerList[__${i.index}__].isActive}"-->
+                        <!--                                       th:selected="*{playerList[__${i.index}__].isActive}">-->
+                        <!--                            </td>-->
+                        <!--########################################-->
+
+
+
+                    </tbody>
+                </table>
+                <table>
+<!--                    <thead></thead>-->
+                    <tbody>
+                    <tr th:each="player, i : ${modelOrderedList.playerList}"
+                        th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].isPlaying}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].perception}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].tracking}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].lockPicking}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].disarmTraps}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].objectUsage}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].runes}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].influence}">
+                        </td>
+                        <td>
+                            <input class="form-control" type="hidden"
+                                   th:field="*{playerList[__${i.index}__].stealth}">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
+            </div>
+        </div>
+    </form>
     <div>
-        <table class="table table-bordered">
-            <thead th:style="'background-color:gray'">
-            <tr>
-                <th>ID</th>
-                <th>Char ID</th>
-                <th>Name</th>
-                <th>Gender</th>
-                <th>Race</th>
-                <th>Class</th>
-                <th>Level</th>
-                <th>XP</th>
-
-                <th>Target</th>
-                <th>Activity</th>
-                <th>Attack type</th>
-                <th>Critical type</th>
-
-                <th>HP max</th>
-                <th>HP actual</th>
-                <th>MM</th>
-                <th>TB</th>
-
-                <th>TB for defense</th>
-
-                <th>Secondary TB</th>
-                <th>Base Magic TB</th>
-                <th>Target Magic TB</th>
-                <th>VB</th>
-                <th>Shield</th>
-                <th>AGI bonus</th>
-                <th>MD Lenyeg</th>
-                <th>MD Kapcsolat</th>
-                <th>Armor Type</th>
-                <th>isStunned</th>
-                <th>Penalty for Activities</th>
-                <th>HP loss/round</th>
-
-                <th>EDIT</th>
-
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="player : ${orderedList}"
-                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
-                <td th:text="${player.getId()}"></td>
-                <td th:text="${player.getCharacterId()}"></td>
-                <td th:text="${player.getName()}"></td>
-                <td th:text="${player.getGender()}"></td>
-                <td th:text="${player.getRace()}"></td>
-                <td th:text="${player.getPlayerClass()}"></td>
-                <td th:text="${player.getLvl()}"></td>
-                <td th:text="${player.getXp()}"></td>
-
-                <td th:text="${player.getTarget()}"></td>
-                <td th:text="${player.getActivity()}"></td>
-                <td th:text="${player.getAttackType()}"></td>
-                <td th:text="${player.getCritType()}"></td>
-
-                <td th:text="${player.getHpMax()}"></td>
-                <td th:text="${player.getHpActual()}"></td>
-                <td th:text="${player.getMm()}"></td>
-                <td th:text="${player.getTb()}"></td>
-
-                <td th:text="${player.getTbUsedForDefense()}"></td>
-
-                <td th:text="${player.getSecondaryTB()}"></td>
-                <td th:text="${player.getBaseMagicTB()}"></td>
-                <td th:text="${player.getTargetMagicTB()}"></td>
-                <td th:text="${player.getVb()}"></td>
-                <td th:text="${player.getShield()}"></td>
-                <td th:text="${player.getAgilityBonus()}"></td>
-                <td th:text="${player.getMdLenyeg()}"></td>
-                <td th:text="${player.getMdKapcsolat()}"></td>
-                <td th:text="${player.getArmorType()}"></td>
-                <td th:text="${player.getIsStunned()}"></td>
-                <td th:text="${player.getPenaltyOfActions()}"></td>
-                <td th:text="${player.getHpLossPerRound()}"></td>
-
-                <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}"
-                       th:text="'EDIT'"> </a></td>
-
-                <td th:text="${player.getIsActive()}" type="text"></td>
-<!--                <td th:value="${player.getTarget()}" type="text"></td>-->
-            </tr>
-            </tbody>
-        </table>
+        <a class="btn btn-lg btn-info" th:href="@{/merp/addplayer}" th:text="'ADD NEW PLAYER'"></a>
     </div>
-        <div>
-            <a class="btn btn-lg btn-info" th:href="@{/merp/addplayer}" th:text="'ADD NEW PLAYER'"></a>
-        </div>
-        <div align="center">
-            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/prefight}" th:text="'START FIGHT'"></a>
-        </div>
+    <div align="center">
+        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/prefight}" th:text="'START FIGHT'"></a>
+    </div>
     <div align="center">
         <a class="btn btn-lg btn-info" th:href="@{/merp/adventure}" th:text="'BACK TO ADVENTURE'"></a>
     </div>
-    </div>
-
+</div>
 
 </div>
+
+
 <!-- Optional JavaScript -->
 <!-- jQuery first, then Popper.js, then Bootstrap JS -->
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"

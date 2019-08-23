@@ -78,7 +78,7 @@
                             <input class="form-control" type="text" th:field="*{xp}">
                         </td>
                         <td style="width: 8%">
-                            <select class="form-control" th:field="*{{activity}}">
+                            <select class="form-control" th:field="*{{getPlayerActivity}}">
                                 <option th:each="activity : ${T(com.sol.merp.attributes.PlayerActivity).values()}"
                                         th:value="${{activity}}"
                                         th:text="${{activity}}"

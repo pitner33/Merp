@@ -30,7 +30,7 @@ public class PlayerServiceImpl implements PlayerService {
     public void playerActivitySwitch() {
         List<Player> allPlayers = playerRepository.findAll();
         for (Player player:allPlayers) {
-            if (player.getIsStunned() || isPlayerDead(player) || player.getActivity().equals(PlayerActivity._4PrepareMagic) || player.getActivity().equals(PlayerActivity._5DoNothing)) {
+            if (player.getIsStunned() || isPlayerDead(player) || player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic) || player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) {
                 player.setIsActive(false);
 
             } else player.setIsActive(true);
@@ -43,7 +43,7 @@ public class PlayerServiceImpl implements PlayerService {
         List<Player> allPlayers = playerRepository.findAll();
         for (Player player:allPlayers) {
             if (player.getIsStunned()) {
-                player.setActivity(PlayerActivity._5DoNothing);
+                player.setPlayerActivity(PlayerActivity._5DoNothing);
                 playerRepository.save(player);
             }
         }
@@ -73,13 +73,13 @@ public class PlayerServiceImpl implements PlayerService {
         //findAllWhoPlays list
         //Comparator isActive --> activity --> MM
         //return
-        playerActivitySwitch();
-        doNothingWhenStunned();
+//        playerActivitySwitch(); //Todo Put them back working!!!
+//        doNothingWhenStunned();
         List<Player> allWhoPlays = playerRepository.findAllByIsPlayingIsTrue();
 
         Comparator<Player> orderByIsActiveThenActivityThenMM = Comparator
                 .comparing(Player::getIsActive).reversed()
-                .thenComparing(Player::getActivity).reversed()
+                .thenComparing(Player::getPlayerActivity).reversed()
                 .thenComparing(Player::getMm).reversed();
         Collections.sort(allWhoPlays, orderByIsActiveThenActivityThenMM);
         System.out.println(allWhoPlays.toString());

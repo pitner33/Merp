@@ -111,7 +111,7 @@ public class FightServiceImpl implements FightService {
             if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
                 defender.setStunnedForRounds(defender.getStunnedForRounds() + attackResultsDTO.getCritResultStunnedForRounds());
                 defender.setIsStunned(true);
-                defender.setActivity(PlayerActivity._5DoNothing);
+                defender.setPlayerActivity(PlayerActivity._5DoNothing);
                 logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
                 //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
             }

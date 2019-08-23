@@ -27,7 +27,7 @@ public class Player {
     private Boolean isActive; //capable for actions
     private Integer lvl;
     private Double xp;
-    private PlayerActivity activity;
+    private PlayerActivity playerActivity;
     private AttackType attackType;
     private CritType critType;
     private PlayerTarget target;
@@ -71,7 +71,7 @@ public class Player {
         this.isActive = true;
         this.lvl = lvl;
         this.xp = Double.valueOf(lvl * 1000);
-        this.activity = PlayerActivity._5DoNothing;
+        this.playerActivity = PlayerActivity._5DoNothing;
         this.attackType = attackType;
         this.critType = critType;
         this.target = target;
@@ -114,7 +114,7 @@ public class Player {
         this.isActive = true;
         this.lvl = lvl;
         this.xp = Double.valueOf(lvl * 1000);
-        this.activity = PlayerActivity._5DoNothing;
+        this.playerActivity = PlayerActivity._5DoNothing;
         this.attackType = attackType;
         this.critType = critType;
         this.target = PlayerTarget.none;
@@ -150,19 +150,19 @@ public class Player {
         if (hpActual <= 0d) {
             this.hpActual = 0d;
             this.isActive = false;
-            this.activity = PlayerActivity._5DoNothing;
+            this.playerActivity = PlayerActivity._5DoNothing;
         } else this.hpActual = hpActual;
     }
 
-    public void setActive(Boolean active) {
-        if (this.hpActual <= 0) {
+    public void setActive() {
+        if ((this.hpActual <= 0 ) || (this.playerActivity == PlayerActivity._5DoNothing) || (this.isStunned)) {
             isActive = false;
-        } else isActive = active;
+        } else isActive = true;
     }
 
-    public void setActivity(PlayerActivity activity) {
+    public void setPlayerActivity(PlayerActivity playerActivity) {
         if (this.hpActual <= 0) {
-            this.activity = PlayerActivity._5DoNothing;
-        } else this.activity = activity;
+            this.playerActivity = PlayerActivity._5DoNothing;
+        } else this.playerActivity = playerActivity;
     }
 }
