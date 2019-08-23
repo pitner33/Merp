@@ -43,6 +43,8 @@ public interface FightService {
 
     List<String> getCritResultRow(Player attacker, Integer critRollModified);
 
+
+
     AttackType attackerWhichTBToUse(Player attacker);
 
     CritType attackerWhichCritToUse(Player attacker);

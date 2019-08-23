@@ -12,7 +12,8 @@
 <div>
     <div class="row">
         <div class="col-xl-12">
-            <h1 th:text="'MERP - ADVENTURE - Round: ' + ${roundCount}"></h1>
+            <h1>MERP - OrderedList</h1>
+            <h1 th:text="'Counter: ' + ${counter.getFightCount()} + '/' + ${counter.getFightCountMax()}">MERP - OrderedList</h1>
         </div>
     </div>
 
@@ -26,21 +27,18 @@
                 <th>Gender</th>
                 <th>Race</th>
                 <th>Class</th>
+                <th></th>
+                <th>Play in next adventure</th>
                 <th>Level</th>
                 <th>XP</th>
-
-                <th>Target</th>
                 <th>Activity</th>
                 <th>Attack type</th>
                 <th>Critical type</th>
-
                 <th>HP max</th>
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-
                 <th>TB for defense</th>
-
                 <th>Secondary TB</th>
                 <th>Base Magic TB</th>
                 <th>Target Magic TB</th>
@@ -53,9 +51,16 @@
                 <th>isStunned</th>
                 <th>Penalty for Activities</th>
                 <th>HP loss/round</th>
-
+                <th>Perception</th>
+                <th>Tracking</th>
+                <th>Lockpicking</th>
+                <th>Disarm Traps</th>
+                <th>Object usage</th>
+                <th>Runes</th>
+                <th>Influence</th>
+                <th>Stealth</th>
                 <th>EDIT</th>
-
+                <th>DEL</th>
             </tr>
             </thead>
             <tbody>
@@ -67,21 +72,25 @@
                 <td th:text="${player.getGender()}"></td>
                 <td th:text="${player.getRace()}"></td>
                 <td th:text="${player.getPlayerClass()}"></td>
+
+                <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm"
+                                                        th:href="@{'/merp/edit_isplay/' + ${player.getId()}}"
+                                                        th:text="'Don'+'\\'+'t Play'"> </a></td>
+                <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm"
+                                                            th:href="@{'/merp/edit_isplay/' + ${player.getId()}}"
+                                                            th:text="'Play'"> </a></td>
+
+                <td th:text="${player.getIsPlaying()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
-
-                <td th:text="${player.getTarget()}"></td>
                 <td th:text="${player.getActivity()}"></td>
                 <td th:text="${player.getAttackType()}"></td>
                 <td th:text="${player.getCritType()}"></td>
-
                 <td th:text="${player.getHpMax()}"></td>
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-
                 <td th:text="${player.getTbUsedForDefense()}"></td>
-
                 <td th:text="${player.getSecondaryTB()}"></td>
                 <td th:text="${player.getBaseMagicTB()}"></td>
                 <td th:text="${player.getTargetMagicTB()}"></td>
@@ -94,25 +103,29 @@
                 <td th:text="${player.getIsStunned()}"></td>
                 <td th:text="${player.getPenaltyOfActions()}"></td>
                 <td th:text="${player.getHpLossPerRound()}"></td>
-
+                <td th:text="${player.getPerception()}"></td>
+                <td th:text="${player.getTracking()}"></td>
+                <td th:text="${player.getLockPicking()}"></td>
+                <td th:text="${player.getDisarmTraps()}"></td>
+                <td th:text="${player.getObjectUsage()}"></td>
+                <td th:text="${player.getRunes()}"></td>
+                <td th:text="${player.getInfluence()}"></td>
+                <td th:text="${player.getStealth()}"></td>
                 <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}"
                        th:text="'EDIT'"> </a></td>
-
+                <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}"
+                       th:text="'DEL'"> </a></td>
                 <td th:text="${player.getIsActive()}" type="text"></td>
-<!--                <td th:value="${player.getTarget()}" type="text"></td>-->
+                <td th:value="${player.getTarget()}" type="text"></td>
             </tr>
             </tbody>
         </table>
-    </div>
         <div>
             <a class="btn btn-lg btn-info" th:href="@{/merp/addplayer}" th:text="'ADD NEW PLAYER'"></a>
         </div>
         <div align="center">
-            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/prefight}" th:text="'START FIGHT'"></a>
+            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure}" th:text="'START ADVENTURE'"></a>
         </div>
-    <div align="center">
-        <a class="btn btn-lg btn-info" th:href="@{/merp/adventure}" th:text="'BACK TO ADVENTURE'"></a>
-    </div>
     </div>
 
 

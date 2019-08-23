@@ -12,6 +12,7 @@ public interface PlayerService {
     Boolean isPlayerDead(Player player);
     Boolean isPlayerHealthBelow50percent(Player player);
     List<Player> adventurersOrderedList();
+    List<Player> nextPlayersToFight();
 
 }
 

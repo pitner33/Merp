@@ -1,22 +1,22 @@
 package com.sol.merp.characters;
 
 import com.sol.merp.attributes.PlayerActivity;
+import com.sol.merp.fight.FightCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class PlayerServiceImpl implements PlayerService {
-
+    @Autowired
     private PlayerRepository playerRepository;
 
     @Autowired
-    public PlayerServiceImpl(PlayerRepository playerRepository) {
-        this.playerRepository = playerRepository;
-    }
+    FightCount fightCount;
 
     @Override
     public void changeIsPlayStatus(Player player) {
@@ -83,7 +83,28 @@ public class PlayerServiceImpl implements PlayerService {
                 .thenComparing(Player::getMm).reversed();
         Collections.sort(allWhoPlays, orderByIsActiveThenActivityThenMM);
         System.out.println(allWhoPlays.toString());
+        System.out.println(allWhoPlays.getClass());
         return allWhoPlays;
+    }
+
+    @Override
+    public List<Player> nextPlayersToFight() {
+        List<Player> orderedList = adventurersOrderedList();
+        Integer counter = fightCount.getFightCount();
+        fightCount.setFightCountMax(orderedList.size());
+        List<Player> nextPlayersTofight = new ArrayList<>();
+        if (counter <= fightCount.getFightCountMax()) {
+            Player attacker = orderedList.get(counter - 1);
+            String defenderCharacterId = attacker.getTarget().toString();
+            Player defender = playerRepository.findByCharacterId(defenderCharacterId);
+
+            nextPlayersTofight.add(attacker);
+            nextPlayersTofight.add(defender);
+            return nextPlayersTofight;
+        } else {
+
+            return nextPlayersTofight;
+        }
     }
 }
 //TODO findAll lista MM szerint sorba rendezve a harchoz

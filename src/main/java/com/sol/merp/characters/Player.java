@@ -61,6 +61,49 @@ public class Player {
 
 
 
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType, PlayerTarget target, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+        this.characterId = characterId;
+        this.name = name;
+        this.gender = gender;
+        this.race = race;
+        this.playerClass = playerClass;
+        this.isPlaying = false;
+        this.isActive = true;
+        this.lvl = lvl;
+        this.xp = Double.valueOf(lvl * 1000);
+        this.activity = PlayerActivity._5DoNothing;
+        this.attackType = attackType;
+        this.critType = critType;
+        this.target = target;
+        this.hpMax = hpMax;
+        this.hpActual = hpMax;
+        this.mm = mm;
+        this.tb = tb;
+        this.tbUsedForDefense = 0;
+        this.secondaryTB = secondaryTB;
+        this.baseMagicTB = baseMagicTB;
+        this.targetMagicTB = targetMagicTB;
+        this.vb = vb;
+        this.shield = shield;
+        this.agilityBonus = agilityBonus;
+        this.mdLenyeg = mdLenyeg;
+        this.mdKapcsolat = mdKapcsolat;
+        this.armorType = armorType;
+        this.isStunned = false;
+        this.stunnedForRounds = 0;
+        this.penaltyOfActions = 0;
+        this.hpLossPerRound = 0;
+        this.perception = perception;
+        this.tracking = tracking;
+        this.lockPicking = lockPicking;
+        this.disarmTraps = disarmTraps;
+        this.objectUsage = objectUsage;
+        this.runes = runes;
+        this.influence = influence;
+        this.stealth = stealth;
+    }
+
+    //TODO delete / ideiglenes a playertarget beallitashoz
     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;

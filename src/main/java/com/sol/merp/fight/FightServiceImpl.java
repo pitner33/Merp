@@ -23,19 +23,6 @@ public class FightServiceImpl implements FightService {
 
     private Logger logger = LoggerFactory.getLogger(this.getClass());
 
-//    private D100Roll d100Roll;
-    private String roll1;
-    private String roll2;
-    private String roll3;
-    private String roll4;
-    private Player attacker;
-    private Player defender;
-
-
-
-//    @Autowired
-//    AttackResultsDTO attackResultsDTO;
-
     @Autowired
     private MapsFromTabs mapsFromTabs;
 
@@ -57,10 +44,11 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackBaseMagic(Player attacker, Player defender) {
+        //TODO hozzaigazitani a logicot az OtherThan...methodhoz
         AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
         attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
-        //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
+        //check if the attackresult is "Fail"
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker, attackResultsDTO);
             return;
@@ -69,10 +57,11 @@ public class FightServiceImpl implements FightService {
 
     @Override
     public void attackMagicBall(Player attacker, Player defender) {
+        //TODO hozzaigazitani a logicot az OtherThan...methodhoz
         AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
         attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
-        //check if the attackresult is "Fail" and TODO do the Fail roll and results AND somehow STOP the process here szét kell szedni a methodot kisebb  methodokra - egy adja az eredményt és aztán a kövi az alapján iránít egyéb methodokhoz
+        //check if the attackresult is "Fail"
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
             failRoll(attacker, attackResultsDTO);
             return;
@@ -84,7 +73,7 @@ public class FightServiceImpl implements FightService {
         AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
         attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
 
-        //check if the attackresult is "Fail" and TODO do the Fail roll and results Failrollba
+        //check if the attackresult is "Fail"
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
             //even in case of Fail, the defender suffers damage from bleeding in the given round
             attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
@@ -95,8 +84,7 @@ public class FightServiceImpl implements FightService {
             failRoll(attacker, attackResultsDTO);
             return attackResultsDTO;
         } else {
-//            attackResultsDTO.setFailResultText("none"); //from previous rounds it should not stay in
-            //ge the Damage as Integer and crit as String from attackResult String
+            //get the Damage as Integer and crit as String from attackResult String
             attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResultsDTO.getAttackResult()));
             attackResultsDTO.setCrit(getCritFromAttackResult(attackResultsDTO.getAttackResult()));
             logger.info("BaseDamage : {}", attackResultsDTO.getBaseDamage());
@@ -128,10 +116,9 @@ public class FightServiceImpl implements FightService {
                 //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
             }
 
-            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO HP/round??? + setHPactual methodba beletenni h nem halott-e
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
-            //TODO defender stats modify befor saving
             playerRepository.save(defender);
 
             return attackResultsDTO;
@@ -314,7 +301,7 @@ TODO      */
 
     @Override
     public void critRoll(Player attacker, String crit, AttackResultsDTO attackResultsDTO) {
-        //TODO Manage 'if' type and 'instant death' results
+        //TODO Manage 'if' type and 'instant death' results - more columns in GoogleSheet and fields for them in AttackresultDTO
         //crit roll between 0-100
         Integer critRoll = d100Roll.d100Random();
         Integer critRollModified = getModifiedCritRoll(critRoll, crit);
@@ -391,6 +378,8 @@ TODO      */
         } else
             throw new IllegalStateException("Cannot get critResultRow from critType: " + attacker.getCritType() + " and modified critRoll: " + critRollModified);
     }
+
+
 
     @Override
     public AttackType attackerWhichTBToUse(Player attacker) {

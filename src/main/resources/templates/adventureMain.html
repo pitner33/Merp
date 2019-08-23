@@ -15,36 +15,127 @@
             <h1>MERP - ADVENTURE</h1>
         </div>
     </div>
-    <div th:align="center">
-        <a class="btn btn-lg btn-success" th:href="@{/merp/round}" th:text="'START ROUND'"></a>
-        <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
-    </div>
-
-    <form th:action="@{'/merp/adventure'}" th:object="${adventurers}" method="post">
+<!--    <form th:action="@{'/merp/adventure'}" th:object="${adventurers}" method="post">-->
 
 
-            <fieldset>
-            <div>
-                <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
-                <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+<!--            <fieldset>-->
+<!--            <div>-->
+<!--                <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>-->
+<!--                <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>-->
 
-            </div>
+                <div>
+                    <table class="table table-bordered">
+                        <thead th:style="'background-color:gray'">
+                        <tr>
+                            <th>ID</th>
+                            <th>Char ID</th>
+                            <th>Name</th>
+                            <th>Gender</th>
+                            <th>Race</th>
+                            <th>Class</th>
+                            <th></th>
+                            <th>Play in next adventure</th>
+                            <th>Level</th>
+                            <th>XP</th>
+                            <th>Activity</th>
+                            <th>Attack type</th>
+                            <th>Critical type</th>
+                            <th>HP max</th>
+                            <th>HP actual</th>
+                            <th>MM</th>
+                            <th>TB</th>
+                            <th>TB for defense</th>
+                            <th>Secondary TB</th>
+                            <th>Base Magic TB</th>
+                            <th>Target Magic TB</th>
+                            <th>VB</th>
+                            <th>Shield</th>
+                            <th>AGI bonus</th>
+                            <th>MD Lenyeg</th>
+                            <th>MD Kapcsolat</th>
+                            <th>Armor Type</th>
+                            <th>isStunned</th>
+                            <th>Penalty for Activities</th>
+                            <th>HP loss/round</th>
+                            <th>Perception</th>
+                            <th>Tracking</th>
+                            <th>Lockpicking</th>
+                            <th>Disarm Traps</th>
+                            <th>Object usage</th>
+                            <th>Runes</th>
+                            <th>Influence</th>
+                            <th>Stealth</th>
+                            <th>EDIT</th>
+                            <th>DEL</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="player : ${adventurers}"
+                            th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                            <td th:text="${player.getId()}"></td>
+                            <td th:text="${player.getCharacterId()}"></td>
+                            <td th:text="${player.getName()}"></td>
+                            <td th:text="${player.getGender()}"></td>
+                            <td th:text="${player.getRace()}"></td>
+                            <td th:text="${player.getPlayerClass()}"></td>
 
-            <table>
-                <thead>
-                <tr>
-                    <th> Title</th>
-                    <th> Author</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="player, itemStat : *{players}">
-                    <td><input th:field="${player[__${itemStat.index}__].name}" /></td>
-<!--                    <td><input th:field="*{player[__${itemStat.index}__].lvl}" /></td>-->
-                </tr>
-                </tbody>
-            </table>
-            </fieldset>
+                            <td th:if="${player.getIsPlaying()}"><a class="btn btn-warning btn-sm"
+                                                                    th:href="@{'/merp/edit_isplay/' + ${player.getId()}}"
+                                                                    th:text="'Don'+'\\'+'t Play'"> </a></td>
+                            <td th:unless="${player.getIsPlaying()}"><a class="btn btn-success btn-sm"
+                                                                        th:href="@{'/merp/edit_isplay/' + ${player.getId()}}"
+                                                                        th:text="'Play'"> </a></td>
+
+                            <td th:text="${player.getIsPlaying()}"></td>
+                            <td th:text="${player.getLvl()}"></td>
+                            <td th:text="${player.getXp()}"></td>
+                            <td th:text="${player.getActivity()}"></td>
+                            <td th:text="${player.getAttackType()}"></td>
+                            <td th:text="${player.getCritType()}"></td>
+                            <td th:text="${player.getHpMax()}"></td>
+                            <td th:text="${player.getHpActual()}"></td>
+                            <td th:text="${player.getMm()}"></td>
+                            <td th:text="${player.getTb()}"></td>
+                            <td th:text="${player.getTbUsedForDefense()}"></td>
+                            <td th:text="${player.getSecondaryTB()}"></td>
+                            <td th:text="${player.getBaseMagicTB()}"></td>
+                            <td th:text="${player.getTargetMagicTB()}"></td>
+                            <td th:text="${player.getVb()}"></td>
+                            <td th:text="${player.getShield()}"></td>
+                            <td th:text="${player.getAgilityBonus()}"></td>
+                            <td th:text="${player.getMdLenyeg()}"></td>
+                            <td th:text="${player.getMdKapcsolat()}"></td>
+                            <td th:text="${player.getArmorType()}"></td>
+                            <td th:text="${player.getIsStunned()}"></td>
+                            <td th:text="${player.getPenaltyOfActions()}"></td>
+                            <td th:text="${player.getHpLossPerRound()}"></td>
+                            <td th:text="${player.getPerception()}"></td>
+                            <td th:text="${player.getTracking()}"></td>
+                            <td th:text="${player.getLockPicking()}"></td>
+                            <td th:text="${player.getDisarmTraps()}"></td>
+                            <td th:text="${player.getObjectUsage()}"></td>
+                            <td th:text="${player.getRunes()}"></td>
+                            <td th:text="${player.getInfluence()}"></td>
+                            <td th:text="${player.getStealth()}"></td>
+                            <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}"
+                                   th:text="'EDIT'"> </a></td>
+                            <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}"
+                                   th:text="'DEL'"> </a></td>
+                            <td th:text="${player.getIsActive()}" type="text"></td>
+                            <td th:value="${player.getTarget()}" type="text"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div>
+                        <a class="btn btn-lg btn-info" th:href="@{/merp/addplayer}" th:text="'ADD NEW PLAYER'"></a>
+                    </div>
+
+                    <div th:align="center">
+                        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/round}" th:text="'START ROUND'"></a>
+                        <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+                    </div>
+                </div>
+<!--            </fieldset>-->
     </form>
 
 
