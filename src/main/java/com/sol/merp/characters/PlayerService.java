@@ -13,6 +13,9 @@ public interface PlayerService {
     Boolean isPlayerHealthBelow50percent(Player player);
     List<Player> adventurersOrderedList();
     List<Player> nextPlayersToFight();
+    List<Player> stunnedPlayers();
+    List<Player> deadPlayers();
+    Double healthPercent(Player player);
 
 }
 

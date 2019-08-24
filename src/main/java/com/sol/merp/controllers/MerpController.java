@@ -110,7 +110,16 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/round")
-    public String round(Model modelOrderedList, Model modelModifiers, Model modelRoundCount, Model modelPlayerActivity, Model modelAttackType, Model modelCritType, Model modelPlayerTarget) {
+    public String round(Model modelOrderedList,
+                        Model modelModifiers,
+                        Model modelRoundCount,
+                        Model modelPlayerActivity,
+                        Model modelAttackType,
+                        Model modelCritType,
+                        Model modelPlayerTarget,
+                        Model modelStunnedPlayers,
+                        Model modelDeadPlayers)
+    {
         fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
         round.setRoundCount(round.getRoundCount() + 1);
 
@@ -124,6 +133,10 @@ public class MerpController {
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
         modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
+        modelStunnedPlayers.addAttribute("modelStunnedPlayers", playerService.stunnedPlayers());
+        modelDeadPlayers.addAttribute("modelDeadPlayers", playerService.deadPlayers());
+
+
         return  "adventureRound";
     }
 
@@ -136,7 +149,7 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/prefight")
-    public String preFight(Model model, Model model3, Model m) {
+    public String preFight(Model model, Model model3, Model m, Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
 
         List<Player> playersFight = playerService.nextPlayersToFight();
@@ -144,6 +157,9 @@ public class MerpController {
         model.addAttribute("players", playersFight);
         model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
         m.addAttribute("counter", fightCount);
+
+        //TODO outofbound a vegen
+//        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(playersFight.get(1)));
 
         if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
             return "redirect:/merp/adventure/round";

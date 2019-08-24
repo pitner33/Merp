@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class PlayerServiceImpl implements PlayerService {
@@ -105,6 +106,25 @@ public class PlayerServiceImpl implements PlayerService {
 
             return nextPlayersTofight;
         }
+    }
+
+    @Override
+    public List<Player> stunnedPlayers() {
+        return adventurersOrderedList().stream()
+                .filter(player -> player.getIsStunned())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Player> deadPlayers() {
+        return adventurersOrderedList().stream()
+                .filter(player -> player.getHpActual() <= 0)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Double healthPercent(Player player) {
+        return ((player.getHpActual() / player.getHpMax()) * 100);
     }
 }
 //TODO findAll lista MM szerint sorba rendezve a harchoz
