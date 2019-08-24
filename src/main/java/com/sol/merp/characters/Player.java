@@ -151,9 +151,10 @@ public class Player {
             this.hpActual = 0d;
             this.isActive = false;
             this.playerActivity = PlayerActivity._5DoNothing;
+            this.isStunned = false;
         } else this.hpActual = hpActual;
     }
-
+// Player is not active when stunned or dead
     public void setActive() {
         if ((this.hpActual <= 0 ) || (this.playerActivity == PlayerActivity._5DoNothing) || (this.isStunned)) {
             isActive = false;
@@ -165,4 +166,23 @@ public class Player {
             this.playerActivity = PlayerActivity._5DoNothing;
         } else this.playerActivity = playerActivity;
     }
+
+    public void setStunned(Boolean stunned) {
+        if ((this.hpActual <= 0) || (this.stunnedForRounds == 0)) {
+            this.isStunned = false;
+        }
+        isStunned = stunned;
+    }
+
+    public void setStunnedForRounds(Integer stunnedForRounds) {
+        if (stunnedForRounds <= 0) {
+            this.stunnedForRounds = 0;
+            this.isStunned = false;
+        } else {
+            this.stunnedForRounds = stunnedForRounds;
+            this.isStunned = true;
+        }
+    }
+
+
 }

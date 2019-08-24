@@ -5,6 +5,7 @@ import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
+import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
@@ -31,6 +32,9 @@ public class FightServiceImpl implements FightService {
 
     @Autowired
     D100Roll d100Roll;
+
+    @Autowired
+    PlayerListObject adventurerOrderedListObject;
 
     @Override
     public void attack(Player attacker, Player defender) {
@@ -379,6 +383,18 @@ TODO      */
             throw new IllegalStateException("Cannot get critResultRow from critType: " + attacker.getCritType() + " and modified critRoll: " + critRollModified);
     }
 
+    @Override
+    public void decreaseStunnedForRoundCounter() {
+        adventurerOrderedListObject.getPlayerList()
+                .stream()
+                .filter(Player::getIsStunned)
+                .forEach(player -> {
+                    player.setStunnedForRounds(player.getStunnedForRounds() - 1);
+                    playerRepository.save(player);
+                });
+
+
+    }
 
 
     @Override

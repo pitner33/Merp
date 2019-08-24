@@ -45,6 +45,8 @@ public class MerpController {
     Round round;
     @Autowired
     FightCount fightCount;
+    @Autowired
+    PlayerListObject adventurerOrderedListObject;
 
 
 
@@ -120,15 +122,16 @@ public class MerpController {
                         Model modelStunnedPlayers,
                         Model modelDeadPlayers)
     {
-        fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
-        round.setRoundCount(round.getRoundCount() + 1);
+//        fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
+//        round.setRoundCount(round.getRoundCount() + 1);
 
-        PlayerListObject playerListObject = new PlayerListObject();
-        playerListObject.setPlayerList(playerService.adventurersOrderedList());
+//        playerService.adventurersOrderedList();
+//
+//        fightService.decreaseStunnedForRoundCounter();
 
         modelRoundCount.addAttribute("modelRoundCount", round.getRoundCount());
         modelModifiers.addAttribute("modelModifiers", attackModifierRepository.findById(13L).get());
-        modelOrderedList.addAttribute("modelOrderedList", playerListObject);
+        modelOrderedList.addAttribute("modelOrderedList", adventurerOrderedListObject);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
@@ -162,7 +165,7 @@ public class MerpController {
 //        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(playersFight.get(1)));
 
         if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
-            return "redirect:/merp/adventure/round";
+            return "redirect:/merp/adventure/nextround";
         } else {
             return "adventurePreFight";
         }
@@ -201,5 +204,18 @@ public class MerpController {
     @GetMapping("/adventure/nextfight")
     public String nextFight() {
         return "redirect:/merp/adventure/prefight";
+    }
+
+    @GetMapping("/adventure/nextround")
+    public String nextRound() {
+        fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
+        round.setRoundCount(round.getRoundCount() + 1);
+
+        playerService.adventurersOrderedList();
+
+        fightService.decreaseStunnedForRoundCounter();
+
+
+        return "redirect:/merp/adventure/round";
     }
 }

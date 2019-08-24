@@ -60,8 +60,11 @@
             </thead>
             <tbody>
             <tr th:each="player : ${players}"
-                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
-                <td th:text="${player.getId()}"></td>
+                th:style="${player.hpActual<=0} ? 'background-color:#E41032'
+                        : (${player.isStunned} ? 'background-color:#2A95C9'
+                        : (${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'))">
+
+            <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
                 <td th:text="${player.getGender()}"></td>
@@ -176,7 +179,7 @@
         <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/nextfight}" th:text="'NEXT FIGHT'"></a>
     </div>
     <div align="center">
-        <a class="btn btn-lg btn-info" th:href="@{/merp/adventure/round}" th:text="'END Of ROUND'"></a>
+        <a class="btn btn-lg btn-info" th:href="@{/merp/adventure/nextround}" th:text="'END Of ROUND'"></a>
     </div>
 
 

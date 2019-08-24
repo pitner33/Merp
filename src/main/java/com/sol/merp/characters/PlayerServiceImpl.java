@@ -19,6 +19,9 @@ public class PlayerServiceImpl implements PlayerService {
     @Autowired
     FightCount fightCount;
 
+    @Autowired
+    PlayerListObject adventurerOrderedListObject;
+
     @Override
     public void changeIsPlayStatus(Player player) {
         if (player.getIsPlaying()) {
@@ -31,7 +34,7 @@ public class PlayerServiceImpl implements PlayerService {
     public void playerActivitySwitch() {
         List<Player> allPlayers = playerRepository.findAll();
         for (Player player:allPlayers) {
-            if (player.getIsStunned() || isPlayerDead(player) || player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic) || player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) {
+            if (player.getIsStunned() || playerDead(player) || player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic) || player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) {
                 player.setIsActive(false);
 
             } else player.setIsActive(true);
@@ -51,7 +54,7 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
-    public Boolean isPlayerDead(Player player) {
+    public Boolean playerDead(Player player) {
         if (player.getHpActual() <= 0) {
             return true;
         }
@@ -79,18 +82,21 @@ public class PlayerServiceImpl implements PlayerService {
         List<Player> allWhoPlays = playerRepository.findAllByIsPlayingIsTrue();
 
         Comparator<Player> orderByIsActiveThenActivityThenMM = Comparator
-                .comparing(Player::getIsActive).reversed()
+                .comparing(this::playerDead)
+                .thenComparing(Player::getIsStunned).reversed()
+                .thenComparing(Player::getIsActive).reversed()
                 .thenComparing(Player::getPlayerActivity).reversed()
                 .thenComparing(Player::getMm).reversed();
         Collections.sort(allWhoPlays, orderByIsActiveThenActivityThenMM);
         System.out.println(allWhoPlays.toString());
         System.out.println(allWhoPlays.getClass());
+        adventurerOrderedListObject.setPlayerList(allWhoPlays);
         return allWhoPlays;
     }
 
     @Override
     public List<Player> nextPlayersToFight() {
-        List<Player> orderedList = adventurersOrderedList();
+        List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
         Integer counter = fightCount.getFightCount();
         fightCount.setFightCountMax(orderedList.size());
         List<Player> nextPlayersTofight = new ArrayList<>();

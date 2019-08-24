@@ -43,6 +43,8 @@ public interface FightService {
 
     List<String> getCritResultRow(Player attacker, Integer critRollModified);
 
+    void decreaseStunnedForRoundCounter();
+
 
 
     AttackType attackerWhichTBToUse(Player attacker);
