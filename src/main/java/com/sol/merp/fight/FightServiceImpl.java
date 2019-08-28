@@ -7,6 +7,7 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.PlayerRepository;
+import com.sol.merp.characters.PlayerService;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -29,6 +31,9 @@ public class FightServiceImpl implements FightService {
 
     @Autowired
     PlayerRepository playerRepository;
+
+    @Autowired
+    PlayerService playerService;
 
     @Autowired
     D100Roll d100Roll;
@@ -123,7 +128,29 @@ public class FightServiceImpl implements FightService {
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
-            playerRepository.save(defender);
+            //TODO separate method playerservice void()
+            // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
+//            List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
+            List<Player> newOrderedList = new ArrayList<>();
+
+            playerService.checkAndSetStats(defender);
+            for (int i = 0; i < adventurerOrderedListObject.getPlayerList().size(); i++) {
+                if (adventurerOrderedListObject.getPlayerList().get(i).getId().equals(defender.getId())) {
+                    newOrderedList.add(defender);
+                } else newOrderedList.add(adventurerOrderedListObject.getPlayerList().get(i));
+
+            }
+            adventurerOrderedListObject.setPlayerList(newOrderedList);
+
+//            orderedList.forEach(player -> {
+//                if (player.getId().equals(defender.getId())) {
+//                    newOrderedList.add(defender);
+//                } else newOrderedList.add(player);
+//                adventurerOrderedListObject.setPlayerList(newOrderedList);
+//            });
+
+
+//            playerRepository.save(defender);
 
             return attackResultsDTO;
         }

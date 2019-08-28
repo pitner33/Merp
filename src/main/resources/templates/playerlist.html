@@ -96,7 +96,10 @@
             </thead>
             <tbody>
             <tr th:each="player : ${players}"
-                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                th:style="${player.hpActual<=0} ? 'background-color:#E41032'
+                        : (${player.isStunned} ? 'background-color:#2A95C9'
+                        : (${!player.isActive} ? 'background-color:#C0D6E4'
+                        : (${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12')))">
                 <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>

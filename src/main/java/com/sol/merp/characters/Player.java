@@ -25,6 +25,7 @@ public class Player {
     private PlayerClass playerClass;
     private Boolean isPlaying;
     private Boolean isActive; //capable for actions
+    private Boolean isAlive;
     private Integer lvl;
     private Double xp;
     private PlayerActivity playerActivity;
@@ -61,7 +62,10 @@ public class Player {
 
 
 
-    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType, PlayerTarget target, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
+                  PlayerTarget target, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb,
+                  Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
+                  Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
         this.gender = gender;
@@ -69,9 +73,10 @@ public class Player {
         this.playerClass = playerClass;
         this.isPlaying = false;
         this.isActive = true;
+        this.isAlive = true;
         this.lvl = lvl;
         this.xp = Double.valueOf(lvl * 1000);
-        this.playerActivity = PlayerActivity._5DoNothing;
+        this.playerActivity = playerActivity;
         this.attackType = attackType;
         this.critType = critType;
         this.target = target;
@@ -104,7 +109,10 @@ public class Player {
     }
 
     //TODO delete / ideiglenes a playertarget beallitashoz
-    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType,
+                  Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb,
+                  Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
+                  Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
         this.gender = gender;
@@ -146,43 +154,49 @@ public class Player {
         this.stealth = stealth;
     }
 
-    public void setHpActual(Double hpActual) {
-        if (hpActual <= 0d) {
-            this.hpActual = 0d;
-            this.isActive = false;
-            this.playerActivity = PlayerActivity._5DoNothing;
-            this.isStunned = false;
-        } else this.hpActual = hpActual;
-    }
-// Player is not active when stunned or dead
-    public void setActive() {
-        if ((this.hpActual <= 0 ) || (this.playerActivity == PlayerActivity._5DoNothing) || (this.isStunned)) {
-            isActive = false;
-        } else isActive = true;
-    }
+//    public void setHpActual(Double hpActual) {
+//        if (hpActual <= 0d) {
+//            this.hpActual = 0d;
+//            this.isActive = false;
+//            this.playerActivity = PlayerActivity._5DoNothing;
+//            this.isStunned = false;
+//            this.stunnedForRounds = 0;
+//        } else this.hpActual = hpActual;
+//    }
+//
+//    public void setPlayerActivity(PlayerActivity playerActivity) {
+//        if ((playerActivity.equals(PlayerActivity._1PerformMagic)) ||
+//                (playerActivity.equals(PlayerActivity._2RangedAttack)) ||
+//                (playerActivity.equals(PlayerActivity._3PhisicalAttackOrMovement))){
+//            setIsActive(true);
+//        }
+//        this.playerActivity = playerActivity;
+//    }
+//
+//    public void setStunned(Boolean stunned) {
+//        if ((this.hpActual <= 0) || (this.stunnedForRounds == 0)) {
+//            this.isStunned = false;
+//        }
+//        if (stunned) {
+//            this.stunnedForRounds = 1;
+//        }
+//        isStunned = stunned;
+//    }
 
-    public void setPlayerActivity(PlayerActivity playerActivity) {
-        if (this.hpActual <= 0) {
-            this.playerActivity = PlayerActivity._5DoNothing;
-        } else this.playerActivity = playerActivity;
-    }
+//    public void setAlive(Boolean alive) {
+//        if (!alive) {
+//            setHpActual(0D);
+//            setIsActive(false);
+//            setIsStunned(false);
+//            setStunnedForRounds(0);
+//            setPlayerActivity(PlayerActivity._5DoNothing);
+//        }
+//        isAlive = alive;
+//    }
 
-    public void setStunned(Boolean stunned) {
-        if ((this.hpActual <= 0) || (this.stunnedForRounds == 0)) {
-            this.isStunned = false;
-        }
-        isStunned = stunned;
-    }
 
-    public void setStunnedForRounds(Integer stunnedForRounds) {
-        if (stunnedForRounds <= 0) {
-            this.stunnedForRounds = 0;
-            this.isStunned = false;
-        } else {
-            this.stunnedForRounds = stunnedForRounds;
-            this.isStunned = true;
-        }
-    }
+    //TODO this way won't work - service method needed with same logic, check all Object when POST
+
 
 
 }

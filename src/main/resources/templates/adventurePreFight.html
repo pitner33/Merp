@@ -62,9 +62,10 @@
             <tr th:each="player : ${players}"
                 th:style="${player.hpActual<=0} ? 'background-color:#E41032'
                         : (${player.isStunned} ? 'background-color:#2A95C9'
-                        : (${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'))">
+                        : (${!player.isActive} ? 'background-color:#C0D6E4'
+                        : (${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12')))">
 
-            <td th:text="${player.getId()}"></td>
+                <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
                 <td th:text="${player.getGender()}"></td>
@@ -107,13 +108,13 @@
             </tbody>
         </table>
     </div>
-<!--    TODO nem mutatja a csikot jelenleg illetve outofboundot dob a vegen-->
-<!--    <div class="progress" th:align="center" th:object="${modelHealthPercent}">-->
-<!--        <div class="progress-bar" role="progressbar" th:value="${modelHealthPercent}"-->
-<!--             aria-valuemin="0" aria-valuemax="100" style="width:70%" th:text="${modelHealthPercent}">-->
+    <!--    TODO nem mutatja a csikot jelenleg illetve outofboundot dob a vegen-->
+    <!--    <div class="progress" th:align="center" th:object="${modelHealthPercent}">-->
+    <!--        <div class="progress-bar" role="progressbar" th:value="${modelHealthPercent}"-->
+    <!--             aria-valuemin="0" aria-valuemax="100" style="width:70%" th:text="${modelHealthPercent}">-->
 
-<!--        </div>-->
-<!--    </div>-->
+    <!--        </div>-->
+    <!--    </div>-->
     <div>
         <form th:action="@{'/merp/adventure/round'}" th:object="${attackmodifier}" method="post">
 
@@ -122,7 +123,7 @@
 
                 <div>
                     <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
-                    <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+                    <a class="btn btn-lg btn-primary" th:href="@{/merp/adventure/round}" th:text="Back"></a>
                 </div>
                 <div>
                     <ul>
@@ -181,8 +182,6 @@
     <div align="center">
         <a class="btn btn-lg btn-info" th:href="@{/merp/adventure/nextround}" th:text="'END Of ROUND'"></a>
     </div>
-
-
 
 
 </div>

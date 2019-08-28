@@ -4,10 +4,7 @@ import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
-import com.sol.merp.characters.Player;
-import com.sol.merp.characters.PlayerListObject;
-import com.sol.merp.characters.PlayerRepository;
-import com.sol.merp.characters.PlayerService;
+import com.sol.merp.characters.*;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.fight.FightCount;
 import com.sol.merp.fight.FightService;
@@ -47,6 +44,8 @@ public class MerpController {
     FightCount fightCount;
     @Autowired
     PlayerListObject adventurerOrderedListObject;
+    @Autowired
+    NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
 
 
 
@@ -135,6 +134,7 @@ public class MerpController {
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
+//        modelPlayerTarget.addAttribute("modelPlayerTarget", playerService.targetablePlayers());
         modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
         modelStunnedPlayers.addAttribute("modelStunnedPlayers", playerService.stunnedPlayers());
         modelDeadPlayers.addAttribute("modelDeadPlayers", playerService.deadPlayers());
@@ -146,21 +146,27 @@ public class MerpController {
     @PostMapping("/adventure/round")
     public String roundPost(@ModelAttribute(value = "modelOrderedList") PlayerListObject playerListObject) {
         playerListObject.getPlayerList().forEach(player -> {
+            playerService.checkAndSetStats(player);
             playerRepository.save(player);
         });
         return "redirect:/merp/adventure/round";
     }
 
+    //TODO round-prefight-fight kört megnézni mikor ment,
+    // hogy a fightban bekábult csóka ne tudjon visszatámadni ugyanabban a körben már,
+    // tehát ne legyen benne a fightképes listában
     @GetMapping("/adventure/prefight")
     public String preFight(Model model, Model model3, Model m, Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
 
-        List<Player> playersFight = playerService.nextPlayersToFight();
+//        adventurerOrderedListObject.getPlayerList().forEach(player -> playerRepository.save(player));
 
-        model.addAttribute("players", playersFight);
+//        List<Player> nextPlease = playerService.nextPlayersToFight();
+//        System.out.println("whatever, just stop here");
+
+        model.addAttribute("players", playerService.nextPlayersToFight());
         model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
         m.addAttribute("counter", fightCount);
-
         //TODO outofbound a vegen
 //        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(playersFight.get(1)));
 
@@ -173,14 +179,13 @@ public class MerpController {
 
     @GetMapping("/adventure/fight")
     public String fight(Model model, Model model2, Model model3, Model m) {
-        List<Player> playersFight = playerService.nextPlayersToFight();
 
-        Player attacker = playersFight.get(0);
-        Player defender = playersFight.get(1);
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
         AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker,defender);
 
-        model.addAttribute("players", playersFight);
+        model.addAttribute("players", nextTwoPlayersToFigthObject.getNextTwoPlayersToFight());
         model2.addAttribute("resultDTO", attackResultsDTO);
         model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
         m.addAttribute("counter", fightCount);
@@ -188,6 +193,7 @@ public class MerpController {
         return "adventureFight";
     }
 
+    //TODO is it in use? If not, DELETE
     @GetMapping("/orderedlist")
     public String orderedList(Model model, Model model2) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
@@ -203,6 +209,7 @@ public class MerpController {
 
     @GetMapping("/adventure/nextfight")
     public String nextFight() {
+
         return "redirect:/merp/adventure/prefight";
     }
 
@@ -215,7 +222,12 @@ public class MerpController {
 
         fightService.decreaseStunnedForRoundCounter();
 
+        adventurerOrderedListObject.getPlayerList().forEach(player -> {
+            playerService.checkAndSetStats(player);
+        });
 
         return "redirect:/merp/adventure/round";
     }
+
+//    @PostMapping("adventure/round/savechanges")
 }

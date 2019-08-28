@@ -13,7 +13,7 @@
     <div class="row">
         <div class="col-xl-12">
             <h1>MERP - ADVENTURE - FIGHT</h1>
-            <h1 th:text="'Counter: ' + ${counter.getFightCount()} + '/' + ${counter.getFightCountMax()}">
+            <h1 th:text="'Counter: ' + ${counter.getFightCount()} + '/' + ${counter.getFightCountMax()}"></h1>
         </div>
     </div>
     <div>
@@ -60,7 +60,10 @@
             </thead>
             <tbody>
             <tr th:each="player : ${players}"
-                th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'">
+                th:style="${player.hpActual<=0} ? 'background-color:#E41032'
+                        : (${player.isStunned} ? 'background-color:#2A95C9'
+                        : (${!player.isActive} ? 'background-color:#C0D6E4'
+                        : (${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12')))">
                 <td th:text="${player.getId()}"></td>
                 <td th:text="${player.getCharacterId()}"></td>
                 <td th:text="${player.getName()}"></td>
@@ -112,7 +115,7 @@
 
                 <div>
                     <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
-                    <a class="btn btn-lg btn-primary" th:href="@{/merp/allplayers}" th:text="Back"></a>
+                    <a class="btn btn-lg btn-primary" th:href="@{/merp/adventure/round}" th:text="Back"></a>
                 </div>
                 <div>
                     <ul>
@@ -162,9 +165,9 @@
 
     </div>
 
-<!--    <div align="center">-->
-<!--        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>-->
-<!--    </div>-->
+    <!--    <div align="center">-->
+    <!--        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>-->
+    <!--    </div>-->
     <div align="center">
         <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/nextfight}" th:text="'NEXT FIGHT'"></a>
     </div>
@@ -223,22 +226,22 @@
         </div>
     </div>
 </div>
-<div class="alert alert-info" role="alert">
+<div class="alert alert-info" role="alert" th:align="center">
     <strong th:text="${resultDTO.getD100OpenRoll()}"></strong>
 </div>
-<div class="alert alert-info" role="alert">
+<div class="alert alert-info" role="alert" th:align="center">
     <strong th:text="${resultDTO.getRollResult()}"></strong>
 </div>
-<div class="alert alert-success" role="alert">
+<div class="alert alert-success" role="alert" th:align="center">
     <strong th:text="${resultDTO.getAttackResult()}"></strong>
 </div>
-<div class="alert alert-success" role="alert">
+<div class="alert alert-success" role="alert" th:align="center">
     <strong th:text="${resultDTO.getCritResultText()}"></strong>
 </div>
-<div class="alert alert-success" role="alert">
+<div class="alert alert-success" role="alert" th:align="center">
     <strong th:text="'Full damage: ' + ${resultDTO.getFullDamage()}"></strong>
 </div>
-<div class="alert alert-danger" role="alert">
+<div class="alert alert-danger" role="alert" th:align="center">
     <strong th:text="${resultDTO.getFailResultText()}"></strong>
 </div>
 
