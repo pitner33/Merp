@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -128,29 +127,9 @@ public class FightServiceImpl implements FightService {
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
-            //TODO separate method playerservice void()
+            //TODO separate method playerservice void(PLayer defender)
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
-//            List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
-            List<Player> newOrderedList = new ArrayList<>();
-
-            playerService.checkAndSetStats(defender);
-            for (int i = 0; i < adventurerOrderedListObject.getPlayerList().size(); i++) {
-                if (adventurerOrderedListObject.getPlayerList().get(i).getId().equals(defender.getId())) {
-                    newOrderedList.add(defender);
-                } else newOrderedList.add(adventurerOrderedListObject.getPlayerList().get(i));
-
-            }
-            adventurerOrderedListObject.setPlayerList(newOrderedList);
-
-//            orderedList.forEach(player -> {
-//                if (player.getId().equals(defender.getId())) {
-//                    newOrderedList.add(defender);
-//                } else newOrderedList.add(player);
-//                adventurerOrderedListObject.setPlayerList(newOrderedList);
-//            });
-
-
-//            playerRepository.save(defender);
+            playerService.refreshAdventurerOrderedListObject(defender);
 
             return attackResultsDTO;
         }
@@ -173,7 +152,7 @@ public class FightServiceImpl implements FightService {
         String attackResultD100 = getAttackResultFromRowByDefenderArmor(attackResultRowD100, defender);
 
         if (attackResultD100.equals("Fail")) {
-            return  attackResultD100;
+            return attackResultD100;
         } else {
 //based on attack type and rollResult get the attack resultrow from the corresponding map
             List<String> attackResultRow = getAttackResultRowByAttackType(attacker, rollResult);

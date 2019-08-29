@@ -48,16 +48,6 @@ public class MerpController {
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
 
 
-
-
-
-//    public MerpController(PlayerRepository playerRepository, PlayerService playerService, AttackModifier attackModifier) {
-//        this.playerRepository = playerRepository;
-//        this.playerService = playerService;
-//        this.attackModifier = attackModifier;
-//    }
-
-
     @GetMapping("/allplayers")  //TODO allplayers only for players, separate page for NPCs
     public String playerlist(Model model) {
         System.out.println(mapsFromTabs.getMapSlashing().get(149).toString()); //TODO csak azert benne hogy mukodik-e - kivenni
@@ -103,8 +93,8 @@ public class MerpController {
     }
 
     @PostMapping("/adventure")
-    public String adventureMainPost(@ModelAttribute(value="adventurers") List<Player> allWhoPlays) {
-        for (Player player:allWhoPlays) {
+    public String adventureMainPost(@ModelAttribute(value = "adventurers") List<Player> allWhoPlays) {
+        for (Player player : allWhoPlays) {
             playerRepository.save(player);
         }
         return "redirect:/merp/adventure";
@@ -119,14 +109,7 @@ public class MerpController {
                         Model modelCritType,
                         Model modelPlayerTarget,
                         Model modelStunnedPlayers,
-                        Model modelDeadPlayers)
-    {
-//        fightCount.setFightCount(0); //fightcount set to -1 (when loading prefight it will be 0), prepare for next round
-//        round.setRoundCount(round.getRoundCount() + 1);
-
-//        playerService.adventurersOrderedList();
-//
-//        fightService.decreaseStunnedForRoundCounter();
+                        Model modelDeadPlayers) {
 
         modelRoundCount.addAttribute("modelRoundCount", round.getRoundCount());
         modelModifiers.addAttribute("modelModifiers", attackModifierRepository.findById(13L).get());
@@ -139,8 +122,7 @@ public class MerpController {
         modelStunnedPlayers.addAttribute("modelStunnedPlayers", playerService.stunnedPlayers());
         modelDeadPlayers.addAttribute("modelDeadPlayers", playerService.deadPlayers());
 
-
-        return  "adventureRound";
+        return "adventureRound";
     }
 
     @PostMapping("/adventure/round")
@@ -152,17 +134,9 @@ public class MerpController {
         return "redirect:/merp/adventure/round";
     }
 
-    //TODO round-prefight-fight kört megnézni mikor ment,
-    // hogy a fightban bekábult csóka ne tudjon visszatámadni ugyanabban a körben már,
-    // tehát ne legyen benne a fightképes listában
     @GetMapping("/adventure/prefight")
     public String preFight(Model model, Model model3, Model m, Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
-
-//        adventurerOrderedListObject.getPlayerList().forEach(player -> playerRepository.save(player));
-
-//        List<Player> nextPlease = playerService.nextPlayersToFight();
-//        System.out.println("whatever, just stop here");
 
         model.addAttribute("players", playerService.nextPlayersToFight());
         model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
@@ -183,7 +157,7 @@ public class MerpController {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
-        AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker,defender);
+        AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker, defender);
 
         model.addAttribute("players", nextTwoPlayersToFigthObject.getNextTwoPlayersToFight());
         model2.addAttribute("resultDTO", attackResultsDTO);
@@ -229,5 +203,4 @@ public class MerpController {
         return "redirect:/merp/adventure/round";
     }
 
-//    @PostMapping("adventure/round/savechanges")
 }

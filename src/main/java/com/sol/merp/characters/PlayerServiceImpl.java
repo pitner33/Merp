@@ -1,12 +1,14 @@
 package com.sol.merp.characters;
 
 import com.sol.merp.attributes.PlayerActivity;
-import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.fight.FightCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,7 +36,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public void playerActivitySwitch() {
         List<Player> allPlayers = playerRepository.findAll();
-        for (Player player:allPlayers) {
+        for (Player player : allPlayers) {
             if (player.getIsStunned() || playerDead(player) || player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic) || player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) {
                 player.setIsActive(false);
 
@@ -46,7 +48,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public void doNothingWhenStunned() {
         List<Player> allPlayers = playerRepository.findAll();
-        for (Player player:allPlayers) {
+        for (Player player : allPlayers) {
             if (player.getIsStunned()) {
                 player.setPlayerActivity(PlayerActivity._5DoNothing);
                 playerRepository.save(player);
@@ -66,20 +68,19 @@ public class PlayerServiceImpl implements PlayerService {
     public Boolean isPlayerHealthBelow50percent(Player player) {
         Double hpActual = player.getHpActual();
         Double hpMax = player.getHpMax();
-        Double hpPercent = hpActual/hpMax;
+        Double hpPercent = hpActual / hpMax;
         if (hpPercent <= 0.5) {
             return true;
         }
         return false;
     }
 
+    //get the players who are playing in the adventure and ordered them (dead/stunned/donothindORpreparemagic/mm/activity ORDER from bottom to top
+    //put them in a list, wrap it into an object
+    //the method is called ONLY at the beginning of a new round
+    //during the round after each and every fight defender stats are refreshed in the object!s list KEEPING the order and number of players (void refreshAdventurerOrderedListObject(Player defender))
     @Override
     public List<Player> adventurersOrderedList() {
-        //findAllWhoPlays list
-        //Comparator isActive --> activity --> MM
-        //return
-//        playerActivitySwitch(); //Todo Put them back working!!!
-//        doNothingWhenStunned();
         List<Player> allWhoPlays = playerRepository.findAllByIsPlayingIsTrue();
 
         Comparator<Player> orderByIsActiveThenActivityThenMM = Comparator
@@ -95,6 +96,7 @@ public class PlayerServiceImpl implements PlayerService {
         return allWhoPlays;
     }
 
+    //picks the next ACTIVE player from ordered list as attacker, and its target, put them into a list and wrap the list into an object
     @Override
     public List<Player> nextPlayersToFight() { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
         List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
@@ -103,12 +105,12 @@ public class PlayerServiceImpl implements PlayerService {
 
         if (fightCount.getFightCount() <= fightCount.getFightCountMax()) {
             Player attacker = orderedList.get(fightCount.getFightCount() - 1);
-            while (!attacker.getIsActive())  {
-                    fightCount.setFightCount(fightCount.getFightCount() + 1);
-                    if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
-                        break;
-                    }
-                    attacker = orderedList.get(fightCount.getFightCount() - 1);
+            while (!attacker.getIsActive()) {
+                fightCount.setFightCount(fightCount.getFightCount() + 1);
+                if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
+                    break;
+                }
+                attacker = orderedList.get(fightCount.getFightCount() - 1);
             }
 
             String defenderCharacterId = attacker.getTarget().toString();
@@ -122,17 +124,6 @@ public class PlayerServiceImpl implements PlayerService {
 
             return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
         } else return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-    }
-
-    @Override
-    public Set<PlayerTarget> targetablePlayers() {
-        Set<PlayerTarget> targetablePlayers = new HashSet<>();
-        List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
-        orderedList.forEach(player -> {
-            PlayerTarget playerTarget = player.getTarget();
-            targetablePlayers.add(playerTarget);
-        });
-        return targetablePlayers;
     }
 
     @Override
@@ -152,6 +143,21 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public Double healthPercent(Player player) {
         return ((player.getHpActual() / player.getHpMax()) * 100);
+    }
+
+    //Refreshing the ordered list object with defendet stats KEEPING the order of the list and the players in it
+    //it is used after each and every fight during a round
+    @Override
+    public void refreshAdventurerOrderedListObject(Player defender) {
+        List<Player> newOrderedList = new ArrayList<>();
+
+        checkAndSetStats(defender); // also saves the defender to the repo
+        for (int i = 0; i < adventurerOrderedListObject.getPlayerList().size(); i++) {
+            if (adventurerOrderedListObject.getPlayerList().get(i).getId().equals(defender.getId())) {
+                newOrderedList.add(defender);
+            } else newOrderedList.add(adventurerOrderedListObject.getPlayerList().get(i));
+        }
+        adventurerOrderedListObject.setPlayerList(newOrderedList);
     }
 
     @Override
@@ -190,38 +196,5 @@ public class PlayerServiceImpl implements PlayerService {
         }
 
         playerRepository.save(player);
-
-
     }
-
-//    @Override
-//    public void checkAndSetStunnedForRounds(Player player) {
-//        if (player.getStunnedForRounds() <= 0) {
-//            player.setStunnedForRounds(0);
-//            player.setStunned(false);
-//        } else {
-//            player.setStunned(true);
-//            player.setPlayerActivity(PlayerActivity._5DoNothing);
-//            player.setIsActive(false);
-//        }
-//        playerRepository.save(player);
-//    }
-//
-//    @Override
-//    public void checkAndSetIsActive(Player player) {
-//        if ((player.getHpActual() <= 0) ||
-//                (player.getIsStunned()) ||
-//                (player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) ||
-//                (player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic))) {
-//            player.setIsActive(false);
-//        } else {
-//            player.setIsActive(true);
-//        }
-//        playerRepository.save(player);
-//    }
-
 }
-//TODO findAll lista MM szerint sorba rendezve a harchoz
-//TODO listabn ne legzen benne a halott, kabult
-//TODO kulon lista a kabultaknak
-//TODO kulon lista a halottaknak
