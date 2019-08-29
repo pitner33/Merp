@@ -12,6 +12,7 @@ import com.sol.merp.fight.Round;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,7 +118,6 @@ public class MerpController {
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
-//        modelPlayerTarget.addAttribute("modelPlayerTarget", playerService.targetablePlayers());
         modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
         modelStunnedPlayers.addAttribute("modelStunnedPlayers", playerService.stunnedPlayers());
         modelDeadPlayers.addAttribute("modelDeadPlayers", playerService.deadPlayers());
@@ -152,34 +152,54 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/fight")
-    public String fight(Model model, Model model2, Model model3, Model m) {
+    public String fight(Model modelNextTwoPlayers,
+                        Model modelResultDTO,
+                        Model modelAttackModifier,
+                        Model modelFightCount,
+                        Model modelPlayerActivity,
+                        Model modelAttackType,
+                        Model modelCritType,
+                        Model modelPlayerTarget) {
 
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
         AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker, defender);
 
-        model.addAttribute("players", nextTwoPlayersToFigthObject.getNextTwoPlayersToFight());
-        model2.addAttribute("resultDTO", attackResultsDTO);
-        model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
-        m.addAttribute("counter", fightCount);
+        modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
+        modelResultDTO.addAttribute("resultDTO", attackResultsDTO);
+        modelAttackModifier.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
+        modelFightCount.addAttribute("counter", fightCount);
+        modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
+        modelAttackType.addAttribute("modelAttackType", AttackType.values());
+        modelCritType.addAttribute("modelCritType", CritType.values());
+        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
 
         return "adventureFight";
     }
 
-    //TODO is it in use? If not, DELETE
-    @GetMapping("/orderedlist")
-    public String orderedList(Model model, Model model2) {
-        fightCount.setFightCount(fightCount.getFightCount() + 1);
-        fightCount.setFightCountMax(3);
-        List<Player> orderedList = playerService.adventurersOrderedList();
-        model.addAttribute("orderedList", orderedList);
-        model2.addAttribute("counter", fightCount);
-        if (fightCount.getFightCount().intValue() == fightCount.getFightCountMax().intValue()) {
-            return "redirect:/merp/allplayers";
-        }
-        return "orderedList";
+    @PostMapping("/adventure/fight")
+    public String fightPost(@ModelAttribute(value = "players")NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
+        nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
+            playerService.checkAndSetStats(player);
+            playerRepository.save(player);
+        });
+        return "redirect:/merp/adventure/fight"; //TODO this way the attack will be duplicated upon save --> Save button DISABLED!!!
     }
+
+//    //TODO is it in use? If not, DELETE
+//    @GetMapping("/orderedlist")
+//    public String orderedList(Model model, Model model2) {
+//        fightCount.setFightCount(fightCount.getFightCount() + 1);
+//        fightCount.setFightCountMax(3);
+//        List<Player> orderedList = playerService.adventurersOrderedList();
+//        model.addAttribute("orderedList", orderedList);
+//        model2.addAttribute("counter", fightCount);
+//        if (fightCount.getFightCount().intValue() == fightCount.getFightCountMax().intValue()) {
+//            return "redirect:/merp/allplayers";
+//        }
+//        return "orderedList";
+//    }
 
     @GetMapping("/adventure/nextfight")
     public String nextFight() {

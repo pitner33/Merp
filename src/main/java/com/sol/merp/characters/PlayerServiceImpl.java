@@ -111,7 +111,6 @@ public class PlayerServiceImpl implements PlayerService {
             attacker.setTarget(PlayerTarget.none);
             attacker.setIsActive(false);
         }
-
     }
 
     //picks the next ACTIVE player from ordered list as attacker, and its target, put them into a list and wrap the list into an object
