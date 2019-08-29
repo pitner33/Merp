@@ -35,9 +35,9 @@ public class Player {
     private Double hpMax;
     private Double hpActual; //TODO setter cannot go below 0 - in case of dead character
     private Integer mm;
-    private Integer tb;
+    private Integer tb; //TODO Hasmpap legyen azattacktype syerinti kulcsokkal és a hozzá tartozó TB értékekkel
     private Integer tbUsedForDefense;
-    private Integer secondaryTB;
+    private Integer secondaryTB; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
     private Integer baseMagicTB;
     private Integer targetMagicTB;
     private Integer vb;

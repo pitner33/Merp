@@ -36,6 +36,8 @@ public interface PlayerService {
 
     void experienceCounterCrit(String crit);
     void experienceCounterKill();
+    void experienceCounterManeuver();
+    void experienceCounterMagic();
 
 
 

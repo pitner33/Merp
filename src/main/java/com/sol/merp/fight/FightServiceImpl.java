@@ -126,13 +126,14 @@ public class FightServiceImpl implements FightService {
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
-//            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+//
 
 
             //TODO separate method playerservice void(PLayer defender)
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
 
+            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
             playerService.experienceCounterKill();
 
             return attackResultsDTO;

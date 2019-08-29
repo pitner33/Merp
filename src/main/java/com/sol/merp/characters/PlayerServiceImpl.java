@@ -298,6 +298,32 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    public void experienceCounterManeuver() {
+        //TODO implement method
+    }
+
+    @Override
+    public void experienceCounterMagic() {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        int magicLvl = 1; //TODO ivenni a magiclevlelt valahonnan, és a methodot magát betenni a helyére, hogy számolja az XP-t
+        Double experienceMagic = 0D;
+
+        if (attacker.getLvl() <= magicLvl) {
+            experienceMagic = 100D;
+        } else {
+            experienceMagic = Double.valueOf(100 - ((attacker.getLvl() - magicLvl) * 10));
+        }
+
+        if (experienceMagic < 0) {
+            experienceMagic = 0D;
+        }
+
+        attacker.setXp(attacker.getXp() + experienceMagic);
+        refreshAdventurerOrderedListObject(attacker);
+
+    }
+
+    @Override
     public Boolean isPlayerFightAlone() {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         int count = 0;
