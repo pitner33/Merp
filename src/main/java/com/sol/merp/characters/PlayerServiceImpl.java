@@ -96,35 +96,25 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
-    public List<Player> nextPlayersToFight() {
+    public List<Player> nextPlayersToFight() { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
         List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
+        //TODO mivel itt változik a lista mérete, néha kimarad plazer a támadásból
+        // --> megoldani ugyanezt az orderedListtel
         List<Player> allPlayersFightInNextRound = orderedList
                 .stream()
                 .filter(player -> player.getIsActive())
                 .collect(Collectors.toList());
 
-        Integer counter = fightCount.getFightCount(); //TODO unnecessary, remove, use fightCount.getCount()
         fightCount.setFightCountMax(allPlayersFightInNextRound.size());
-        List<Player> nextPlayersTofight = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight(); //TODO remove, unnecessary, use the Object itself
 
-        if (counter <= fightCount.getFightCountMax()) {
-            Player attacker = allPlayersFightInNextRound.get(counter - 1);
+        if (fightCount.getFightCount() <= fightCount.getFightCountMax()) {
+            Player attacker = allPlayersFightInNextRound.get(fightCount.getFightCount() - 1);
             if (!attacker.getIsActive()) {
                 do {
-                    counter += 1;
-                    attacker = allPlayersFightInNextRound.get(counter - 1);
+                    fightCount.setFightCount(fightCount.getFightCount() + 1);
+                    attacker = allPlayersFightInNextRound.get(fightCount.getFightCount() - 1);
                 } while (!attacker.getIsActive());
             }
-            fightCount.setFightCount(counter);
-
-            List<Player> newOrderedList = new ArrayList<>();
-
-//            for (int i = 0; i < orderedList.size(); i++) {
-//                if (orderedList.get(i).getId().equals(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getId())) {
-//                    newOrderedList.add(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1));
-//                } else newOrderedList.add(orderedList.get(i));
-//            }
-//            adventurerOrderedListObject.setPlayerList(newOrderedList);
 
             String defenderCharacterId = attacker.getTarget().toString();
             Player defender = playerRepository.findByCharacterId(defenderCharacterId);
@@ -135,14 +125,8 @@ public class PlayerServiceImpl implements PlayerService {
 
             nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
 
-
-
-
             return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-        } else {
-
-            return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-        }
+        } else return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
     }
 
     @Override
