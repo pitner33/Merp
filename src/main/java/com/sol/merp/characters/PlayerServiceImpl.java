@@ -98,22 +98,17 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public List<Player> nextPlayersToFight() { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
         List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
-        //TODO mivel itt változik a lista mérete, néha kimarad plazer a támadásból
-        // --> megoldani ugyanezt az orderedListtel
-        List<Player> allPlayersFightInNextRound = orderedList
-                .stream()
-                .filter(player -> player.getIsActive())
-                .collect(Collectors.toList());
 
-        fightCount.setFightCountMax(allPlayersFightInNextRound.size());
+        fightCount.setFightCountMax(orderedList.size());
 
         if (fightCount.getFightCount() <= fightCount.getFightCountMax()) {
-            Player attacker = allPlayersFightInNextRound.get(fightCount.getFightCount() - 1);
-            if (!attacker.getIsActive()) {
-                do {
+            Player attacker = orderedList.get(fightCount.getFightCount() - 1);
+            while (!attacker.getIsActive())  {
                     fightCount.setFightCount(fightCount.getFightCount() + 1);
-                    attacker = allPlayersFightInNextRound.get(fightCount.getFightCount() - 1);
-                } while (!attacker.getIsActive());
+                    if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
+                        break;
+                    }
+                    attacker = orderedList.get(fightCount.getFightCount() - 1);
             }
 
             String defenderCharacterId = attacker.getTarget().toString();
