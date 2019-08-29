@@ -1,6 +1,7 @@
 package com.sol.merp.modifiers;
 
 import lombok.*;
+import org.springframework.stereotype.Component;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -11,11 +12,12 @@ import javax.persistence.Id;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
+@Component
+//@Entity
 public class AttackModifier{
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
+//    @Id
+//    @GeneratedValue(strategy = GenerationType.AUTO)
+//    private Long id;
     private Boolean attackFromWeakSide;
     private Boolean attackFromBehind;
     private Boolean defenderSurprised;
@@ -24,40 +26,46 @@ public class AttackModifier{
     private Boolean attackerHPBelow50Percent;
     private Boolean attackerMoreThan3MetersMovement;
 
-    public Integer countAttackModifier() {
-        Integer attackModifierNum = 0;
-        if (attackFromWeakSide) {
-            attackModifierNum += 15;
-        }
-        if (attackFromBehind) {
-            attackModifierNum += 20;
-        }
-        if (defenderSurprised) {
-            attackModifierNum += 20;
-        }
-        if (defenderStunned) {
-            attackModifierNum += 20;
-        }
-        if (attackFromWeakSide) {
-            attackModifierNum -= 30;
-        }
-        if (attackerHPBelow50Percent) {
-            attackModifierNum -= 20;
-        }
-        if (attackerMoreThan3MetersMovement) {
-            attackModifierNum -= 10;
-        }
+//    public Integer countAttackModifier() {
+//        Integer attackModifierNum = 0;
+//        if (attackFromWeakSide) {
+//            attackModifierNum += 15;
+//        }
+//        if (attackFromBehind) {
+//            attackModifierNum += 20;
+//        }
+//        if (defenderSurprised) {
+//            attackModifierNum += 20;
+//        }
+//        if (defenderStunned) {
+//            attackModifierNum += 20;
+//        }
+//        if (attackFromWeakSide) {
+//            attackModifierNum -= 30;
+//        }
+//        if (attackerHPBelow50Percent) {
+//            attackModifierNum -= 20;
+//        }
+//        if (attackerMoreThan3MetersMovement) {
+//            attackModifierNum -= 10;
+//        }
+//
+//        return attackModifierNum;
+//    }
 
-        return attackModifierNum;
-    }
-
-    public AttackModifier(Boolean attackFromWeakSide, Boolean attackFromBehind, Boolean defenderSurprised, Boolean defenderStunned, Boolean attackerWeaponChange, Boolean attackerHPBelow50Percent, Boolean attackerMoreThan3MetersMovement) {
-        this.attackFromWeakSide = attackFromWeakSide;
-        this.attackFromBehind = attackFromBehind;
-        this.defenderSurprised = defenderSurprised;
-        this.defenderStunned = defenderStunned;
-        this.attackerWeaponChange = attackerWeaponChange;
-        this.attackerHPBelow50Percent = attackerHPBelow50Percent;
-        this.attackerMoreThan3MetersMovement = attackerMoreThan3MetersMovement;
-    }
+//    public AttackModifier(Boolean attackFromWeakSide,
+//                          Boolean attackFromBehind,
+//                          Boolean defenderSurprised,
+//                          Boolean defenderStunned,
+//                          Boolean attackerWeaponChange,
+//                          Boolean attackerHPBelow50Percent,
+//                          Boolean attackerMoreThan3MetersMovement) {
+//        this.attackFromWeakSide = attackFromWeakSide;
+//        this.attackFromBehind = attackFromBehind;
+//        this.defenderSurprised = defenderSurprised;
+//        this.defenderStunned = defenderStunned;
+//        this.attackerWeaponChange = attackerWeaponChange;
+//        this.attackerHPBelow50Percent = attackerHPBelow50Percent;
+//        this.attackerMoreThan3MetersMovement = attackerMoreThan3MetersMovement;
+//    }
 }

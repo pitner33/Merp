@@ -209,6 +209,7 @@ public class FightServiceImpl implements FightService {
                 IF fail:
                     failmodifier
 TODO      */
+        logger.info("TB counted: " + (attacker.getTb() - attacker.getTbUsedForDefense()));
         return attacker.getTb() - attacker.getTbUsedForDefense();
     }
 
@@ -220,6 +221,7 @@ TODO      */
         Magia MD ide vagy kulon??? merthogz ay roll!
 
  TODO     */
+        logger.info("VB counted: " + (defender.getVb() + defender.getTbUsedForDefense()));
         return defender.getVb() + defender.getTbUsedForDefense();
     }
 

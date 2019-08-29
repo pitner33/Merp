@@ -17,7 +17,7 @@
         </div>
     </div>
     <div>
-        <form th:action="@{'/merp/adventure/prefight'}" th:object="${players}" method="post">
+        <form th:action="@{'/merp/adventure/prefight/saveplayer'}" th:object="${players}" method="post">
             <div class="form-group">
                 <div>
                     <table class="table table-bordered">
@@ -329,53 +329,54 @@
 
     <!--        </div>-->
     <!--    </div>-->
+<!--        TODO kijavítani a babythymeleaf alapján-->
     <div>
-        <form th:action="@{'/merp/adventure/round'}" th:object="${attackmodifier}" method="post">
+        <form th:action="@{'/merp/adventure/prefight/savemodifier'}" th:object="${attackmodifier}" method="post">
 
 
             <div class="form-group">
 
                 <div>
-                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save Changes'"></button>
+                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save modifiers'"></button>
                     <a class="btn btn-lg btn-primary" th:href="@{/merp/adventure/round}" th:text="Back"></a>
                 </div>
                 <div>
                     <ul>
                         <li>
-                            <input id="weaksideattack" name="weaksideattack" type="checkbox"
+                            <input class="form-control" th:align="left" id="weaksideattack" name="weaksideattack" type="checkbox"
                                    th:value="*{attackFromWeakSide}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="weaksideattack">Attackfrom weak side</label>
                         </li>
                         <li>
-                            <input id="backstab" name="backstab" type="checkbox" th:value="*{attackFromBehind}"/>
+                            <input class="form-control" th:align="left" id="backstab" name="backstab" type="checkbox" th:value="*{attackFromBehind}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="backstab">Backstab</label>
                         </li>
                         <li>
-                            <input id="surprised" name="surprised" type="checkbox" th:value="*{defenderSurprised}"/>
+                            <input class="form-control" th:align="left" id="surprised" name="surprised" type="checkbox" th:value="*{defenderSurprised}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="surprised">Target is surprised</label>
                         </li>
                         <li>
-                            <input id="stunned" name="stunned" type="checkbox" th:value="*{defenderStunned}"/>
+                            <input class="form-control" th:align="left" id="stunned" name="stunned" type="checkbox" th:field="*{defenderStunned}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="stunned">Target is stunned</label>
                         </li>
                         <li>
-                            <input id="weaponchange" name="weaponchange" type="checkbox"
-                                   th:value="*{attackerWeaponChange}"/>
+                            <input class="form-control" th:align="left" id="weaponchange" name="weaponchange" type="checkbox"
+                                   th:field="*{attackerWeaponChange}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="weaponchange">Attacker weapon change</label>
                         </li>
                         <li>
-                            <input id="below50" name="below50" type="checkbox" th:value="*{attackerHPBelow50Percent}"/>
+                            <input class="form-control" th:align="left" id="below50" name="below50" type="checkbox" th:field="*{attackerHPBelow50Percent}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="below50">Attacker HP below 50%</label>
                         </li>
                         <li>
-                            <input id="morethan3meters" name="morethan3meters" type="checkbox"
-                                   th:value="*{attackerMoreThan3MetersMovement}"/>
+                            <input class="form-control" th:align="left" id="morethan3meters" name="morethan3meters" type="checkbox"
+                                   th:field="*{attackerMoreThan3MetersMovement}"/>
                             <!--                        <input name="_features" type="hidden" value="on" />-->
                             <label for="morethan3meters">Attacker moves more than 3 meters</label>
                         </li>
