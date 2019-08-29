@@ -20,7 +20,7 @@ public interface PlayerService {
 
     void checkIfTargetIsInOrderedList(Player attacker);
 
-    List<Player> nextPlayersToFight();
+    NextTwoPlayersToFigthObject nextPlayersToFight();
 
     List<Player> stunnedPlayers();
 

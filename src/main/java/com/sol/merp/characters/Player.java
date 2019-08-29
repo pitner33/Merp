@@ -154,7 +154,13 @@ public class Player {
         this.stealth = stealth;
     }
 
-//    public void setHpActual(Double hpActual) {
+//    public void setTbUsedForDefense(Integer tbUsedForDefense) {
+//        if (tbUsedForDefense > this.tb / 2) {
+//            this.tbUsedForDefense = this.tb / 2;
+//        } else this.tbUsedForDefense = tbUsedForDefense;
+//    }
+
+    //    public void setHpActual(Double hpActual) {
 //        if (hpActual <= 0d) {
 //            this.hpActual = 0d;
 //            this.isActive = false;

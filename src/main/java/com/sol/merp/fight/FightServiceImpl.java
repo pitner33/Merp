@@ -209,7 +209,7 @@ public class FightServiceImpl implements FightService {
                 IF fail:
                     failmodifier
 TODO      */
-        return attacker.getTb();
+        return attacker.getTb() - attacker.getTbUsedForDefense();
     }
 
     @Override
@@ -220,7 +220,7 @@ TODO      */
         Magia MD ide vagy kulon??? merthogz ay roll!
 
  TODO     */
-        return defender.getVb();
+        return defender.getVb() + defender.getTbUsedForDefense();
     }
 
     @Override

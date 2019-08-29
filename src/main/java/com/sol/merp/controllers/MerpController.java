@@ -135,12 +135,23 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/prefight")
-    public String preFight(Model model, Model model3, Model m, Model modelHealthPercent) {
+    public String preFight(Model modelNextTwoPlayers,
+                           Model modelAttackModifier,
+                           Model modelFightCount,
+                           Model modelPlayerActivity,
+                           Model modelAttackType,
+                           Model modelCritType,
+                           Model modelPlayerTarget,
+                           Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
 
-        model.addAttribute("players", playerService.nextPlayersToFight());
-        model3.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
-        m.addAttribute("counter", fightCount);
+        modelNextTwoPlayers.addAttribute("players", playerService.nextPlayersToFight());
+        modelAttackModifier.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
+        modelFightCount.addAttribute("counter", fightCount);
+        modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
+        modelAttackType.addAttribute("modelAttackType", AttackType.values());
+        modelCritType.addAttribute("modelCritType", CritType.values());
+        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
         //TODO outofbound a vegen
 //        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(playersFight.get(1)));
 
@@ -149,6 +160,18 @@ public class MerpController {
         } else {
             return "adventurePreFight";
         }
+    }
+
+    @PostMapping("/adventure/prefight")
+    public String prefightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
+        fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
+        nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
+            //here refreshing ordered list, KEEP the order, checkAndSetStat, also save in repo
+            playerService.refreshAdventurerOrderedListObject(player);
+            //TODO for weapon change Secondary TB? Or smtg.
+            //TODO for targetchange decrease TB to half (check the rules)
+        });
+        return "redirect:/merp/adventure/prefight";
     }
 
     @GetMapping("/adventure/fight")

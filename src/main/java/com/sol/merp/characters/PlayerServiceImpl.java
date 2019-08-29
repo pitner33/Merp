@@ -115,7 +115,7 @@ public class PlayerServiceImpl implements PlayerService {
 
     //picks the next ACTIVE player from ordered list as attacker, and its target, put them into a list and wrap the list into an object
     @Override
-    public List<Player> nextPlayersToFight() { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
+    public NextTwoPlayersToFigthObject nextPlayersToFight() { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
         List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
 
         fightCount.setFightCountMax(orderedList.size());
@@ -139,8 +139,8 @@ public class PlayerServiceImpl implements PlayerService {
 
             nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
 
-            return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-        } else return nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+            return nextTwoPlayersToFigthObject;
+        } else return nextTwoPlayersToFigthObject;
     }
 
     @Override
@@ -210,6 +210,10 @@ public class PlayerServiceImpl implements PlayerService {
             player.setIsActive(false);
         } else {
             player.setIsActive(true);
+        }
+
+        if (player.getTbUsedForDefense() > player.getTb() / 2) {
+            player.setTbUsedForDefense(player.getTb() / 2);
         }
 
         playerRepository.save(player);

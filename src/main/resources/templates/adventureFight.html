@@ -415,22 +415,22 @@
     </div>
 </div>
 <div class="alert alert-info" role="alert" th:align="center">
-    <strong th:text="${resultDTO.getD100OpenRoll()}"></strong>
+    <strong th:text="'D100 Open roll: ' + ${resultDTO.getD100OpenRoll()}"></strong>
 </div>
 <div class="alert alert-info" role="alert" th:align="center">
-    <strong th:text="${resultDTO.getRollResult()}"></strong>
+    <strong th:text="'Roll result: ' + ${resultDTO.getRollResult()}"></strong>
 </div>
 <div class="alert alert-success" role="alert" th:align="center">
-    <strong th:text="${resultDTO.getAttackResult()}"></strong>
+    <strong th:text="'Attack result: ' + ${resultDTO.getAttackResult()}"></strong>
 </div>
 <div class="alert alert-success" role="alert" th:align="center">
-    <strong th:text="${resultDTO.getCritResultText()}"></strong>
+    <strong th:text="'Crit effect: ' + ${resultDTO.getCritResultText()}"></strong>
 </div>
 <div class="alert alert-success" role="alert" th:align="center">
     <strong th:text="'Full damage: ' + ${resultDTO.getFullDamage()}"></strong>
 </div>
 <div class="alert alert-danger" role="alert" th:align="center">
-    <strong th:text="${resultDTO.getFailResultText()}"></strong>
+    <strong th:text="'Kudarc: ' + ${resultDTO.getFailResultText()}"></strong>
 </div>
 
 
