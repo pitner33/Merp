@@ -151,12 +151,14 @@ public class MerpController {
                            Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
         NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject = playerService.nextPlayersToFight();
-        attackModifierService.setAttackModifierPlayerValues();
+//
+//        TODO fix that shit
+//        attackModifierService.setAttackModifierPlayerValues();
+
         experienceModifiers.setIsTargetAlive(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getIsAlive());
 
 
         modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
-//        modelAttackModifier.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
         modelAttackModifier.addAttribute("attackmodifier", attackModifier);
 
         modelFightCount.addAttribute("counter", fightCount);
@@ -188,6 +190,15 @@ public class MerpController {
     @PostMapping("/adventure/prefight/savemodifier")
     public String prefightPost(@ModelAttribute(value = "attackmodifier") AttackModifier modified) {
         fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
+
+        attackModifier.setAttackFromWeakSide(modified.getAttackFromWeakSide());
+        attackModifier.setAttackFromBehind(modified.getAttackFromBehind());
+        attackModifier.setDefenderSurprised(modified.getDefenderSurprised());
+        attackModifier.setDefenderStunned(modified.getDefenderStunned());
+        attackModifier.setAttackerWeaponChange(modified.getAttackerWeaponChange());
+        attackModifier.setAttackerTargetChange(modified.getAttackerTargetChange());
+        attackModifier.setAttackerHPBelow50Percent(modified.getAttackerHPBelow50Percent());
+        attackModifier.setAttackerMoreThan3MetersMovement(modified.getAttackerMoreThan3MetersMovement());
 //        attackModifierService.setAttackModifierAllValues(modified);
 
         logger.info("ATTACKMODIFIER STUN {} ", attackModifier.getDefenderStunned().toString());
@@ -251,6 +262,14 @@ public class MerpController {
 
     @GetMapping("/adventure/nextfight")
     public String nextFight() {
+        attackModifier.setAttackFromWeakSide(false);
+        attackModifier.setAttackFromBehind(false);
+        attackModifier.setDefenderSurprised(false);
+        attackModifier.setDefenderStunned(false);
+        attackModifier.setAttackerWeaponChange(false);
+        attackModifier.setAttackerTargetChange(false);
+        attackModifier.setAttackerHPBelow50Percent(false);
+        attackModifier.setAttackerMoreThan3MetersMovement(false);
 
         return "redirect:/merp/adventure/prefight";
     }

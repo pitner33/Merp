@@ -7,6 +7,6 @@ import org.springframework.stereotype.Service;
 public interface AttackModifierService {
     Integer countAttackModifier();
     void setAttackModifierPlayerValues();
-    void setAttackModifierAllValues(AttackModifier attackModifier);
+//    void setAttackModifierAllValues(AttackModifier attackModifier);
 
 }

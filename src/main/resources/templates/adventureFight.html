@@ -309,41 +309,43 @@
                     <ul>
                         <li>
                             <input id="weaksideattack" name="weaksideattack" type="checkbox"
-                                   th:value="*{attackFromWeakSide}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="weaksideattack">Attackfrom weak side</label>
+                                   th:field="*{attackFromWeakSide}"/>
+                            <label for="weaksideattack">Attack from weak side</label>
                         </li>
                         <li>
-                            <input id="backstab" name="backstab" type="checkbox" th:value="*{attackFromBehind}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
+                            <input id="backstab" name="backstab" type="checkbox"
+                                   th:field="*{attackFromBehind}"/>
                             <label for="backstab">Backstab</label>
                         </li>
                         <li>
-                            <input id="surprised" name="surprised" type="checkbox" th:value="*{defenderSurprised}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="surprised">Target is surprised</label>
+                            <input id="surprised" name="surprised" type="checkbox"
+                                   th:field="*{defenderSurprised}"/>
+                            <label for="surprised">Target surprised</label>
                         </li>
                         <li>
-                            <input id="stunned" name="stunned" type="checkbox" th:value="*{defenderStunned}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="stunned">Target is stunned</label>
+                            <input id="stunned" name="stunned" type="checkbox"
+                                   th:field="*{defenderStunned}"/>
+                            <label for="stunned">Target stunned</label>
                         </li>
                         <li>
                             <input id="weaponchange" name="weaponchange" type="checkbox"
-                                   th:value="*{attackerWeaponChange}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="weaponchange">Attacker weapon change</label>
+                                   th:field="*{attackerWeaponChange}"/>
+                            <label for="weaponchange">Attacker changes weapon</label>
                         </li>
                         <li>
-                            <input id="below50" name="below50" type="checkbox" th:value="*{attackerHPBelow50Percent}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="below50">Attacker HP below 50%</label>
+                            <input id="targetchange" name="targetchange" type="checkbox"
+                                   th:field="*{attackerTargetChange}"/>
+                            <label for="weaponchange">Attacker changes target</label>
+                        </li>
+                        <li>
+                            <input id="below50" name="below50" type="checkbox"
+                                   th:field="*{attackerHPBelow50Percent}"/>
+                            <label for="below50">Attacker HP below 50 percent</label>
                         </li>
                         <li>
                             <input id="morethan3meters" name="morethan3meters" type="checkbox"
-                                   th:value="*{attackerMoreThan3MetersMovement}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="morethan3meters">Attacker moves more than 3 meters</label>
+                                   th:field="*{attackerMoreThan3MetersMovement}"/>
+                            <label for="morethan3meters">Attacker moved more than 3 meters</label>
                         </li>
 
                     </ul>

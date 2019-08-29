@@ -338,48 +338,60 @@
 
                 <div>
                     <button class="btn btn-lg btn-success" type="submit" th:text="'Save modifiers'"></button>
+
                     <a class="btn btn-lg btn-primary" th:href="@{/merp/adventure/round}" th:text="Back"></a>
                 </div>
                 <div>
                     <ul>
                         <li>
-                            <input class="form-control" th:align="left" id="weaksideattack" name="weaksideattack" type="checkbox"
-                                   th:value="*{attackFromWeakSide}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="weaksideattack">Attackfrom weak side</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="weaksideattack" name="weaksideattack" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackFromWeakSide}" th:text="' Attack from weak side '"/>
+                            </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="backstab" name="backstab" type="checkbox" th:value="*{attackFromBehind}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="backstab">Backstab</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="backstab" name="backstab" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackFromBehind}" th:text="' Backstab '"/>
+                                </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="surprised" name="surprised" type="checkbox" th:value="*{defenderSurprised}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="surprised">Target is surprised</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="surprised" name="surprised" type="checkbox" checked autocomplete="off"
+                                       th:field="*{defenderSurprised}" th:text="' Target surprised '"/>
+                                </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="stunned" name="stunned" type="checkbox" th:field="*{defenderStunned}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="stunned">Target is stunned</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="stunned" name="stunned" type="checkbox" checked autocomplete="off"
+                                       th:field="*{defenderStunned}" th:text="' Target stunned '"/>
+                                </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="weaponchange" name="weaponchange" type="checkbox"
-                                   th:field="*{attackerWeaponChange}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="weaponchange">Attacker weapon change</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="weaponchange" name="weaponchange" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackerWeaponChange}" th:text="' Attacker changes weapon '"/>
+                                </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="below50" name="below50" type="checkbox" th:field="*{attackerHPBelow50Percent}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="below50">Attacker HP below 50%</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="targetchange" name="targetchange" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackerTargetChange}" th:text="' Attacker changes target '"/>
+                                </label>
                         </li>
                         <li>
-                            <input class="form-control" th:align="left" id="morethan3meters" name="morethan3meters" type="checkbox"
-                                   th:field="*{attackerMoreThan3MetersMovement}"/>
-                            <!--                        <input name="_features" type="hidden" value="on" />-->
-                            <label for="morethan3meters">Attacker moves more than 3 meters</label>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="hp" name="hp" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackerHPBelow50Percent}" th:text="' Attacker HP below 50 percent '"/>
+                            </label>
                         </li>
+                        <li>
+                            <label class="btn-lg btn-secondary active" >
+                                <input id="move" name="move" type="checkbox" checked autocomplete="off"
+                                       th:field="*{attackerMoreThan3MetersMovement}" th:text="' Attacker moved more than 3 meters '"/>
+                            </label>
+                        </li>
+
 
                     </ul>
                 </div>

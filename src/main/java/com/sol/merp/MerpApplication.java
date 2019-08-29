@@ -78,6 +78,7 @@ public class MerpApplication implements CommandLineRunner {
         attackModifier.setDefenderSurprised(false);
         attackModifier.setDefenderStunned(false);
         attackModifier.setAttackerWeaponChange(false);
+        attackModifier.setAttackerTargetChange(false);
         attackModifier.setAttackerHPBelow50Percent(false);
         attackModifier.setAttackerMoreThan3MetersMovement(false);
 

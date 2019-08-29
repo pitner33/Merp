@@ -40,6 +40,9 @@ public class AttackModifierServiceImpl implements AttackModifierService {
         if (attackModifier.getAttackerMoreThan3MetersMovement()) {
             attackModifierNum -= 10;
         }
+        if (attackModifier.getAttackerTargetChange()) {
+            //TODO Attacker TB 50% if true, 100% if Not + refresh adventurerOrderedListObject
+        }
 
         return attackModifierNum;
     }
@@ -51,22 +54,22 @@ public class AttackModifierServiceImpl implements AttackModifierService {
 
         if (playerService.healthPercent(attacker) < 50) {
             attackModifier.setAttackerHPBelow50Percent(true);
-        }
+        } else attackModifier.setAttackerHPBelow50Percent(false);
 
         if (defender.getIsStunned()) {
             attackModifier.setDefenderStunned(true);
-        }
+        } else attackModifier.setDefenderStunned(false);
 
     }
 
-    @Override
-    public void setAttackModifierAllValues(AttackModifier attackModifier) {
-        attackModifier.setAttackFromWeakSide(attackModifier.getAttackFromWeakSide());
-        attackModifier.setAttackFromBehind(attackModifier.getAttackFromBehind());
-        attackModifier.setDefenderSurprised(attackModifier.getDefenderSurprised());
-        attackModifier.setDefenderStunned(attackModifier.getDefenderStunned());
-        attackModifier.setAttackerWeaponChange(attackModifier.getAttackerWeaponChange());
-        attackModifier.setAttackerHPBelow50Percent(attackModifier.getAttackerHPBelow50Percent());
-        attackModifier.setAttackerMoreThan3MetersMovement(attackModifier.getAttackerMoreThan3MetersMovement());
-    }
+//    @Override
+//    public void setAttackModifierAllValues(AttackModifier attackModifier) {
+//        attackModifier.setAttackFromWeakSide(attackModifier.getAttackFromWeakSide());
+//        attackModifier.setAttackFromBehind(attackModifier.getAttackFromBehind());
+//        attackModifier.setDefenderSurprised(attackModifier.getDefenderSurprised());
+//        attackModifier.setDefenderStunned(attackModifier.getDefenderStunned());
+//        attackModifier.setAttackerWeaponChange(attackModifier.getAttackerWeaponChange());
+//        attackModifier.setAttackerHPBelow50Percent(attackModifier.getAttackerHPBelow50Percent());
+//        attackModifier.setAttackerMoreThan3MetersMovement(attackModifier.getAttackerMoreThan3MetersMovement());
+//    }
 }

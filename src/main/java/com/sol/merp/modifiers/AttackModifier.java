@@ -23,6 +23,7 @@ public class AttackModifier{
     private Boolean defenderSurprised;
     private Boolean defenderStunned;
     private Boolean attackerWeaponChange;
+    private Boolean attackerTargetChange;
     private Boolean attackerHPBelow50Percent;
     private Boolean attackerMoreThan3MetersMovement;
 

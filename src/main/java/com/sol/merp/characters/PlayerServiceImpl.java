@@ -3,6 +3,7 @@ package com.sol.merp.characters;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.fight.FightCount;
+import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.modifiers.ExperienceModifiers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,9 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Autowired
     ExperienceModifiers experienceModifiers;
+
+    @Autowired
+    AttackModifierService attackModifierService;
 
     @Override
     public void changeIsPlayStatus(Player player) {
@@ -142,6 +146,8 @@ public class PlayerServiceImpl implements PlayerService {
             nextTwoPLayersToFight.add(defender);
 
             nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
+
+            attackModifierService.setAttackModifierPlayerValues();
 
             return nextTwoPlayersToFigthObject;
         } else return nextTwoPlayersToFigthObject;
