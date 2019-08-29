@@ -75,7 +75,7 @@ public class Player {
         this.isActive = true;
         this.isAlive = true;
         this.lvl = lvl;
-        this.xp = Double.valueOf(lvl * 1000);
+        this.xp = Double.valueOf(lvl * 10000);
         this.playerActivity = playerActivity;
         this.attackType = attackType;
         this.critType = critType;

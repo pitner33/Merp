@@ -13,6 +13,7 @@ import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifier;
 //import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.modifiers.AttackModifierService;
+import com.sol.merp.modifiers.ExperienceModifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,8 @@ public class MerpController {
     PlayerListObject adventurerOrderedListObject;
     @Autowired
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
+    @Autowired
+    ExperienceModifiers experienceModifiers;
 
 
     @GetMapping("/allplayers")  //TODO allplayers only for players, separate page for NPCs
@@ -149,6 +152,7 @@ public class MerpController {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
         NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject = playerService.nextPlayersToFight();
         attackModifierService.setAttackModifierPlayerValues();
+        experienceModifiers.setIsTargetAlive(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getIsAlive());
 
 
         modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
@@ -176,7 +180,6 @@ public class MerpController {
         nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
             //here refreshing ordered list, KEEP the order, checkAndSetStat, also save in repo
             playerService.refreshAdventurerOrderedListObject(player);
-            //TODO for weapon change Secondary TB? Or smtg.
             //TODO for targetchange decrease TB to half (check the rules)
         });
         return "redirect:/merp/adventure/prefight";
@@ -225,8 +228,9 @@ public class MerpController {
     @PostMapping("/adventure/fight")
     public String fightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
         nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
-            playerService.checkAndSetStats(player);
-            playerRepository.save(player);
+//            playerService.checkAndSetStats(player);
+//            playerRepository.save(player);
+            playerService.refreshAdventurerOrderedListObject(player);
         });
         return "redirect:/merp/adventure/fight"; //TODO this way the attack will be duplicated upon save --> Save button DISABLED!!!
     }

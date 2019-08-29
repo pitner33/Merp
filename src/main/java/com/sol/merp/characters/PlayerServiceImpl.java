@@ -3,6 +3,7 @@ package com.sol.merp.characters;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.fight.FightCount;
+import com.sol.merp.modifiers.ExperienceModifiers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,9 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Autowired
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
+
+    @Autowired
+    ExperienceModifiers experienceModifiers;
 
     @Override
     public void changeIsPlayStatus(Player player) {
@@ -223,5 +227,85 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public void playerExperienceCounter(Player player) {
 //TODO lehet ezt külön methodokba kellene attackresult/death/mm/stb-re
+    }
+
+    @Override
+    public void experienceCounterCrit(String crit) {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        Double defenderLvl = Double.valueOf(defender.getLvl());
+
+
+        if (crit.equals("X")) {
+            experienceModifiers.setCritMultiplyer(0D);
+        } else if (crit.equals("T")) {
+            experienceModifiers.setCritMultiplyer(0D);
+        } else if (crit.equals("A")) {
+            experienceModifiers.setCritMultiplyer(5D);
+        } else if (crit.equals("B")) {
+            experienceModifiers.setCritMultiplyer(10D);
+        } else if (crit.equals("C")) {
+            experienceModifiers.setCritMultiplyer(15D);
+        } else if (crit.equals("D")) {
+            experienceModifiers.setCritMultiplyer(20D);
+        } else if (crit.equals("E")) {
+            experienceModifiers.setCritMultiplyer(25D);
+        }
+
+        if (!defender.getIsAlive()) {
+            experienceModifiers.setCritModifier(0D);
+        } else if (healthPercent(defender) < 15) {
+            experienceModifiers.setCritModifier(0.1);
+        } else if (defender.getIsStunned()) {
+            experienceModifiers.setCritModifier(0.5);
+        } else if (isPlayerFightAlone()) {
+            experienceModifiers.setCritModifier(2D);
+        } else  experienceModifiers.setCritModifier(1D);
+
+        Double experienceAttacker = defenderLvl * experienceModifiers.getCritMultiplyer() * experienceModifiers.getCritModifier();
+        attacker.setXp(attacker.getXp() + experienceAttacker);
+        refreshAdventurerOrderedListObject(attacker);
+
+        Double experienceDefender = 20 * experienceModifiers.getCritMultiplyer();
+        defender.setXp(defender.getXp() + experienceDefender);
+        refreshAdventurerOrderedListObject(defender);
+    }
+
+    @Override
+    public void experienceCounterKill() {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        Double experienceKill = 0D;
+
+        if ((!defender.getIsAlive()) && (experienceModifiers.getIsTargetAlive())) {
+            if(attacker.getLvl().equals(defender.getLvl())) {
+                experienceKill = 200D;
+            }
+            if(attacker.getLvl() < defender.getLvl()) {
+                experienceKill = 200D + (defender.getLvl() - attacker.getLvl()) * 50;
+            }
+            if(attacker.getLvl() > defender.getLvl()) {
+                experienceKill = 200D - (attacker.getLvl() - defender.getLvl()) * 25;
+            }
+        }
+
+        if (experienceKill < 0) {
+            experienceKill = 0D;
+        }
+        attacker.setXp(attacker.getXp() + experienceKill);
+        refreshAdventurerOrderedListObject(attacker);
+
+    }
+
+    @Override
+    public Boolean isPlayerFightAlone() {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        int count = 0;
+        for (Player player: adventurerOrderedListObject.getPlayerList()) {
+            if (player.getTarget() == attacker.getTarget()) {
+                count += 1;
+            }
+        }
+        return count == 1;
     }
 }

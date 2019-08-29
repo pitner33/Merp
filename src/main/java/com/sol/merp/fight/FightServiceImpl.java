@@ -121,15 +121,19 @@ public class FightServiceImpl implements FightService {
                 defender.setIsStunned(true);
                 defender.setPlayerActivity(PlayerActivity._5DoNothing);
                 logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
-                //TODO kitalalni, hogy a /round ertekek hogyan lesznek automatice szamolva (roundszamlalo az elejen indul es jegyzi mikor kapta a buntit)
             }
 
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
 
+//            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+
+
             //TODO separate method playerservice void(PLayer defender)
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
+
+            playerService.experienceCounterKill();
 
             return attackResultsDTO;
         }

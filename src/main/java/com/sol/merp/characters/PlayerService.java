@@ -34,6 +34,13 @@ public interface PlayerService {
 
     void playerExperienceCounter(Player player);
 
+    void experienceCounterCrit(String crit);
+    void experienceCounterKill();
+
+
+
+    Boolean isPlayerFightAlone();
+
 }
 
 //TODO bandage/refresh method a HP/round nullazasra
