@@ -1,6 +1,7 @@
 package com.sol.merp.characters;
 
 import com.sol.merp.attributes.PlayerActivity;
+import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.fight.FightCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -93,7 +94,24 @@ public class PlayerServiceImpl implements PlayerService {
         System.out.println(allWhoPlays.toString());
         System.out.println(allWhoPlays.getClass());
         adventurerOrderedListObject.setPlayerList(allWhoPlays);
+
+        adventurerOrderedListObject.getPlayerList().forEach(this::checkIfTargetIsInOrderedList);
         return allWhoPlays;
+    }
+
+    //checks if player's target was in ordered list, and if not, set to inactive
+    @Override
+    public void checkIfTargetIsInOrderedList(Player attacker) {
+        Boolean isTargetInOrderedList;
+
+        String targetCharacterId = attacker.getTarget().toString();
+        Player target = playerRepository.findByCharacterId(targetCharacterId);
+
+        if (!adventurerOrderedListObject.getPlayerList().contains(target)) {
+            attacker.setTarget(PlayerTarget.none);
+            attacker.setIsActive(false);
+        }
+
     }
 
     //picks the next ACTIVE player from ordered list as attacker, and its target, put them into a list and wrap the list into an object
@@ -196,5 +214,11 @@ public class PlayerServiceImpl implements PlayerService {
         }
 
         playerRepository.save(player);
+    }
+
+    //Adds experience points after each and every action
+    @Override
+    public void playerExperienceCounter(Player player) {
+//TODO lehet ezt külön methodokba kellene attackresult/death/mm/stb-re
     }
 }

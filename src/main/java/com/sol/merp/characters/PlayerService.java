@@ -18,6 +18,8 @@ public interface PlayerService {
 
     List<Player> adventurersOrderedList();
 
+    void checkIfTargetIsInOrderedList(Player attacker);
+
     List<Player> nextPlayersToFight();
 
     List<Player> stunnedPlayers();
@@ -29,6 +31,8 @@ public interface PlayerService {
     void refreshAdventurerOrderedListObject(Player defender);
 
     void checkAndSetStats(Player player);
+
+    void playerExperienceCounter(Player player);
 
 }
 
