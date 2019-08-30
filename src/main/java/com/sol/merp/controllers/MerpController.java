@@ -32,8 +32,6 @@ public class MerpController {
     private PlayerRepository playerRepository;
     @Autowired
     private PlayerService playerService;
-    //    @Autowired
-//    private AttackModifierRepository attackModifierRepository;
     @Autowired
     AttackModifier attackModifier;
     @Autowired
@@ -118,7 +116,6 @@ public class MerpController {
                         Model modelDeadPlayers) {
 
         modelRoundCount.addAttribute("modelRoundCount", round.getRoundCount());
-//        modelModifiers.addAttribute("modelModifiers", attackModifierRepository.findById(13L).get());
         modelModifiers.addAttribute("modelModifiers", attackModifier);
         modelOrderedList.addAttribute("modelOrderedList", adventurerOrderedListObject);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
@@ -151,16 +148,11 @@ public class MerpController {
                            Model modelHealthPercent) {
         fightCount.setFightCount(fightCount.getFightCount() + 1);
         NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject = playerService.nextPlayersToFight();
-//
-//        TODO fix that shit
-//        attackModifierService.setAttackModifierPlayerValues();
 
         experienceModifiers.setIsTargetAlive(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getIsAlive());
 
-
         modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
         modelAttackModifier.addAttribute("attackmodifier", attackModifier);
-
         modelFightCount.addAttribute("counter", fightCount);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
@@ -180,6 +172,7 @@ public class MerpController {
     public String prefightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
         fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
         nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
+
             //here refreshing ordered list, KEEP the order, checkAndSetStat, also save in repo
             playerService.refreshAdventurerOrderedListObject(player);
             //TODO for targetchange decrease TB to half (check the rules)
@@ -191,15 +184,7 @@ public class MerpController {
     public String prefightPost(@ModelAttribute(value = "attackmodifier") AttackModifier modified) {
         fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
 
-        attackModifier.setAttackFromWeakSide(modified.getAttackFromWeakSide());
-        attackModifier.setAttackFromBehind(modified.getAttackFromBehind());
-        attackModifier.setDefenderSurprised(modified.getDefenderSurprised());
-        attackModifier.setDefenderStunned(modified.getDefenderStunned());
-        attackModifier.setAttackerWeaponChange(modified.getAttackerWeaponChange());
-        attackModifier.setAttackerTargetChange(modified.getAttackerTargetChange());
-        attackModifier.setAttackerHPBelow50Percent(modified.getAttackerHPBelow50Percent());
-        attackModifier.setAttackerMoreThan3MetersMovement(modified.getAttackerMoreThan3MetersMovement());
-//        attackModifierService.setAttackModifierAllValues(modified);
+        attackModifierService.setAttackModifierFromPostMethod(modified);
 
         logger.info("ATTACKMODIFIER STUN {} ", attackModifier.getDefenderStunned().toString());
         logger.info("ATTACKMODIFIER SUPR {} ", attackModifier.getDefenderSurprised().toString());
@@ -225,7 +210,6 @@ public class MerpController {
 
         modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
         modelResultDTO.addAttribute("resultDTO", attackResultsDTO);
-//        modelAttackModifier.addAttribute("attackmodifier", attackModifierRepository.findById(13L).get());
         modelAttackModifier.addAttribute("attackmodifier", attackModifier);
         modelFightCount.addAttribute("counter", fightCount);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
@@ -239,38 +223,15 @@ public class MerpController {
     @PostMapping("/adventure/fight")
     public String fightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
         nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
-//            playerService.checkAndSetStats(player);
-//            playerRepository.save(player);
             playerService.refreshAdventurerOrderedListObject(player);
         });
-        return "redirect:/merp/adventure/fight"; //TODO this way the attack will be duplicated upon save --> Save button DISABLED!!!
+        return "redirect:/merp/adventure/fight"; // this way the attack will be duplicated upon save --> Save button DISABLED!!!
     }
 
-//    //TODO is it in use? If not, DELETE
-//    @GetMapping("/orderedlist")
-//    public String orderedList(Model model, Model model2) {
-//        fightCount.setFightCount(fightCount.getFightCount() + 1);
-//        fightCount.setFightCountMax(3);
-//        List<Player> orderedList = playerService.adventurersOrderedList();
-//        model.addAttribute("orderedList", orderedList);
-//        model2.addAttribute("counter", fightCount);
-//        if (fightCount.getFightCount().intValue() == fightCount.getFightCountMax().intValue()) {
-//            return "redirect:/merp/allplayers";
-//        }
-//        return "orderedList";
-//    }
 
     @GetMapping("/adventure/nextfight")
     public String nextFight() {
-        attackModifier.setAttackFromWeakSide(false);
-        attackModifier.setAttackFromBehind(false);
-        attackModifier.setDefenderSurprised(false);
-        attackModifier.setDefenderStunned(false);
-        attackModifier.setAttackerWeaponChange(false);
-        attackModifier.setAttackerTargetChange(false);
-        attackModifier.setAttackerHPBelow50Percent(false);
-        attackModifier.setAttackerMoreThan3MetersMovement(false);
-
+        attackModifierService.resetAttackmodifier();
         return "redirect:/merp/adventure/prefight";
     }
 
@@ -289,5 +250,4 @@ public class MerpController {
 
         return "redirect:/merp/adventure/round";
     }
-
 }

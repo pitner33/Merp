@@ -147,8 +147,6 @@ public class PlayerServiceImpl implements PlayerService {
 
             nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
 
-            attackModifierService.setAttackModifierPlayerValues();
-
             return nextTwoPlayersToFigthObject;
         } else return nextTwoPlayersToFigthObject;
     }

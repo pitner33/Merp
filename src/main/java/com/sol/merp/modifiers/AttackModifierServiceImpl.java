@@ -16,6 +16,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
 
 
+    //Todo betenni amegfelelő helyre
     @Override
     public Integer countAttackModifier() {
         Integer attackModifierNum = 0;
@@ -48,7 +49,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     }
 
     @Override
-    public void setAttackModifierPlayerValues() {
+    public void setAttackModifierFromPostMethod(AttackModifier attackModifierFromPost) {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
@@ -60,16 +61,34 @@ public class AttackModifierServiceImpl implements AttackModifierService {
             attackModifier.setDefenderStunned(true);
         } else attackModifier.setDefenderStunned(false);
 
+        attackModifier.setAttackFromWeakSide(attackModifierFromPost.getAttackFromWeakSide());
+        attackModifier.setAttackFromBehind(attackModifierFromPost.getAttackFromBehind());
+        attackModifier.setDefenderSurprised(attackModifierFromPost.getDefenderSurprised());
+        attackModifier.setAttackerWeaponChange(attackModifierFromPost.getAttackerWeaponChange());
+        attackModifier.setAttackerTargetChange(attackModifierFromPost.getAttackerTargetChange());
+        attackModifier.setAttackerMoreThan3MetersMovement(attackModifierFromPost.getAttackerMoreThan3MetersMovement());
     }
 
-//    @Override
-//    public void setAttackModifierAllValues(AttackModifier attackModifier) {
-//        attackModifier.setAttackFromWeakSide(attackModifier.getAttackFromWeakSide());
-//        attackModifier.setAttackFromBehind(attackModifier.getAttackFromBehind());
-//        attackModifier.setDefenderSurprised(attackModifier.getDefenderSurprised());
-//        attackModifier.setDefenderStunned(attackModifier.getDefenderStunned());
-//        attackModifier.setAttackerWeaponChange(attackModifier.getAttackerWeaponChange());
-//        attackModifier.setAttackerHPBelow50Percent(attackModifier.getAttackerHPBelow50Percent());
-//        attackModifier.setAttackerMoreThan3MetersMovement(attackModifier.getAttackerMoreThan3MetersMovement());
-//    }
+    @Override
+    public void resetAttackmodifier() {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+
+        if (playerService.healthPercent(attacker) < 50) {
+            attackModifier.setAttackerHPBelow50Percent(true);
+        } else attackModifier.setAttackerHPBelow50Percent(false);
+
+        if (defender.getIsStunned()) {
+            attackModifier.setDefenderStunned(true);
+        } else attackModifier.setDefenderStunned(false);
+
+
+        attackModifier.setAttackFromWeakSide(false);
+        attackModifier.setAttackFromBehind(false);
+        attackModifier.setDefenderSurprised(false);
+        attackModifier.setAttackerWeaponChange(false);
+        attackModifier.setAttackerTargetChange(false);
+        attackModifier.setAttackerMoreThan3MetersMovement(false);
+
+    }
 }
