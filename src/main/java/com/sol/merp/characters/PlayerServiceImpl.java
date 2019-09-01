@@ -2,6 +2,7 @@ package com.sol.merp.characters;
 
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
+import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.fight.FightCount;
 import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.modifiers.ExperienceModifiers;
@@ -147,6 +148,7 @@ public class PlayerServiceImpl implements PlayerService {
 
             nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
 
+
             return nextTwoPlayersToFigthObject;
         } else return nextTwoPlayersToFigthObject;
     }
@@ -233,6 +235,15 @@ public class PlayerServiceImpl implements PlayerService {
 //TODO lehet ezt külön methodokba kellene attackresult/death/mm/stb-re
     }
 
+    //experience from getting wounded
+    @Override
+    public void experienceCounterHPLoss(Integer hpLoss) {
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        defender.setXp(defender.getXp() + hpLoss);
+        refreshAdventurerOrderedListObject(defender);
+    }
+
+    //experience from giving or getting crit blow
     @Override
     public void experienceCounterCrit(String crit) {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);

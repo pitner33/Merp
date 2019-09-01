@@ -26,6 +26,7 @@ public class AttackModifier{
     private Boolean attackerTargetChange;
     private Boolean attackerHPBelow50Percent;
     private Boolean attackerMoreThan3MetersMovement;
+    private Integer modifierByGameMaster;
 
 //    public Integer countAttackModifier() {
 //        Integer attackModifierNum = 0;

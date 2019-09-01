@@ -391,6 +391,12 @@
                                        th:field="*{attackerMoreThan3MetersMovement}" th:text="' Attacker moved more than 3 meters '"/>
                             </label>
                         </li>
+                        <li>
+                            <label class="btn-lg btn-secondary active" th:text="' Extra modifier added by GameMaster '"></label>
+                                <input id="gm" name="gm" type="text" checked autocomplete="off"
+                                       th:field="*{modifierByGameMaster}" />
+
+                        </li>
 
 
                     </ul>

@@ -45,6 +45,8 @@ public class AttackModifierServiceImpl implements AttackModifierService {
             //TODO Attacker TB 50% if true, 100% if Not + refresh adventurerOrderedListObject
         }
 
+        attackModifierNum += attackModifier.getModifierByGameMaster();
+
         return attackModifierNum;
     }
 
@@ -67,19 +69,38 @@ public class AttackModifierServiceImpl implements AttackModifierService {
         attackModifier.setAttackerWeaponChange(attackModifierFromPost.getAttackerWeaponChange());
         attackModifier.setAttackerTargetChange(attackModifierFromPost.getAttackerTargetChange());
         attackModifier.setAttackerMoreThan3MetersMovement(attackModifierFromPost.getAttackerMoreThan3MetersMovement());
+        attackModifier.setModifierByGameMaster(attackModifierFromPost.getModifierByGameMaster());
     }
+
+//    @Override
+//    public void setAttackModifierOnlyPlayerDependent() {
+//        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+//        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+//
+//        if (playerService.healthPercent(attacker) < 50) {
+//            attackModifier.setAttackerHPBelow50Percent(true);
+//        } else attackModifier.setAttackerHPBelow50Percent(false);
+//
+//        if (defender.getIsStunned()) {
+//            attackModifier.setDefenderStunned(true);
+//        } else attackModifier.setDefenderStunned(false);
+//    }
 
     @Override
     public void resetAttackmodifier() {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
-        if (playerService.healthPercent(attacker) < 50) {
-            attackModifier.setAttackerHPBelow50Percent(true);
+        if (attacker != null) {
+            if (playerService.healthPercent(attacker) < 50) {
+                attackModifier.setAttackerHPBelow50Percent(true);
+            } else attackModifier.setAttackerHPBelow50Percent(false);
         } else attackModifier.setAttackerHPBelow50Percent(false);
 
-        if (defender.getIsStunned()) {
-            attackModifier.setDefenderStunned(true);
+        if (defender != null) {
+            if (defender.getIsStunned()) {
+                attackModifier.setDefenderStunned(true);
+            } else attackModifier.setDefenderStunned(false);
         } else attackModifier.setDefenderStunned(false);
 
 
@@ -89,6 +110,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
         attackModifier.setAttackerWeaponChange(false);
         attackModifier.setAttackerTargetChange(false);
         attackModifier.setAttackerMoreThan3MetersMovement(false);
+        attackModifier.setModifierByGameMaster(0);
 
     }
 }

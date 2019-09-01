@@ -74,7 +74,8 @@
                             <!--                        th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'"-->
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].id}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].id}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].id}">
                             </td>
                             <td>
@@ -83,14 +84,17 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].characterId}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].name}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].name}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].name}">
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].gender}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].gender}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].gender}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].race}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].race}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].race}">
                             </td>
                             <td>
@@ -100,39 +104,45 @@
                             </td>
 
 
-
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].lvl}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].lvl}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].lvl}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].xp}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].xp}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].xp}">
                             </td>
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].playerActivity}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].playerActivity}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].playerActivity}">
                             </td>
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].target}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].target}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].target}">
                             </td>
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].attackType}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].attackType}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].attackType}">
                             </td>
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].critType}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].critType}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].critType}">
                             </td>
 
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].hpMax}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].hpMax}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].hpMax}">
                             </td>
                             <td>
@@ -141,16 +151,19 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].hpActual}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].mm}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].mm}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].mm}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].tb}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].tb}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].tb}">
                             </td>
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].tbUsedForDefense}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].tbUsedForDefense}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].tbUsedForDefense}">
                             </td>
 
@@ -170,11 +183,13 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].vb}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].vb}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].vb}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].shield}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].shield}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].shield}">
                             </td>
                             <td>
@@ -206,7 +221,8 @@
                             <!-- -------------------------------------------------------------------------------------------- -->
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].stunnedForRounds}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].stunnedForRounds}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].stunnedForRounds}">
                             </td>
 
@@ -285,155 +301,161 @@
                     </table>
                 </div>
                 <div>
-<!--                    TODO no need for this button at fight results IF Fail and instant death will be implemented-->
-<!--                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save player'"></button>-->
+                    <!--                    TODO no need for this button at fight results IF Fail and instant death will be implemented-->
+                    <!--                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save player'"></button>-->
                 </div>
             </div>
         </form>
 
 
+        <div>
+            <form th:action="@{'/merp/adventure/round'}" th:object="${attackmodifier}" method="post">
 
 
+                <div class="form-group">
 
-    <div>
-        <form th:action="@{'/merp/adventure/round'}" th:object="${attackmodifier}" method="post">
+                    <div>
+                        <!--                    TODO no need this button on fight results page - just show them-->
+                        <!--                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save Modifiers'"></button>-->
+                    </div>
+                    <div>
+                        <ul>
+                            <li>
+                                <input id="weaksideattack" name="weaksideattack" type="checkbox"
+                                       th:field="*{attackFromWeakSide}"/>
+                                <label for="weaksideattack">Attack from weak side</label>
+                            </li>
+                            <li>
+                                <input id="backstab" name="backstab" type="checkbox"
+                                       th:field="*{attackFromBehind}"/>
+                                <label for="backstab">Backstab</label>
+                            </li>
+                            <li>
+                                <input id="surprised" name="surprised" type="checkbox"
+                                       th:field="*{defenderSurprised}"/>
+                                <label for="surprised">Target surprised</label>
+                            </li>
+                            <li>
+                                <input id="stunned" name="stunned" type="checkbox"
+                                       th:field="*{defenderStunned}"/>
+                                <label for="stunned">Target stunned</label>
+                            </li>
+                            <li>
+                                <input id="weaponchange" name="weaponchange" type="checkbox"
+                                       th:field="*{attackerWeaponChange}"/>
+                                <label for="weaponchange">Attacker changes weapon</label>
+                            </li>
+                            <li>
+                                <input id="targetchange" name="targetchange" type="checkbox"
+                                       th:field="*{attackerTargetChange}"/>
+                                <label for="weaponchange">Attacker changes target</label>
+                            </li>
+                            <li>
+                                <input id="below50" name="below50" type="checkbox"
+                                       th:field="*{attackerHPBelow50Percent}"/>
+                                <label for="below50">Attacker HP below 50 percent</label>
+                            </li>
+                            <li>
+                                <input id="morethan3meters" name="morethan3meters" type="checkbox"
+                                       th:field="*{attackerMoreThan3MetersMovement}"/>
+                                <label for="morethan3meters">Attacker moved more than 3 meters</label>
+                            </li>
+                            <li>
+                                <label for="gm"> Extra modifier added by GameMaster </label>
+                                <input id="gm" name="gm" type="text"
+                                       th:field="*{modifierByGameMaster}"/>
+                            </li>
 
-
-            <div class="form-group">
-
-                <div>
-<!--                    TODO no need this button on fight results page - just show them-->
-<!--                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save Modifiers'"></button>-->
+                        </ul>
+                    </div>
                 </div>
-                <div>
-                    <ul>
-                        <li>
-                            <input id="weaksideattack" name="weaksideattack" type="checkbox"
-                                   th:field="*{attackFromWeakSide}"/>
-                            <label for="weaksideattack">Attack from weak side</label>
-                        </li>
-                        <li>
-                            <input id="backstab" name="backstab" type="checkbox"
-                                   th:field="*{attackFromBehind}"/>
-                            <label for="backstab">Backstab</label>
-                        </li>
-                        <li>
-                            <input id="surprised" name="surprised" type="checkbox"
-                                   th:field="*{defenderSurprised}"/>
-                            <label for="surprised">Target surprised</label>
-                        </li>
-                        <li>
-                            <input id="stunned" name="stunned" type="checkbox"
-                                   th:field="*{defenderStunned}"/>
-                            <label for="stunned">Target stunned</label>
-                        </li>
-                        <li>
-                            <input id="weaponchange" name="weaponchange" type="checkbox"
-                                   th:field="*{attackerWeaponChange}"/>
-                            <label for="weaponchange">Attacker changes weapon</label>
-                        </li>
-                        <li>
-                            <input id="targetchange" name="targetchange" type="checkbox"
-                                   th:field="*{attackerTargetChange}"/>
-                            <label for="weaponchange">Attacker changes target</label>
-                        </li>
-                        <li>
-                            <input id="below50" name="below50" type="checkbox"
-                                   th:field="*{attackerHPBelow50Percent}"/>
-                            <label for="below50">Attacker HP below 50 percent</label>
-                        </li>
-                        <li>
-                            <input id="morethan3meters" name="morethan3meters" type="checkbox"
-                                   th:field="*{attackerMoreThan3MetersMovement}"/>
-                            <label for="morethan3meters">Attacker moved more than 3 meters</label>
-                        </li>
+            </form>
 
-                    </ul>
-                </div>
-            </div>
-        </form>
+        </div>
 
-    </div>
+        <!--    <div align="center">-->
+        <!--        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>-->
+        <!--    </div>-->
+        <div align="center">
+            <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/nextfight}" th:text="'NEXT FIGHT'"></a>
+        </div>
+        <div align="center">
+            <a class="btn btn-lg btn-info" th:href="@{/merp/adventure/nextround}" th:text="'END Of ROUND'"></a>
+        </div>
 
-    <!--    <div align="center">-->
-    <!--        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>-->
-    <!--    </div>-->
-    <div align="center">
-        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/nextfight}" th:text="'NEXT FIGHT'"></a>
-    </div>
-    <div align="center">
-        <a class="btn btn-lg btn-info" th:href="@{/merp/adventure/nextround}" th:text="'END Of ROUND'"></a>
-    </div>
-
-    <div>
-        <table class="table table-bordered">
-            <thead th:style="'background-color:gray'">
-            <tr>
-                <th>Attack Result</th>
-                <th>Base damage</th>
-                <th>Crit type</th>
-                <th>Crit result</th>
-                <th>Crit additional damage</th>
-                <th>Crit HPloss/round</th>
-                <th>Crit Stunned/round</th>
-                <th>Crit Penalty of actions</th>
-                <th>Full damage without bleeding</th>
-                <th>Full damage</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr>
-                <td th:text="${resultDTO.getAttackResult()}"></td>
-                <td th:text="${resultDTO.getBaseDamage()}"></td>
-                <td th:text="${resultDTO.getCrit()}"></td>
-                <td th:text="${resultDTO.getCritResultText()}"></td>
-                <td th:text="${resultDTO.getCritResultAdditionalDamage()}"></td>
-                <td th:text="${resultDTO.getCritResultHPLossPerRound()}"></td>
-                <td th:text="${resultDTO.getCritResultStunnedForRounds()}"></td>
-                <td th:text="${resultDTO.getCritResultPenaltyOfActions()}"></td>
-                <td th:text="${resultDTO.getFullDamageWithoutBleeding()}"></td>
-                <td th:text="${resultDTO.getFullDamage()}"></td>
-            </tr>
-            </tbody>
-        </table>
-
-    </div>
-    <div>
         <div>
             <table class="table table-bordered">
                 <thead th:style="'background-color:gray'">
                 <tr>
-                    <th>Fail Result</th>
-
+                    <th>Attack Result</th>
+                    <th>Base damage</th>
+                    <th>Crit type</th>
+                    <th>Crit result</th>
+                    <th>Crit additional damage</th>
+                    <th>Crit HPloss/round</th>
+                    <th>Crit Stunned/round</th>
+                    <th>Crit Penalty of actions</th>
+                    <th>Full damage without bleeding</th>
+                    <th>Full damage</th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr>
-                    <td th:text="${resultDTO.getFailResultText()}"></td>
+                    <td th:text="${resultDTO.getAttackResult()}"></td>
+                    <td th:text="${resultDTO.getBaseDamage()}"></td>
+                    <td th:text="${resultDTO.getCrit()}"></td>
+                    <td th:text="${resultDTO.getCritResultText()}"></td>
+                    <td th:text="${resultDTO.getCritResultAdditionalDamage()}"></td>
+                    <td th:text="${resultDTO.getCritResultHPLossPerRound()}"></td>
+                    <td th:text="${resultDTO.getCritResultStunnedForRounds()}"></td>
+                    <td th:text="${resultDTO.getCritResultPenaltyOfActions()}"></td>
+                    <td th:text="${resultDTO.getFullDamageWithoutBleeding()}"></td>
+                    <td th:text="${resultDTO.getFullDamage()}"></td>
                 </tr>
                 </tbody>
             </table>
+
         </div>
+        <!--        TODO delete - need space on screen-->
+        <!--    <div>-->
+        <!--        <div>-->
+        <!--            <table class="table table-bordered">-->
+        <!--                <thead th:style="'background-color:gray'">-->
+        <!--                <tr>-->
+        <!--                    <th>Fail Result</th>-->
+
+        <!--                </tr>-->
+        <!--                </thead>-->
+        <!--                <tbody>-->
+        <!--                <tr>-->
+        <!--                    <td th:text="${resultDTO.getFailResultText()}"></td>-->
+        <!--                </tr>-->
+        <!--                </tbody>-->
+        <!--            </table>-->
+        <!--        </div>-->
+        <!--    </div>-->
     </div>
-</div>
-<div class="alert alert-info" role="alert" th:align="center">
-    <strong th:text="'D100 Open roll: ' + ${resultDTO.getD100OpenRoll()}"></strong>
-</div>
-<div class="alert alert-info" role="alert" th:align="center">
-    <strong th:text="'Roll result: ' + ${resultDTO.getRollResult()}"></strong>
-</div>
-<div class="alert alert-success" role="alert" th:align="center">
-    <strong th:text="'Attack result: ' + ${resultDTO.getAttackResult()}"></strong>
-</div>
-<div class="alert alert-success" role="alert" th:align="center">
-    <strong th:text="'Crit effect: ' + ${resultDTO.getCritResultText()}"></strong>
-</div>
-<div class="alert alert-success" role="alert" th:align="center">
-    <strong th:text="'Full damage: ' + ${resultDTO.getFullDamage()}"></strong>
-</div>
-<div class="alert alert-danger" role="alert" th:align="center">
-    <strong th:text="'Kudarc: ' + ${resultDTO.getFailResultText()}"></strong>
-</div>
+    <div class="alert alert-info" role="alert" th:align="center">
+        <strong th:text="'D100 Open roll: ' + ${resultDTO.getD100OpenRoll()}"></strong>
+    </div>
+    <div class="alert alert-info" role="alert" th:align="center">
+        <strong th:text="'Roll result: ' + ${resultDTO.getRollResult()}"></strong>
+    </div>
+    <div class="alert alert-info" role="alert" th:align="center">
+        <strong th:text="'Attack modifiers alltogether: ' + ${modelAttackModifierResult}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert" th:align="center">
+        <strong th:text="'Attack result: ' + ${resultDTO.getAttackResult()}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert" th:align="center">
+        <strong th:text="'Crit effect: ' + ${resultDTO.getCritResultText()}"></strong>
+    </div>
+    <div class="alert alert-success" role="alert" th:align="center">
+        <strong th:text="'Full damage: ' + ${resultDTO.getFullDamage()}"></strong>
+    </div>
+    <div class="alert alert-danger" role="alert" th:align="center">
+        <strong th:text="'Kudarc: ' + ${resultDTO.getFailResultText()}"></strong>
+    </div>
 
 
 </div>

@@ -1,7 +1,9 @@
 package com.sol.merp.characters;
 
+import com.sol.merp.dto.AttackResultsDTO;
 import org.springframework.stereotype.Service;
 
+import javax.persistence.Index;
 import java.util.List;
 
 @Service
@@ -34,6 +36,7 @@ public interface PlayerService {
 
     void playerExperienceCounter(Player player);
 
+    void experienceCounterHPLoss(Integer hpLoss);
     void experienceCounterCrit(String crit);
     void experienceCounterKill();
     void experienceCounterManeuver();

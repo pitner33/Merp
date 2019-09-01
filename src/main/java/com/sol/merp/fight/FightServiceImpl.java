@@ -11,6 +11,7 @@ import com.sol.merp.characters.PlayerService;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
+import com.sol.merp.modifiers.AttackModifierService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,9 @@ public class FightServiceImpl implements FightService {
 
     @Autowired
     PlayerListObject adventurerOrderedListObject;
+
+    @Autowired
+    AttackModifierService attackModifierService;
 
     @Override
     public void attack(Player attacker, Player defender) {
@@ -123,17 +127,21 @@ public class FightServiceImpl implements FightService {
                 logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
             }
 
-            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage()); //TODO  setHPactual methodba beletenni h nem halott-e
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
             logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+
+            if (attackResultsDTO.getCritResultsInstantDeath()) {
+                defender.setIsAlive(false);
+            }
 
 //
 
 
-            //TODO separate method playerservice void(PLayer defender)
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
 
-            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+//            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
+//            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
             playerService.experienceCounterKill();
 
             return attackResultsDTO;
@@ -214,8 +222,12 @@ public class FightServiceImpl implements FightService {
                 IF fail:
                     failmodifier
 TODO      */
+        Integer attackModifierValue = attackModifierService.countAttackModifier();
+        logger.info("modifier {}", attackModifierService.countAttackModifier());
+        logger.info("TB player {}", attacker.getTb());
+        logger.info("TB count {}", attacker.getTb() - attacker.getTbUsedForDefense() + attackModifierValue);
         logger.info("TB counted: " + (attacker.getTb() - attacker.getTbUsedForDefense()));
-        return attacker.getTb() - attacker.getTbUsedForDefense();
+        return attacker.getTb() - attacker.getTbUsedForDefense() + attackModifierValue;
     }
 
     @Override
@@ -325,6 +337,8 @@ TODO      */
         logger.info("CRIT: CritRoll : {}", critRoll);
         logger.info("CRIT: Modified CritRoll : {}", critRollModified);
 
+//        critRollModified = 120; //TODO delete! Only for testing
+
         //ctitRoll Results
         List<String> critResultRow = getCritResultRow(attacker, critRollModified);
 
@@ -333,6 +347,9 @@ TODO      */
         attackResultsDTO.setCritResultHPLossPerRound(Integer.parseInt(critResultRow.get(2)));
         attackResultsDTO.setCritResultStunnedForRounds(Integer.parseInt(critResultRow.get(3)));
         attackResultsDTO.setCritResultPenaltyOfActions(Integer.parseInt(critResultRow.get(4)));
+        if (critResultRow.get(5).equals("1")) {
+            attackResultsDTO.setCritResultsInstantDeath(true);
+        }
     }
 
     @Override
