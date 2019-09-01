@@ -111,7 +111,7 @@
                         </td>
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 20%">
                             <select class="form-control" th:field="*{playerList[__${i.index}__].playerActivity}">
                                 <option th:each="playerActivityElement : ${modelPlayerActivity}"
                                         th:value="${playerActivityElement}"
@@ -123,7 +123,7 @@
                         <!-- -------------------------------------------------------------------------------------------- -->
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 20%">
                             <select class="form-control" th:field="*{playerList[__${i.index}__].target}">
                                 <option th:each="playerTargetElement : ${modelPlayerTarget}"
                                         th:value="${playerTargetElement}"
@@ -135,7 +135,7 @@
                         <!-- -------------------------------------------------------------------------------------------- -->
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 20%">
                             <select class="form-control" th:field="*{playerList[__${i.index}__].attackType}">
                                 <option th:each="attackTypeElement : ${modelAttackType}"
                                         th:value="${attackTypeElement}"
@@ -147,7 +147,7 @@
                         <!-- -------------------------------------------------------------------------------------------- -->
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 20%">
                             <select class="form-control" th:field="*{playerList[__${i.index}__].critType}">
                                 <option th:each="critTypeElement : ${modelCritType}"
                                         th:value="${critTypeElement}"
@@ -177,7 +177,7 @@
                         </td>
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 8%">
                             <input class="form-control" type="text"
                                    th:field="*{playerList[__${i.index}__].tbUsedForDefense}">
                         </td>
@@ -228,7 +228,7 @@
                         </td>
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 5%">
                             <input class="form-control" type="checkbox"
                                    th:field="*{playerList[__${i.index}__].isStunned}">
                         </td>
@@ -239,17 +239,24 @@
                         <!-- -------------------------------------------------------------------------------------------- -->
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 8%">
                             <input class="form-control" type="text"
                                    th:field="*{playerList[__${i.index}__].stunnedForRounds}">
                         </td>
                         <!-- -------------------------------------------------------------------------------------------- -->
 
-                        <td>
-                            <input class="form-control" type="hidden"
-                                   th:text="*{playerList[__${i.index}__].penaltyOfActions}"
+<!--                        <td>-->
+<!--                            <input class="form-control" type="hidden"-->
+<!--                                   th:text="*{playerList[__${i.index}__].penaltyOfActions}"-->
+<!--                                   th:field="*{playerList[__${i.index}__].penaltyOfActions}">-->
+<!--                        </td>-->
+                        <!--###### CHANGEABLE ##########################################################################-->
+                        <td style="width: 8%">
+                            <input class="form-control" type="text"
                                    th:field="*{playerList[__${i.index}__].penaltyOfActions}">
                         </td>
+                        <!-- -------------------------------------------------------------------------------------------- -->
+
                         <td>
                             <input class="form-control" type="hidden"
                                    th:text="*{playerList[__${i.index}__].hpLossPerRound}"
@@ -258,14 +265,14 @@
 
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 5%">
                             <input class="form-control" type="checkbox"
                                    th:field="*{playerList[__${i.index}__].isActive}">
                         </td>
                         <!-- -------------------------------------------------------------------------------------------- -->
 
                         <!--###### CHANGEABLE ##########################################################################-->
-                        <td style="width: 10%">
+                        <td style="width: 5%">
                             <input class="form-control" type="checkbox"
                                    th:field="*{playerList[__${i.index}__].isAlive}">
                         </td>

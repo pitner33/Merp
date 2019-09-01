@@ -3,7 +3,6 @@ package com.sol.merp._TODOS;
 public class TODOS {
 
     /*
-    TODO prefight/savePlayer nem ment
     TODO KÉSZ, TESZTELNI attackModifierService.resetAttackmodifier(); a nextfightban ha csak két player... tud nullpointert dobni valahogy
      (Akkor van, ha manuálisan kistunnolom, de a targetet none-on hagyom - kell ezzel kezdeni valamit?)
      --> reset methodban megvizsgálni, hogy nem null-e a defender és csak akkor plazer szerint, amúgy meg false legyen KÉSZ, TESZTELNI
@@ -11,8 +10,6 @@ public class TODOS {
 
 
 
-    TODO /round Penalty for activities szerkeszthető legyen, mert néha van /kör effekt belőle
-    TODO Target mező legyen szélesebb, mert a legördülő menü nyilától pont nem létszik a target
     TODO Ball magic
     TODO AoE effect támadásnál
     TODO Alapmágia
