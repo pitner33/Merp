@@ -69,6 +69,13 @@ public class MerpController {
         return "redirect:/merp/allplayers";
     }
 
+    @GetMapping("/revive/{id}")
+    public String revivePlayer(@PathVariable Long id) {
+        Player player = playerRepository.findById(id).get();
+        playerService.revivePlayer(player);
+        return "redirect:/merp/allplayers";
+    }
+
     @GetMapping("/edit/{id}")
     public String editPlayer(@PathVariable Long id, Model model) {
         playerService.playerActivitySwitch();

@@ -28,8 +28,6 @@ public class TODOS {
     TODO elején a JK és NJK karakterek kiválasztása külön oldalon történjen - majd az adventure oldalon látszódnak együtt
     TODO NJK B-t feltölteni indokolatlan mennyiségű karakterrel (A Target enumlistát eszerint bővíteni)
     TODO karakter editálás (pl a szintlépést egyelőre kézileg megoldani, meg amúgy is van amikor kell)
-    TODO Karakter Refresh - amikor pihennek 8 órát vagy X időt és meggyógyul a sebesülésből, a statjai visszaállnak alapértékre
-    TODO Karakter Revive - amikor egy karaktert felélesztek: az IsAlive true, és a statjai alapártékre állnak (hogy a halott ork többször játszható legyen)
     TODO ha változtatás volt, de nem lett elmentve, a save gomb más színű legyen!!!!
 
 

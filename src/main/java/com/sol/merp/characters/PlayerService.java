@@ -14,6 +14,8 @@ public interface PlayerService {
 
     void doNothingWhenStunned();
 
+    void revivePlayer(Player player);
+
     Boolean playerDead(Player player);
 
     Boolean isPlayerHealthBelow50percent(Player player);

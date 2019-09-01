@@ -90,6 +90,7 @@
                 <th>Runes</th>
                 <th>Influence</th>
                 <th>Stealth</th>
+                <th>REVIVE</th>
                 <th>EDIT</th>
                 <th>DEL</th>
             </tr>
@@ -141,6 +142,7 @@
                 <td th:text="${player.getRunes()}"></td>
                 <td th:text="${player.getInfluence()}"></td>
                 <td th:text="${player.getStealth()}"></td>
+                <td><a class="btn btn-dark btn-sm" th:href="@{'/merp/revive/' + ${player.getId()}}" th:text="'REVIVE'"> </a></td>
                 <td><a class="btn btn-warning btn-sm" th:href="@{'/merp/edit/' + ${player.getId()}}" th:text="'EDIT'"> </a></td>
                 <td><a class="btn btn-danger btn-sm" th:href="@{'/merp/delete/' + ${player.getId()}}" th:text="'DEL'"> </a></td>
                 <td th:text="${player.getIsActive()}" type="text"></td>

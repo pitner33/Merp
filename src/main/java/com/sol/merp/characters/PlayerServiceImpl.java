@@ -67,6 +67,20 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    public void revivePlayer(Player player) {
+        player.setIsAlive(true);
+        player.setIsActive(true);
+        player.setIsStunned(false);
+        player.setStunnedForRounds(0);
+        player.setHpActual(player.getHpMax());
+        player.setTbUsedForDefense(0);
+        player.setPenaltyOfActions(0);
+        player.setHpLossPerRound(0);
+
+        playerRepository.save(player);
+    }
+
+    @Override
     public Boolean playerDead(Player player) {
         if (player.getHpActual() <= 0) {
             return true;
