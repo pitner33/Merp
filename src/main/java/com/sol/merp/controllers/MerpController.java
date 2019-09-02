@@ -140,10 +140,15 @@ public class MerpController {
 
     @PostMapping("/adventure/round")
     public String roundPost(@ModelAttribute(value = "modelOrderedList") PlayerListObject playerListObject) {
-        playerListObject.getPlayerList().forEach(player -> {
-            playerService.checkAndSetStats(player); //TODO is it used? If so, than change to adventurerOrderedObjectRefresh
-            playerRepository.save(player);
+        playerListObject.getPlayerList().forEach(player -> playerRepository.save(player));
+        playerService.adventurersOrderedList();
+        adventurerOrderedListObject.getPlayerList().forEach(player -> {
+            playerService.checkAndSetStats(player);
         });
+//        playerListObject.getPlayerList().forEach(player -> {
+//            playerService.checkAndSetStats(player); //TODO is it used? If so, than change to adventurerOrderedObjectRefresh
+//            playerRepository.save(player);
+//        });
         return "redirect:/merp/adventure/round";
     }
 

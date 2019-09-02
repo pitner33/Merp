@@ -237,11 +237,12 @@ public class PlayerServiceImpl implements PlayerService {
             player.setIsActive(true);
         }
 
+        setTbBasedOnAttackType(player);
+
         if (player.getTbUsedForDefense() > player.getTb() / 2) {
             player.setTbUsedForDefense(player.getTb() / 2);
         }
 
-        setTbBasedOnAttackType(player);
 
         playerRepository.save(player);
     }
@@ -263,6 +264,7 @@ public class PlayerServiceImpl implements PlayerService {
                 (player.getAttackType().equals(AttackType.magicProjectile))) {
             player.setTb(player.getTbTargetMagic());
         } else player.setTb(0);
+
 
     }
 
