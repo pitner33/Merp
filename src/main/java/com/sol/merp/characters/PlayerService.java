@@ -36,6 +36,8 @@ public interface PlayerService {
 
     void checkAndSetStats(Player player);
 
+    void setTbBasedOnAttackType(Player player);
+
     void playerExperienceCounter(Player player);
 
     void experienceCounterHPLoss(Integer hpLoss);

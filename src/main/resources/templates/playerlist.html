@@ -69,10 +69,17 @@
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-                <th>TB for defense</th>
                 <th>Secondary TB</th>
-                <th>Base Magic TB</th>
-                <th>Target Magic TB</th>
+                <th>TB OneHanded</th>
+                <th>TB TwoHanded</th>
+                <th>TB Ranged</th>
+                <th>TB BaseMagic</th>
+                <th>TB TargetMagic</th>
+
+
+                <th>TB for defense</th>
+<!--                <th>Base Magic TB</th>-->
+<!--                <th>Target Magic TB</th>-->
                 <th>VB</th>
                 <th>Shield</th>
                 <th>AGI bonus</th>
@@ -121,10 +128,16 @@
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-                <td th:text="${player.getTbUsedForDefense()}"></td>
                 <td th:text="${player.getSecondaryTB()}"></td>
-                <td th:text="${player.getBaseMagicTB()}"></td>
-                <td th:text="${player.getTargetMagicTB()}"></td>
+                <td th:text="${player.getTbOneHanded()}"></td>
+                <td th:text="${player.getTbTwoHanded()}"></td>
+                <td th:text="${player.getTbRanged()}"></td>
+                <td th:text="${player.getTbBaseMagic()}"></td>
+                <td th:text="${player.getTbTargetMagic()}"></td>
+
+                <td th:text="${player.getTbUsedForDefense()}"></td>
+<!--                <td th:text="${player.getBaseMagicTB()}"></td>-->
+<!--                <td th:text="${player.getTargetMagicTB()}"></td>-->
                 <td th:text="${player.getVb()}"></td>
                 <td th:text="${player.getShield()}"></td>
                 <td th:text="${player.getAgilityBonus()}"></td>

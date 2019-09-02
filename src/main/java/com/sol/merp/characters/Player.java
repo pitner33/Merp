@@ -33,13 +33,18 @@ public class Player {
     private CritType critType;
     private PlayerTarget target;
     private Double hpMax;
-    private Double hpActual; //TODO setter cannot go below 0 - in case of dead character
+    private Double hpActual;
     private Integer mm;
     private Integer tb; //TODO Hasmpap legyen azattacktype syerinti kulcsokkal és a hozzá tartozó TB értékekkel
+    private Integer tbOneHanded;
+    private Integer tbTwoHanded;
+    private Integer tbRanged;
+    private Integer tbBaseMagic;
+    private Integer tbTargetMagic;
     private Integer tbUsedForDefense;
     private Integer secondaryTB; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
-    private Integer baseMagicTB;
-    private Integer targetMagicTB;
+//    private Integer baseMagicTB;
+//    private Integer targetMagicTB;
     private Integer vb;
     private Boolean shield;
     private Integer agilityBonus;
@@ -61,9 +66,9 @@ public class Player {
 
 
 
-
+    //this one is used for charactercreation when starting the app
     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
-                  PlayerTarget target, Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb,
+                  PlayerTarget target, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer secondaryTB, Integer vb,
                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
@@ -83,11 +88,16 @@ public class Player {
         this.hpMax = hpMax;
         this.hpActual = hpMax;
         this.mm = mm;
-        this.tb = tb;
+        this.tb = 0;
+        this.tbOneHanded = tbOneHanded;
+        this.tbTwoHanded = tbTwoHanded;
+        this.tbRanged = tbRanged;
+        this.tbBaseMagic = tbBaseMagic;
+        this.tbTargetMagic = tbTargetMagic;
         this.tbUsedForDefense = 0;
         this.secondaryTB = secondaryTB;
-        this.baseMagicTB = baseMagicTB;
-        this.targetMagicTB = targetMagicTB;
+//        this.baseMagicTB = baseMagicTB;
+//        this.targetMagicTB = targetMagicTB;
         this.vb = vb;
         this.shield = shield;
         this.agilityBonus = agilityBonus;
@@ -110,7 +120,7 @@ public class Player {
 
     //TODO delete / ideiglenes a playertarget beallitashoz
     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType,
-                  Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer baseMagicTB, Integer targetMagicTB, Integer vb,
+                  Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer vb,
                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
@@ -132,8 +142,8 @@ public class Player {
         this.tb = tb;
         this.tbUsedForDefense = 0;
         this.secondaryTB = secondaryTB;
-        this.baseMagicTB = baseMagicTB;
-        this.targetMagicTB = targetMagicTB;
+//        this.baseMagicTB = baseMagicTB;
+//        this.targetMagicTB = targetMagicTB;
         this.vb = vb;
         this.shield = shield;
         this.agilityBonus = agilityBonus;
@@ -154,7 +164,8 @@ public class Player {
         this.stealth = stealth;
     }
 
-//    public void setTbUsedForDefense(Integer tbUsedForDefense) {
+
+    //    public void setTbUsedForDefense(Integer tbUsedForDefense) {
 //        if (tbUsedForDefense > this.tb / 2) {
 //            this.tbUsedForDefense = this.tb / 2;
 //        } else this.tbUsedForDefense = tbUsedForDefense;

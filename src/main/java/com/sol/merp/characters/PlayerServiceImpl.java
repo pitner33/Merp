@@ -1,5 +1,6 @@
 package com.sol.merp.characters;
 
+import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.dto.AttackResultsDTO;
@@ -240,7 +241,29 @@ public class PlayerServiceImpl implements PlayerService {
             player.setTbUsedForDefense(player.getTb() / 2);
         }
 
+        setTbBasedOnAttackType(player);
+
         playerRepository.save(player);
+    }
+
+    @Override
+    public void setTbBasedOnAttackType(Player player) {
+        if ((player.getAttackType().equals(AttackType.slashing)) ||
+                (player.getAttackType().equals(AttackType.blunt)) ||
+                (player.getAttackType().equals(AttackType.clawsAndFangs)) ||
+                (player.getAttackType().equals(AttackType.grabOrBalance))) {
+            player.setTb(player.getTbOneHanded());
+        } else if (player.getAttackType().equals(AttackType.twoHanded)) {
+            player.setTb(player.getTbTwoHanded());
+        } else if (player.getAttackType().equals(AttackType.ranged)) {
+            player.setTb(player.getTbRanged());
+        } else if (player.getAttackType().equals(AttackType.baseMagic)) {
+            player.setTb(player.getTbBaseMagic());
+        } else if ((player.getAttackType().equals(AttackType.magicBall)) ||
+                (player.getAttackType().equals(AttackType.magicProjectile))) {
+            player.setTb(player.getTbTargetMagic());
+        } else player.setTb(0);
+
     }
 
     //Adds experience points after each and every action

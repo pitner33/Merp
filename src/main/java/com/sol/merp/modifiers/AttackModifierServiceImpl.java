@@ -20,6 +20,8 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     @Override
     public Integer countAttackModifier() {
         Integer attackModifierNum = 0;
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+
         if (attackModifier.getAttackFromWeakSide()) {
             attackModifierNum += 15;
         }
@@ -42,7 +44,9 @@ public class AttackModifierServiceImpl implements AttackModifierService {
             attackModifierNum -= 10;
         }
         if (attackModifier.getAttackerTargetChange()) {
+//            attacker.setTb();
             //TODO Attacker TB 50% if true, 100% if Not + refresh adventurerOrderedListObject
+            //TODO ehhez kelleni fog, hogy legyen TB-lista amiből választ és a UsedTb-t lehet így állítgatni majd
         }
 
         attackModifierNum += attackModifier.getModifierByGameMaster();
