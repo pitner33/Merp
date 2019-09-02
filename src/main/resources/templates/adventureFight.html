@@ -41,12 +41,12 @@
                             <th>HP actual</th>
                             <th>MM</th>
                             <th>TB</th>
+                            <th>Secondary TB</th>
 
                             <th>TB for defense</th>
 
-                            <th>Secondary TB</th>
-                            <th>Base Magic TB</th>
-                            <th>Target Magic TB</th>
+<!--                            <th>Base Magic TB</th>-->
+<!--                            <th>Target Magic TB</th>-->
                             <th>VB</th>
                             <th>Shield</th>
                             <th>AGI bonus</th>
@@ -160,6 +160,11 @@
                                        th:text="*{nextTwoPlayersToFight[__${i.index}__].tb}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].tb}">
                             </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].secondaryTB}"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].secondaryTB}">
+                            </td>
 
                             <td>
                                 <input class="form-control" type="hidden"
@@ -167,21 +172,16 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].tbUsedForDefense}">
                             </td>
 
-                            <td>
-                                <input class="form-control" type="hidden"
-                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].secondaryTB}"
-                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].secondaryTB}">
-                            </td>
-                            <td>
-                                <input class="form-control" type="hidden"
-                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}"
-                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}">
-                            </td>
-                            <td>
-                                <input class="form-control" type="hidden"
-                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}"
-                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}">
-                            </td>
+<!--                            <td>-->
+<!--                                <input class="form-control" type="hidden"-->
+<!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}"-->
+<!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}">-->
+<!--                            </td>-->
+<!--                            <td>-->
+<!--                                <input class="form-control" type="hidden"-->
+<!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}"-->
+<!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}">-->
+<!--                            </td>-->
                             <td>
                                 <input class="form-control" type="hidden"
                                        th:text="*{nextTwoPlayersToFight[__${i.index}__].vb}"
@@ -263,6 +263,26 @@
                             <td>
                                 <input class="form-control" type="hidden"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].isPlaying}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].tbOneHanded}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].tbTwoHanded}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].tbRanged}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].tbBaseMagic}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="hidden"
+                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].tbTargetMagic}">
                             </td>
                             <td>
                                 <input class="form-control" type="hidden"

@@ -13,8 +13,6 @@ public class TODOS {
     TODO Ball magic
     TODO AoE effect támadásnál
     TODO Alapmágia
-    TODO TB értéket a támadás típusa alapján válassza a karakter megfelelő TB-i közül - ez a TB methodban már szerepel, csak meg kell csinálni. De legyen egy usedTB field amit a frontenden látunk, hogy melyiket használja épp
-    TODO a usedTb nél figyelni, hogy a védekezésre használt tb 50%-át ebből számolja, mert most a TB oszlopból veszi
     TODO target change TB 50% ??
 
 
@@ -29,6 +27,7 @@ public class TODOS {
     TODO NJK B-t feltölteni indokolatlan mennyiségű karakterrel (A Target enumlistát eszerint bővíteni)
     TODO karakter editálás (pl a szintlépést egyelőre kézileg megoldani, meg amúgy is van amikor kell)
     TODO ha változtatás volt, de nem lett elmentve, a save gomb más színű legyen!!!!
+    TODO prefight oldalon ha támadástípust vált, nem változik a sorrend - ami nem baj ha nem trükkönek vele :)
 
 
     TODO MM/HM
