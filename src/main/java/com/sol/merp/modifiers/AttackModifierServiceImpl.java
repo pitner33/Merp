@@ -2,6 +2,7 @@ package com.sol.merp.modifiers;
 
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.characters.Player;
+import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 public class AttackModifierServiceImpl implements AttackModifierService {
     @Autowired
     PlayerService playerService;
+    @Autowired
+    PlayerRepository playerRepository;
     @Autowired
     AttackModifier attackModifier;
     @Autowired
@@ -44,9 +47,8 @@ public class AttackModifierServiceImpl implements AttackModifierService {
             attackModifierNum -= 10;
         }
         if (attackModifier.getAttackerTargetChange()) {
-//            attacker.setTb();
-            //TODO Attacker TB 50% if true, 100% if Not + refresh adventurerOrderedListObject
-            //TODO ehhez kelleni fog, hogy legyen TB-lista amiből választ és a UsedTb-t lehet így állítgatni majd
+            attacker.setTb(attacker.getTb() / 2);
+            playerRepository.save(attacker);
         }
 
         attackModifierNum += attackModifier.getModifierByGameMaster();
