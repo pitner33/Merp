@@ -5,7 +5,9 @@ import com.sol.merp.attributes.CritType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.characters.*;
+import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
+import com.sol.merp.dto.DiceRollDTO;
 import com.sol.merp.fight.FightCount;
 import com.sol.merp.fight.FightService;
 import com.sol.merp.fight.Round;
@@ -51,6 +53,10 @@ public class MerpController {
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
     @Autowired
     ExperienceModifiers experienceModifiers;
+    @Autowired
+    D100Roll d100Roll;
+    @Autowired
+    DiceRollDTO diceRollDTO;
 
 
     @GetMapping("/allplayers")  //TODO allplayers only for players, separate page for NPCs
@@ -169,9 +175,14 @@ public class MerpController {
                            Model modelAttackType,
                            Model modelCritType,
                            Model modelPlayerTarget,
-                           Model modelHealthPercent) {
+                           Model modelHealthPercent,
+                           Model modelDiceRoll) {
 //        fightCount.setFightCount(fightCount.getFightCount() + 1);
 //        NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject = playerService.nextPlayersToFight();
+        diceRollDTO.setRoll1("0");
+        diceRollDTO.setRoll2("0");
+        diceRollDTO.setRoll3("0");
+        diceRollDTO.setRoll4("0");
 
         experienceModifiers.setIsTargetAlive(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getIsAlive());
 
@@ -183,7 +194,8 @@ public class MerpController {
         modelCritType.addAttribute("modelCritType", CritType.values());
         modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
         //TODO outofbound a vegen
-//        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(playersFight.get(1)));
+        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1)));
+        modelDiceRoll.addAttribute("modelDiceRoll" , diceRollDTO);
 
         if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
             return "redirect:/merp/adventure/nextround";
@@ -219,6 +231,19 @@ public class MerpController {
         return "redirect:/merp/adventure/prefight";
     }
 
+    @GetMapping("/adventure/fightrandomroll")
+    public String fightRandomRoll() {
+        d100Roll.setD100Roll(d100Roll.d100RandomOpen());
+        return "redirect:/merp/adventure/fight";
+    }
+
+    @PostMapping("/adventure/fightdiceroll")
+    public String fightDiceRoll(@ModelAttribute(value = "modelDiceRoll") DiceRollDTO diceRollDTOPost) {
+        d100Roll.setD100Roll(diceRollDTO.getValueFromDiceRollDTO(diceRollDTOPost));
+        return "redirect:/merp/adventure/fight";
+    }
+
+
     @GetMapping("/adventure/fight")
     public String fight(Model modelNextTwoPlayers,
                         Model modelResultDTO,
@@ -228,10 +253,13 @@ public class MerpController {
                         Model modelPlayerActivity,
                         Model modelAttackType,
                         Model modelCritType,
-                        Model modelPlayerTarget) {
+                        Model modelPlayerTarget,
+                        Model modelHealthPercent) {
 
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+
+
 
 //        attackModifierService.setAttackModifierOnlyPlayerDependent();
 
@@ -246,6 +274,7 @@ public class MerpController {
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
         modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
+        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1)));
 
         return "adventureFight";
     }

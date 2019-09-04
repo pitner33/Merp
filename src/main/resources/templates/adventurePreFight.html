@@ -45,8 +45,8 @@
 
                             <th>TB for defense</th>
 
-<!--                            <th>Base Magic TB</th>-->
-<!--                            <th>Target Magic TB</th>-->
+                            <!--                            <th>Base Magic TB</th>-->
+                            <!--                            <th>Target Magic TB</th>-->
                             <th>VB</th>
                             <th>Shield</th>
                             <th>AGI bonus</th>
@@ -74,7 +74,8 @@
                             <!--                        th:style="${player.getCharacterId().startsWith('JK')}  ? 'background-color:#2ECC71' :  'background-color:#F39C12'"-->
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].id}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].id}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].id}">
                             </td>
                             <td>
@@ -83,15 +84,18 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].characterId}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].name}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].name}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].name}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].gender}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].gender}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].gender}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].race}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].race}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].race}">
                             </td>
                             <td>
@@ -101,19 +105,21 @@
                             </td>
 
 
-
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].lvl}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].lvl}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].lvl}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].xp}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].xp}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].xp}">
                             </td>
 
                             <!--###### CHANGEABLE ##########################################################################-->
                             <td style="width: 20%">
-                                <select class="form-control" th:field="*{nextTwoPlayersToFight[__${i.index}__].playerActivity}">
+                                <select class="form-control"
+                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].playerActivity}">
                                     <option th:each="playerActivityElement : ${modelPlayerActivity}"
                                             th:value="${playerActivityElement}"
                                             th:text="${playerActivityElement}"
@@ -137,7 +143,8 @@
 
                             <!--###### CHANGEABLE ##########################################################################-->
                             <td style="width: 20%">
-                                <select class="form-control" th:field="*{nextTwoPlayersToFight[__${i.index}__].attackType}">
+                                <select class="form-control"
+                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].attackType}">
                                     <option th:each="attackTypeElement : ${modelAttackType}"
                                             th:value="${attackTypeElement}"
                                             th:text="${attackTypeElement}"
@@ -149,7 +156,8 @@
 
                             <!--###### CHANGEABLE ##########################################################################-->
                             <td style="width: 20%">
-                                <select class="form-control" th:field="*{nextTwoPlayersToFight[__${i.index}__].critType}">
+                                <select class="form-control"
+                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].critType}">
                                     <option th:each="critTypeElement : ${modelCritType}"
                                             th:value="${critTypeElement}"
                                             th:text="${critTypeElement}"
@@ -160,7 +168,8 @@
                             <!-- -------------------------------------------------------------------------------------------- -->
 
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].hpMax}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].hpMax}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].hpMax}">
                             </td>
                             <td>
@@ -169,11 +178,13 @@
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].hpActual}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].mm}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].mm}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].mm}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].tb}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].tb}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].tb}">
                             </td>
                             <td>
@@ -189,22 +200,24 @@
                             </td>
                             <!-- -------------------------------------------------------------------------------------------- -->
 
-<!--                            <td>-->
-<!--                                <input class="form-control" type="hidden"-->
-<!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}"-->
-<!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}">-->
-<!--                            </td>-->
-<!--                            <td>-->
-<!--                                <input class="form-control" type="hidden"-->
-<!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}"-->
-<!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}">-->
-<!--                            </td>-->
+                            <!--                            <td>-->
+                            <!--                                <input class="form-control" type="hidden"-->
+                            <!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}"-->
+                            <!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].baseMagicTB}">-->
+                            <!--                            </td>-->
+                            <!--                            <td>-->
+                            <!--                                <input class="form-control" type="hidden"-->
+                            <!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}"-->
+                            <!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].targetMagicTB}">-->
+                            <!--                            </td>-->
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].vb}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].vb}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].vb}">
                             </td>
                             <td>
-                                <input class="form-control" type="hidden" th:text="*{nextTwoPlayersToFight[__${i.index}__].shield}"
+                                <input class="form-control" type="hidden"
+                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].shield}"
                                        th:field="*{nextTwoPlayersToFight[__${i.index}__].shield}">
                             </td>
                             <td>
@@ -242,11 +255,11 @@
                             </td>
                             <!-- -------------------------------------------------------------------------------------------- -->
 
-<!--                            <td>-->
-<!--                                <input class="form-control" type="hidden"-->
-<!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].penaltyOfActions}"-->
-<!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].penaltyOfActions}">-->
-<!--                            </td>-->
+                            <!--                            <td>-->
+                            <!--                                <input class="form-control" type="hidden"-->
+                            <!--                                       th:text="*{nextTwoPlayersToFight[__${i.index}__].penaltyOfActions}"-->
+                            <!--                                       th:field="*{nextTwoPlayersToFight[__${i.index}__].penaltyOfActions}">-->
+                            <!--                            </td>-->
                             <!--###### CHANGEABLE ##########################################################################-->
                             <td style="width: 8%">
                                 <input class="form-control" type="text"
@@ -344,20 +357,64 @@
                         </tbody>
                     </table>
                 </div>
-                <div>
-                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save Players'"></button>
+                <div class="progress" style="height: 30px; margin-left: 25%; margin-right: 25%">
+
+                    <div th:if="${players.getNextTwoPlayersToFight().get(1).getCharacterId().startsWith('JK')}"
+                         class="progress-bar bg-success h5" role="progressbar"
+                         th:style="'width: ' + ${modelHealthPercent} + '%'"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:text="${#numbers.formatDecimal(modelHealthPercent,1,0)} + '%'">
+                    </div>
+                    <div th:unless="${players.getNextTwoPlayersToFight().get(1).getCharacterId().startsWith('JK')}"
+                         class="progress-bar bg-danger h5" role="progressbar"
+                         th:style="'width: ' + ${modelHealthPercent} + '%'"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:text="${#numbers.formatDecimal(modelHealthPercent,1,0)} + '%'">
+                    </div>
                 </div>
             </div>
+            <div>
+                <button class="btn btn-lg btn-success" type="submit" th:text="'Save Players'"></button>
+            </div>
         </form>
-        
-    <!--    TODO nem mutatja a csikot jelenleg illetve outofboundot dob a vegen-->
-    <!--    <div class="progress" th:align="center" th:object="${modelHealthPercent}">-->
-    <!--        <div class="progress-bar" role="progressbar" th:value="${modelHealthPercent}"-->
-    <!--             aria-valuemin="0" aria-valuemax="100" style="width:70%" th:text="${modelHealthPercent}">-->
+    </div>
 
-    <!--        </div>-->
-    <!--    </div>-->
-<!--        TODO kijavítani a babythymeleaf alapján-->
+
+    <div align="center" style="margin-left: 40%; margin-right: 40%">
+        <div>
+            <form th:action="@{'/merp/adventure/fightdiceroll'}" th:object="${modelDiceRoll}" method="post">
+                <div class="form-group ">
+                    <table class="table table-bordered" style="align-items: center">
+                        <thead th:style="'background-color:#ff6a5a'">
+                        <tr>
+                            <th>ROLL1</th>
+                            <th>ROLL2</th>
+                            <th>ROLL3</th>
+                            <th>ROLL4</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td style="width: 8%"><input class="form-control" type="text" th:field="*{roll1}"></td>
+                            <td style="width: 8%"><input class="form-control" type="text" th:field="*{roll2}"></td>
+                            <td style="width: 8%"><input class="form-control" type="text" th:field="*{roll3}"></td>
+                            <td style="width: 8%"><input class="form-control" type="text" th:field="*{roll4}"></td>
+
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <!--                        <input class="form-control d-inline" type="text" th:field="*{roll1}">-->
+                    <!--                        <input class="form-control d-inline" type="text" th:field="*{roll2}">-->
+                    <!--                        <input class="form-control d-inline" type="text" th:field="*{roll3}">-->
+                    <!--                        <input class="form-control d-inline" type="text" th:field="*{roll4}">-->
+                    <button class="btn btn-lg btn-success" type="submit" th:text="'FIGHT!'"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <div>
         <form th:action="@{'/merp/adventure/prefight/savemodifier'}" th:object="${attackmodifier}" method="post">
 
@@ -372,57 +429,61 @@
                 <div>
                     <ul>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
-                                <input id="weaksideattack" name="weaksideattack" type="checkbox" checked autocomplete="off"
+                            <label class="btn-lg btn-secondary active">
+                                <input id="weaksideattack" name="weaksideattack" type="checkbox" checked
+                                       autocomplete="off"
                                        th:field="*{attackFromWeakSide}" th:text="' Attack from weak side '"/>
                             </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="backstab" name="backstab" type="checkbox" checked autocomplete="off"
                                        th:field="*{attackFromBehind}" th:text="' Backstab '"/>
-                                </label>
+                            </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="surprised" name="surprised" type="checkbox" checked autocomplete="off"
                                        th:field="*{defenderSurprised}" th:text="' Target surprised '"/>
-                                </label>
+                            </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="stunned" name="stunned" type="checkbox" checked autocomplete="off"
                                        th:field="*{defenderStunned}" th:text="' Target stunned '"/>
-                                </label>
+                            </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="weaponchange" name="weaponchange" type="checkbox" checked autocomplete="off"
                                        th:field="*{attackerWeaponChange}" th:text="' Attacker changes weapon '"/>
-                                </label>
+                            </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="targetchange" name="targetchange" type="checkbox" checked autocomplete="off"
                                        th:field="*{attackerTargetChange}" th:text="' Attacker changes target '"/>
-                                </label>
+                            </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="hp" name="hp" type="checkbox" checked autocomplete="off"
-                                       th:field="*{attackerHPBelow50Percent}" th:text="' Attacker HP below 50 percent '"/>
+                                       th:field="*{attackerHPBelow50Percent}"
+                                       th:text="' Attacker HP below 50 percent '"/>
                             </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" >
+                            <label class="btn-lg btn-secondary active">
                                 <input id="move" name="move" type="checkbox" checked autocomplete="off"
-                                       th:field="*{attackerMoreThan3MetersMovement}" th:text="' Attacker moved more than 3 meters '"/>
+                                       th:field="*{attackerMoreThan3MetersMovement}"
+                                       th:text="' Attacker moved more than 3 meters '"/>
                             </label>
                         </li>
                         <li>
-                            <label class="btn-lg btn-secondary active" th:text="' Extra modifier added by GameMaster '"></label>
-                                <input id="gm" name="gm" type="text" checked autocomplete="off"
-                                       th:field="*{modifierByGameMaster}" />
+                            <label class="btn-lg btn-secondary active"
+                                   th:text="' Extra modifier added by GameMaster '"></label>
+                            <input id="gm" name="gm" type="text" checked autocomplete="off"
+                                   th:field="*{modifierByGameMaster}"/>
 
                         </li>
 
@@ -435,7 +496,7 @@
     </div>
 
     <div align="center">
-        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fight}" th:text="'FIGHT!'"></a>
+        <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/fightrandomroll}" th:text="'FIGHT!'"></a>
     </div>
     <div align="center">
         <a class="btn btn-lg btn-success" th:href="@{/merp/adventure/nextfight}" th:text="'NEXT FIGHT'"></a>

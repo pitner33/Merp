@@ -134,14 +134,11 @@ public class FightServiceImpl implements FightService {
                 defender.setIsAlive(false);
             }
 
-//
-
-
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
 
-//            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
-//            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
+            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
             playerService.experienceCounterKill();
 
             return attackResultsDTO;
@@ -153,8 +150,10 @@ public class FightServiceImpl implements FightService {
     public String getAttackResultString(Player attacker, Player defender, AttackResultsDTO attackResultsDTO) {
         Integer fullTB = attackerTBWithAllModifiers(attacker);
         Integer fullVB = defenderVBWithAllModifiers(defender);
+
+        //at this point d100Roll is set by one of the prefight endpoints /merp/adventure/fightrandomroll or /merp/adventure/fightdiceroll
 //        Integer d100OpenRoll = d100Roll.d100FromRoll(roll1, roll2, roll3, roll4); Todo kesobb megoldani a kockavel dobast es a beirast
-        Integer d100OpenRoll = d100Roll.d100RandomOpen();
+        Integer d100OpenRoll = d100Roll.getD100Roll();
         Integer rollResult = (fullTB + d100OpenRoll) - fullVB;
 
         attackResultsDTO.setD100OpenRoll(d100OpenRoll);

@@ -7,13 +7,14 @@ public class TODOS {
      (Akkor van, ha manuálisan kistunnolom, de a targetet none-on hagyom - kell ezzel kezdeni valamit?)
      --> reset methodban megvizsgálni, hogy nem null-e a defender és csak akkor plazer szerint, amúgy meg false legyen KÉSZ, TESZTELNI
      TODO tudja saját magát támadni :D skizóóóóóó
-
+     TODO ha csak egy player játszik, ill nincs ellenfél, akkor se akadjon ki a nexttwoplayer method
+    TODO stunned/dead plazers javítani a round oldalon a TB változás miatt
+    TODO kitoltheto meyokbe rossz ertek eseten dobjon hibaoldalt, majd azt leokezva terjen vissza az elozore
 
 
     TODO Ball magic
     TODO AoE effect támadásnál
     TODO Alapmágia
-    TODO target change TB 50% ??
 
 
     TODO Fail effektek a Gsheetbe és az appba, ugyanúgy a 4 oszlop, mint a criteknél

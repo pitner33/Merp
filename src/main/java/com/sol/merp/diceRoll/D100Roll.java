@@ -1,13 +1,21 @@
 package com.sol.merp.diceRoll;
 
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.stereotype.Component;
 
 import java.util.Random;
 
-
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Component
 public class D100Roll {
+    private Integer d100Roll;
 
     public Integer d100Random() {
         return new Random().nextInt(101);

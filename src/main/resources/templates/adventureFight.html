@@ -320,6 +320,21 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="progress" style="height: 30px; margin-left: 25%; margin-right: 25%">
+
+                    <div th:if="${players.getNextTwoPlayersToFight().get(1).getCharacterId().startsWith('JK')}"
+                         class="progress-bar bg-success h5" role="progressbar"
+                         th:style="'width: ' + ${modelHealthPercent} + '%'"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:text="${#numbers.formatDecimal(modelHealthPercent,1,0)} + '%'">
+                    </div>
+                    <div th:unless="${players.getNextTwoPlayersToFight().get(1).getCharacterId().startsWith('JK')}"
+                         class="progress-bar bg-danger h5" role="progressbar"
+                         th:style="'width: ' + ${modelHealthPercent} + '%'"
+                         aria-valuemin="0" aria-valuemax="100"
+                         th:text="${#numbers.formatDecimal(modelHealthPercent,1,0)} + '%'">
+                    </div>
+                </div>
                 <div>
                     <!--                    TODO no need for this button at fight results IF Fail and instant death will be implemented-->
                     <!--                    <button class="btn btn-lg btn-success" type="submit" th:text="'Save player'"></button>-->
