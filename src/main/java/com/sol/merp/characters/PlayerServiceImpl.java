@@ -10,10 +10,7 @@ import com.sol.merp.modifiers.ExperienceModifiers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -179,6 +176,24 @@ public class PlayerServiceImpl implements PlayerService {
         return adventurersOrderedList().stream()
                 .filter(player -> player.getHpActual() <= 0)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<PlayerTarget> targetablePlayerList() {
+        List<PlayerTarget> playerTargetValues = Arrays.asList(PlayerTarget.values());
+        List<PlayerTarget> targetsFromOrderedList = new ArrayList<>();
+        targetsFromOrderedList.add(PlayerTarget.none);
+
+        adventurerOrderedListObject.getPlayerList().forEach(player -> {
+            String charId = player.getCharacterId();
+            for (int i = 0; i < playerTargetValues.size(); i++) {
+                if (playerTargetValues.get(i).toString().equals(charId)) {
+                    targetsFromOrderedList.add(playerTargetValues.get(i));
+                }
+            }
+        });
+        Collections.sort(targetsFromOrderedList);
+        return targetsFromOrderedList;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.sol.merp.characters;
 
+import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.dto.AttackResultsDTO;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,8 @@ public interface PlayerService {
     List<Player> stunnedPlayers();
 
     List<Player> deadPlayers();
+
+    List<PlayerTarget> targetablePlayerList();
 
     Double healthPercent(Player player);
 

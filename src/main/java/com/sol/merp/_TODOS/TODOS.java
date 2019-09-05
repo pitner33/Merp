@@ -9,8 +9,8 @@ public class TODOS {
 
 
 
+    TODO /adventure/fight -ban csomó olyan modelt átadok ami nem is kell - kiszedni
     TODO kitoltheto meyokbe rossz ertek eseten dobjon hibaoldalt, majd azt leokezva terjen vissza az elozore
-    TODO targetlista csak azokat mutassa akik benne vannak az OrderedListben
 
     TODO Ball magic
     TODO AoE effect támadásnál

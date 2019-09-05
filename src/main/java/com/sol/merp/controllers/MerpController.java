@@ -135,7 +135,7 @@ public class MerpController {
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
-        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
+        modelPlayerTarget.addAttribute("modelPlayerTarget", playerService.targetablePlayerList());
         modelStunnedPlayers.addAttribute("modelStunnedPlayers", playerService.stunnedPlayers());
         modelDeadPlayers.addAttribute("modelDeadPlayers", playerService.deadPlayers());
 
@@ -197,7 +197,7 @@ public class MerpController {
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
         modelCritType.addAttribute("modelCritType", CritType.values());
-        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
+        modelPlayerTarget.addAttribute("modelPlayerTarget", playerService.targetablePlayerList());
         //TODO outofbound a vegen
         modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1)));
         modelDiceRoll.addAttribute("modelDiceRoll" , diceRollDTO);
