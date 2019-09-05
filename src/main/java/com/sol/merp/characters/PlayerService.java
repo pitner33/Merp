@@ -24,7 +24,7 @@ public interface PlayerService {
 
     void checkIfTargetIsInOrderedList(Player attacker);
 
-    NextTwoPlayersToFigthObject nextPlayersToFight();
+    NextTwoPlayersToFigthObject nextPlayersToFight() throws Exception;
 
     List<Player> stunnedPlayers();
 

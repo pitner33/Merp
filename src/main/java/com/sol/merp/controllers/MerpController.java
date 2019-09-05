@@ -159,10 +159,15 @@ public class MerpController {
     }
 
     @GetMapping("/adventure/startfight")
-    public String startfight() {
+    public String startfight() throws Exception {
         adventurerOrderedListObject.getPlayerList().forEach(player -> playerService.refreshAdventurerOrderedListObject(player));;
         fightCount.setFightCount(fightCount.getFightCount() + 1);
         playerService.nextPlayersToFight();
+
+        if (nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1) == null) {
+            return "redirect:/merp/error/notarget";
+        }
+
         attackModifierService.resetAttackmodifier();
         return "redirect:/merp/adventure/prefight";
     }
@@ -205,7 +210,7 @@ public class MerpController {
     }
 
     @PostMapping("/adventure/prefight/saveplayer")
-    public String prefightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
+    public String prefightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) throws Exception {
 //        fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
         nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
 
@@ -289,10 +294,15 @@ public class MerpController {
 
 
     @GetMapping("/adventure/nextfight")
-    public String nextFight() {
+    public String nextFight() throws Exception {
         adventurerOrderedListObject.getPlayerList().forEach(player -> playerService.refreshAdventurerOrderedListObject(player));;
         fightCount.setFightCount(fightCount.getFightCount() + 1);
         playerService.nextPlayersToFight();
+
+        if (nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1) == null) {
+            return "redirect:/merp/error/notarget";
+        }
+
         attackModifierService.resetAttackmodifier();
         return "redirect:/merp/adventure/prefight";
     }
@@ -311,5 +321,11 @@ public class MerpController {
         });
 
         return "redirect:/merp/adventure/round";
+    }
+
+    @GetMapping("/error/notarget")
+    public String errorNoTarget(Model modelPlayerWithNoTarget) {
+        modelPlayerWithNoTarget.addAttribute("modelPlayerWithNoTarget", nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0));
+        return "errorNoTarget";
     }
 }

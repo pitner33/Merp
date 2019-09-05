@@ -381,28 +381,33 @@
                 <th>Class</th>
                 <th>Level</th>
                 <th>XP</th>
+
                 <th>Activity</th>
                 <th>Target</th>
                 <th>Attack type</th>
                 <th>Critical type</th>
+
                 <th>HP max</th>
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-                <th>TB for defense</th>
                 <th>Secondary TB</th>
-                <th>Base Magic TB</th>
-                <th>Target Magic TB</th>
+
+                <th>TB for defense</th>
+
                 <th>VB</th>
                 <th>Shield</th>
                 <th>AGI bonus</th>
                 <th>MD Lenyeg</th>
                 <th>MD Kapcsolat</th>
                 <th>Armor Type</th>
+
                 <th>isStunned</th>
                 <th>Stunned for rounds</th>
+
                 <th>Penalty for Activities</th>
                 <th>HP loss/round</th>
+
                 <th>Is Active</th>
                 <th>Is Alive</th>
 
@@ -424,32 +429,35 @@
                 <td th:text="${player.getPlayerClass()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
+
                 <td th:text="${player.getPlayerActivity()}"></td>
-                <td th:value="${player.getTarget()}" type="text"></td>
+                <td th:text="${player.getTarget()}"></td>
                 <td th:text="${player.getAttackType()}"></td>
                 <td th:text="${player.getCritType()}"></td>
+
                 <td th:text="${player.getHpMax()}"></td>
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-                <td th:text="${player.getTbUsedForDefense()}"></td>
                 <td th:text="${player.getSecondaryTB()}"></td>
-                <td th:text="${player.getBaseMagicTB()}"></td>
-                <td th:text="${player.getTargetMagicTB()}"></td>
+
+                <td th:text="${player.getTbUsedForDefense()}"></td>
+
                 <td th:text="${player.getVb()}"></td>
                 <td th:text="${player.getShield()}"></td>
                 <td th:text="${player.getAgilityBonus()}"></td>
                 <td th:text="${player.getMdLenyeg()}"></td>
                 <td th:text="${player.getMdKapcsolat()}"></td>
                 <td th:text="${player.getArmorType()}"></td>
+
                 <td th:text="${player.getIsStunned()}"></td>
                 <td th:text="${player.getStunnedForRounds()}"></td>
+
                 <td th:text="${player.getPenaltyOfActions()}"></td>
                 <td th:text="${player.getHpLossPerRound()}"></td>
-                <td th:text="${player.getIsActive()}" type="text"></td>
-                <td th:text="${player.getIsAlive()}" type="text"></td>
-
-
+                <td th:text="${player.getIsActive()}"></td>
+                <td th:text="${player.getIsAlive()}"></td>
+            </tr>
             </tbody>
         </table>
     </div>
@@ -472,28 +480,33 @@
                 <th>Class</th>
                 <th>Level</th>
                 <th>XP</th>
+
                 <th>Activity</th>
                 <th>Target</th>
                 <th>Attack type</th>
                 <th>Critical type</th>
+
                 <th>HP max</th>
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-                <th>TB for defense</th>
                 <th>Secondary TB</th>
-                <th>Base Magic TB</th>
-                <th>Target Magic TB</th>
+
+                <th>TB for defense</th>
+
                 <th>VB</th>
                 <th>Shield</th>
                 <th>AGI bonus</th>
                 <th>MD Lenyeg</th>
                 <th>MD Kapcsolat</th>
                 <th>Armor Type</th>
+
                 <th>isStunned</th>
                 <th>Stunned for rounds</th>
+
                 <th>Penalty for Activities</th>
                 <th>HP loss/round</th>
+
                 <th>Is Active</th>
                 <th>Is Alive</th>
 
@@ -515,32 +528,35 @@
                 <td th:text="${player.getPlayerClass()}"></td>
                 <td th:text="${player.getLvl()}"></td>
                 <td th:text="${player.getXp()}"></td>
+
                 <td th:text="${player.getPlayerActivity()}"></td>
-                <td th:value="${player.getTarget()}" type="text"></td>
+                <td th:text="${player.getTarget()}"></td>
                 <td th:text="${player.getAttackType()}"></td>
                 <td th:text="${player.getCritType()}"></td>
+
                 <td th:text="${player.getHpMax()}"></td>
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-                <td th:text="${player.getTbUsedForDefense()}"></td>
                 <td th:text="${player.getSecondaryTB()}"></td>
-                <td th:text="${player.getBaseMagicTB()}"></td>
-                <td th:text="${player.getTargetMagicTB()}"></td>
+
+                <td th:text="${player.getTbUsedForDefense()}"></td>
+
                 <td th:text="${player.getVb()}"></td>
                 <td th:text="${player.getShield()}"></td>
                 <td th:text="${player.getAgilityBonus()}"></td>
                 <td th:text="${player.getMdLenyeg()}"></td>
                 <td th:text="${player.getMdKapcsolat()}"></td>
                 <td th:text="${player.getArmorType()}"></td>
+
                 <td th:text="${player.getIsStunned()}"></td>
                 <td th:text="${player.getStunnedForRounds()}"></td>
+
                 <td th:text="${player.getPenaltyOfActions()}"></td>
                 <td th:text="${player.getHpLossPerRound()}"></td>
-                <td th:text="${player.getIsActive()}" type="text"></td>
-                <td th:text="${player.getIsAlive()}" type="text"></td>
-
-
+                <td th:text="${player.getIsActive()}"></td>
+                <td th:text="${player.getIsAlive()}"></td>
+            </tr>
             </tbody>
         </table>
     </div>
