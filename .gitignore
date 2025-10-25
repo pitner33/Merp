@@ -33,3 +33,6 @@ build/
 ### Google Sheet Data ###
 google-sheets-client-secret.json
 
+# Local environment scripts (never commit)
+env.local.ps1
+

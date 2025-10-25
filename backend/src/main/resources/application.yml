@@ -1,0 +1,25 @@
+spring:
+  profiles:
+    active: ${PROFILE:dev}
+  datasource:
+    username: ${DATASOURCE_USERNAME:sa}
+    password: ${DATASOURCE_PASSWORD:}
+    url: ${DATASOURCE_URL:jdbc:h2:mem:merp;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+  jpa:
+    hibernate:
+      ddl-auto: ${HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+  main:
+    allow-circular-references: true
+
+sheet:
+  sheetId: ${SHEET_ID}
+  # Local Excel file path for data loading
+  xlsxPath: "D:/.WINDSURF/workspace/merp/backend/googlesheet/APP/MERP APP TABLES.xlsx"
+  tablePrefix: "gs_"
+
+server:
+  port: 8081

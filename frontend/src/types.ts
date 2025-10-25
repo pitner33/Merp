@@ -1,0 +1,27 @@
+export type Player = {
+  id: number;
+  characterId: string;
+  name: string;
+  gender?: string;
+  race?: string;
+  playerClass?: string;
+  isPlaying: boolean;
+  isActive?: boolean;
+  isStunned?: boolean;
+  lvl: number;
+  xp: number;
+  playerActivity?: string;
+  attackType?: string;
+  critType?: string;
+  hpMax: number;
+  hpActual: number;
+  mm?: number;
+  tb?: number;
+  secondaryTB?: number;
+  tbUsedForDefense?: number;
+  tbOneHanded?: number;
+  tbTwoHanded?: number;
+  tbRanged?: number;
+  tbBaseMagic?: number;
+  tbTargetMagic?: number;
+};
