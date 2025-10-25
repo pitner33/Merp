@@ -13,7 +13,7 @@ import com.sol.merp.fight.FightService;
 import com.sol.merp.fight.Round;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifier;
-//import com.sol.merp.modifiers.AttackModifierRepository;
+import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.modifiers.ExperienceModifiers;
 import org.slf4j.Logger;
@@ -34,7 +34,7 @@ public class MerpController {
     @Autowired
     private PlayerService playerService;
     @Autowired
-    AttackModifier attackModifier;
+    AttackModifierRepository attackModifierRepository;
     @Autowired
     AttackModifierService attackModifierService;
     @Autowired
@@ -64,6 +64,14 @@ public class MerpController {
         playerService.doNothingWhenStunned();
         model.addAttribute("players", playerRepository.findAll());
         return "playerlist";
+    }
+
+    private AttackModifier getOrCreateForCurrentAttacker() {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        if (attacker == null) {
+            return new AttackModifier();
+        }
+        return attackModifierRepository.findByPlayer_Id(attacker.getId()).orElseGet(AttackModifier::new);
     }
 
     @GetMapping("/edit_isplay/{id}")
@@ -128,7 +136,7 @@ public class MerpController {
                         Model modelDeadPlayers) {
 
         modelRoundCount.addAttribute("modelRoundCount", round.getRoundCount());
-        modelModifiers.addAttribute("modelModifiers", attackModifier);
+        modelModifiers.addAttribute("modelModifiers", new AttackModifier());
         modelOrderedList.addAttribute("modelOrderedList", adventurerOrderedListObject);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
@@ -190,7 +198,8 @@ public class MerpController {
         experienceModifiers.setIsTargetAlive(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1).getIsAlive());
 
         modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
-        modelAttackModifier.addAttribute("attackmodifier", attackModifier);
+        AttackModifier am = getOrCreateForCurrentAttacker();
+        modelAttackModifier.addAttribute("attackmodifier", am);
         modelFightCount.addAttribute("counter", fightCount);
         modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
         modelAttackType.addAttribute("modelAttackType", AttackType.values());
@@ -222,73 +231,51 @@ public class MerpController {
 
     @PostMapping("/adventure/prefight/savemodifier")
     public String prefightPost(@ModelAttribute(value = "attackmodifier") AttackModifier modified) {
-//        fightCount.setFightCount(fightCount.getFightCount() - 1); //necessary for not change fightcount when reload page
-
-        attackModifierService.setAttackModifierFromPostMethod(modified);
 //        attackModifierService.countAttackModifier();
 
-        logger.info("ATTACKMODIFIER STUN {} ", attackModifier.getDefenderStunned().toString());
-        logger.info("ATTACKMODIFIER SUPR {} ", attackModifier.getDefenderSurprised().toString());
-        logger.info("ATTACKMODIFIER 50% {} ", attackModifier.getAttackerHPBelow50Percent().toString());
-        logger.info("ATTACKMODIFIER Behind {} ", attackModifier.getAttackFromBehind().toString());
-        return "redirect:/merp/adventure/prefight";
-    }
+    AttackModifier am = getOrCreateForCurrentAttacker();
+    logger.info("ATTACKMODIFIER STUN {} ", String.valueOf(am.getDefenderStunned()));
+    logger.info("ATTACKMODIFIER SUPR {} ", String.valueOf(am.getDefenderSurprised()));
+    logger.info("ATTACKMODIFIER 50% {} ", String.valueOf(am.getAttackerHPBelow50Percent()));
+    logger.info("ATTACKMODIFIER Behind {} ", String.valueOf(am.getAttackFromBehind()));
 
-    @GetMapping("/adventure/fightrandomroll")
-    public String fightRandomRoll() {
-        d100Roll.setD100Roll(d100Roll.d100RandomOpen());
-        return "redirect:/merp/adventure/fight";
-    }
+    return "redirect:/merp/adventure/prefight";
+}
 
-    @PostMapping("/adventure/fightdiceroll")
-    public String fightDiceRoll(@ModelAttribute(value = "modelDiceRoll") DiceRollDTO diceRollDTOPost) {
-        d100Roll.setD100Roll(diceRollDTO.getValueFromDiceRollDTO(diceRollDTOPost));
-        return "redirect:/merp/adventure/fight";
-    }
+@GetMapping("/adventure/fight")
+public String fight(Model modelNextTwoPlayers,
+                    Model modelResultDTO,
+                    Model modelAttackModifier,
+                    Model modelAttackModifierResult,
+                    Model modelFightCount,
+                    Model modelPlayerActivity,
+                    Model modelAttackType,
+                    Model modelCritType,
+                    Model modelPlayerTarget,
+                    Model modelHealthPercent) {
 
-
-    @GetMapping("/adventure/fight")
-    public String fight(Model modelNextTwoPlayers,
-                        Model modelResultDTO,
-                        Model modelAttackModifier,
-                        Model modelAttackModifierResult,
-                        Model modelFightCount,
-                        Model modelPlayerActivity,
-                        Model modelAttackType,
-                        Model modelCritType,
-                        Model modelPlayerTarget,
-                        Model modelHealthPercent) {
-
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
-        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
-
-
+    Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+    Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
 
 //        attackModifierService.setAttackModifierOnlyPlayerDependent();
 
-        AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker, defender);
+    AttackResultsDTO attackResultsDTO = fightService.attackOtherThanBaseMagicOrMagicBall(attacker, defender);
 
-        modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
-        modelResultDTO.addAttribute("resultDTO", attackResultsDTO);
-        modelAttackModifier.addAttribute("attackmodifier", attackModifier);
-        modelAttackModifier.addAttribute("modelAttackModifierResult", attackModifierService.countAttackModifier());
-        modelFightCount.addAttribute("counter", fightCount);
-        modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
-        modelAttackType.addAttribute("modelAttackType", AttackType.values());
-        modelCritType.addAttribute("modelCritType", CritType.values());
-        modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
-        modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1)));
+    modelNextTwoPlayers.addAttribute("players", nextTwoPlayersToFigthObject);
+    modelResultDTO.addAttribute("resultDTO", attackResultsDTO);
+    AttackModifier am = getOrCreateForCurrentAttacker();
+    modelAttackModifier.addAttribute("attackmodifier", am);
+    modelAttackModifier.addAttribute("modelAttackModifierResult", attackModifierService.countAttackModifier());
 
-        return "adventureFight";
-    }
+    modelFightCount.addAttribute("counter", fightCount);
+    modelPlayerActivity.addAttribute("modelPlayerActivity", PlayerActivity.values());
+    modelAttackType.addAttribute("modelAttackType", AttackType.values());
+    modelCritType.addAttribute("modelCritType", CritType.values());
+    modelPlayerTarget.addAttribute("modelPlayerTarget", PlayerTarget.values());
+    modelHealthPercent.addAttribute("modelHealthPercent", playerService.healthPercent(nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1)));
 
-    @PostMapping("/adventure/fight")
-    public String fightPost(@ModelAttribute(value = "players") NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject) {
-        nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().forEach(player -> {
-            playerService.refreshAdventurerOrderedListObject(player);
-        });
-        return "redirect:/merp/adventure/fight"; // this way the attack will be duplicated upon save --> Save button DISABLED!!!
-    }
+    return "adventureFight";
+}
 
 
     @GetMapping("/adventure/nextfight")

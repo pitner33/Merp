@@ -14,7 +14,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     @Autowired
     PlayerRepository playerRepository;
     @Autowired
-    AttackModifier attackModifier;
+    AttackModifierRepository attackModifierRepository;
     @Autowired
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
 
@@ -24,6 +24,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     public Integer countAttackModifier() {
         Integer attackModifierNum = 0;
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        AttackModifier attackModifier = getOrCreateFor(attacker);
 
         if (attackModifier.getAttackFromWeakSide()) {
             attackModifierNum += 15;
@@ -60,6 +61,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     public void setAttackModifierFromPostMethod(AttackModifier attackModifierFromPost) {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        AttackModifier attackModifier = getOrCreateFor(attacker);
 
         if (playerService.healthPercent(attacker) < 50) {
             attackModifier.setAttackerHPBelow50Percent(true);
@@ -76,6 +78,8 @@ public class AttackModifierServiceImpl implements AttackModifierService {
         attackModifier.setAttackerTargetChange(attackModifierFromPost.getAttackerTargetChange());
         attackModifier.setAttackerMoreThan3MetersMovement(attackModifierFromPost.getAttackerMoreThan3MetersMovement());
         attackModifier.setModifierByGameMaster(attackModifierFromPost.getModifierByGameMaster());
+
+        attackModifierRepository.save(attackModifier);
     }
 
 //    @Override
@@ -96,6 +100,7 @@ public class AttackModifierServiceImpl implements AttackModifierService {
     public void resetAttackmodifier() {
         Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
         Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        AttackModifier attackModifier = (attacker != null) ? getOrCreateFor(attacker) : new AttackModifier();
 
         if (attacker != null) {
             if (playerService.healthPercent(attacker) < 50) {
@@ -117,6 +122,25 @@ public class AttackModifierServiceImpl implements AttackModifierService {
         attackModifier.setAttackerTargetChange(false);
         attackModifier.setAttackerMoreThan3MetersMovement(false);
         attackModifier.setModifierByGameMaster(0);
+        if (attacker != null) {
+            attackModifierRepository.save(attackModifier);
+        }
+    }
 
+    private AttackModifier getOrCreateFor(Player player) {
+        return attackModifierRepository.findByPlayer_Id(player.getId()).orElseGet(() -> {
+            AttackModifier am = new AttackModifier();
+            am.setPlayer(player);
+            am.setAttackFromWeakSide(false);
+            am.setAttackFromBehind(false);
+            am.setDefenderSurprised(false);
+            am.setDefenderStunned(false);
+            am.setAttackerWeaponChange(false);
+            am.setAttackerTargetChange(false);
+            am.setAttackerHPBelow50Percent(false);
+            am.setAttackerMoreThan3MetersMovement(false);
+            am.setModifierByGameMaster(0);
+            return attackModifierRepository.save(am);
+        });
     }
 }

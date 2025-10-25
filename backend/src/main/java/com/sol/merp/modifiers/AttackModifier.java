@@ -1,18 +1,23 @@
 package com.sol.merp.modifiers;
 
+import com.sol.merp.characters.Player;
+import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.stereotype.Component;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Component
-//@Entity
+@Entity
 public class AttackModifier{
-//    @Id
-//    @GeneratedValue(strategy = GenerationType.AUTO)
-//    private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @OneToOne
+    @JoinColumn(name = "player_id", unique = true)
+    private Player player;
+
     private Boolean attackFromWeakSide;
     private Boolean attackFromBehind;
     private Boolean defenderSurprised;
