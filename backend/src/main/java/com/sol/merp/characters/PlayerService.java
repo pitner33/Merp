@@ -23,7 +23,13 @@ public interface PlayerService {
 
     void checkIfTargetIsInOrderedList(Player attacker);
 
+    List<Player> activePlayersAsOnAdventureFight();
+
+    void resetActivePlayersBuffer();
+
     NextTwoPlayersToFigthObject nextPlayersToFight() throws Exception;
+
+    NextTwoPlayersToFigthObject nextPlayersToFight(List<Player> activePlayers) throws Exception;
 
     List<Player> stunnedPlayers();
 

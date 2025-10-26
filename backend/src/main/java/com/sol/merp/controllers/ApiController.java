@@ -6,6 +6,9 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
+import com.sol.merp.characters.PlayerListObject;
+import com.sol.merp.characters.NextTwoPlayersToFigthObject;
+import com.sol.merp.fight.Round;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +35,10 @@ public class ApiController {
     private PlayerService playerService;
     @Autowired
     private AttackModifierRepository attackModifierRepository;
+    @Autowired
+    private PlayerListObject adventurerOrderedListObject;
+    @Autowired
+    private Round round;
 
     // Players
     @GetMapping("/players")
@@ -155,6 +162,37 @@ public class ApiController {
 
         log.info("bulk-update finished: saved={}, notFound={}", saved.size(), notFound.size());
         return ResponseEntity.ok(new BulkUpdateResult(saved, notFound));
+    }
+
+    // Fight flow
+    @GetMapping("/fight/round-count")
+    public ResponseEntity<Integer> getRoundCount() {
+        return ResponseEntity.ok(round.getRoundCount());
+    }
+
+    @PostMapping("/fight/reset-round-count")
+    public ResponseEntity<Integer> resetRoundCount() {
+        round.setRoundCount(0);
+        return ResponseEntity.ok(round.getRoundCount());
+    }
+
+    @PostMapping("/fight/start-round")
+    public ResponseEntity<NextTwoPlayersToFigthObject> startRound() throws Exception {
+        playerService.resetActivePlayersBuffer();
+        // Ensure backend state reflects latest statuses before selecting next players
+        playerService.playerActivitySwitch();
+        playerService.doNothingWhenStunned();
+        playerService.adventurersOrderedList();
+        // increment round counter on new round start
+        round.setRoundCount(round.getRoundCount() + 1);
+        NextTwoPlayersToFigthObject result = playerService.nextPlayersToFight();
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/fight/next-round")
+    public ResponseEntity<NextTwoPlayersToFigthObject> startNextRound() throws Exception {
+        NextTwoPlayersToFigthObject result = playerService.nextPlayersToFight();
+        return ResponseEntity.ok(result);
     }
 
     private Integer computeTb(Player p) {

@@ -1,17 +1,38 @@
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 
 export default function AdventureFight() {
   const location = useLocation();
+  const navigate = useNavigate();
   const players = (location.state as { players?: Player[] } | undefined)?.players || [];
   const [rows, setRows] = useState<Player[]>(players);
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [roundCount, setRoundCount] = useState<number>(0);
 
   useEffect(() => {
     let isMounted = true;
+    async function initRoundCounter() {
+      try {
+        if (players.length > 0) {
+          // Coming from AdventureMain: reset counter to 0
+          const res = await fetch('http://localhost:8081/api/fight/reset-round-count', { method: 'POST' });
+          if (res.ok) {
+            const val = await res.json();
+            if (isMounted) setRoundCount(typeof val === 'number' ? val : 0);
+          } else if (isMounted) setRoundCount(0);
+        } else {
+          // Reloading Fight page mid-session: read current counter
+          const res = await fetch('http://localhost:8081/api/fight/round-count');
+          if (res.ok) {
+            const val = await res.json();
+            if (isMounted) setRoundCount(typeof val === 'number' ? val : 0);
+          }
+        }
+      } catch {}
+    }
     async function loadOrdered() {
       try {
         setLoading(true);
@@ -27,6 +48,7 @@ export default function AdventureFight() {
         if (isMounted) setLoading(false);
       }
     }
+    initRoundCounter();
     loadOrdered();
     return () => {
       isMounted = false;
@@ -164,7 +186,91 @@ export default function AdventureFight() {
     <div style={{ padding: 16 }}>
       <h1>Fight</h1>
       <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Link to="/adventure/main">&larr; Back to Adventure</Link>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setLoading(true);
+              const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(rows),
+              });
+              if (!upd.ok) throw new Error(`Bulk update failed (${upd.status})`);
+              const res = await fetch('http://localhost:8081/api/players/ordered');
+              const fetched = res.ok ? await res.json() : rows;
+              const sorted = [...fetched].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
+              navigate('/adventure/main', { state: { players: sorted } });
+            } catch (e) {
+              const sortedFallback = [...rows].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
+              navigate('/adventure/main', { state: { players: sortedFallback } });
+            } finally {
+              setLoading(false);
+            }
+          }}
+          style={{ padding: '8px 14px', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}
+        >
+          END FIGHT
+        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, width: 180 }}>
+          <div
+            style={{
+              marginTop: 4,
+              width: '100%',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+              background: '#eef3ff',
+              color: '#2f5597',
+              border: '2px solid #2f5597',
+              borderRadius: 16,
+              padding: '10px 16px',
+              fontSize: 44,
+              fontWeight: 900,
+              lineHeight: 1,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+            }}
+          >
+            {roundCount}
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+            try {
+              setLoading(true);
+              // 1) Persist the current table to backend so it's aware of targets/activities/etc
+              const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(rows),
+              });
+              if (!upd.ok) throw new Error(`Bulk update failed (${upd.status})`);
+
+              // 2) Start a fresh round
+              const res = await fetch('http://localhost:8081/api/fight/start-round', { method: 'POST' });
+              if (!res.ok) throw new Error(`Next round failed (${res.status})`);
+              const data = await res.json();
+              navigate('/adventure/fight/round', { state: { round: data } });
+            } catch (err) {
+              showToast('Failed to start next round');
+            } finally {
+              setLoading(false);
+            }
+            }}
+            style={{
+              background: '#2f5597',
+              color: '#ffffff',
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
+            Next Round
+          </button>
+        </div>
       </div>
       {loading ? (
         <p>Loading...</p>

@@ -33,12 +33,20 @@ public class PlayerServiceImpl implements PlayerService {
     @Autowired
     AttackModifierService attackModifierService;
 
+    // Temporary buffer to keep ACTIVE players list across next-round calls
+    private List<Player> activePlayersBuffer = null; // null means not initialized for the current round
+
     @Override
     public void changeIsPlayStatus(Player player) {
         if (player.getIsPlaying()) {
             player.setIsPlaying(false);
         } else player.setIsPlaying(true);
         playerRepository.save(player);
+    }
+
+    @Override
+    public void resetActivePlayersBuffer() {
+        this.activePlayersBuffer = null;
     }
 
     @Override
@@ -136,34 +144,101 @@ public class PlayerServiceImpl implements PlayerService {
         }
     }
 
-    //picks the next ACTIVE player from ordered list as attacker, and its target, put them into a list and wrap the list into an object
     @Override
-    public NextTwoPlayersToFigthObject nextPlayersToFight() throws Exception { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
-        List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
-
-        fightCount.setFightCountMax(orderedList.size());
-
-        if (fightCount.getFightCount() <= fightCount.getFightCountMax()) {
-            Player attacker = orderedList.get(fightCount.getFightCount() - 1);
-            while (!attacker.getIsActive()) {
-                fightCount.setFightCount(fightCount.getFightCount() + 1);
-                if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
-                    break;
-                }
-                attacker = orderedList.get(fightCount.getFightCount() - 1);
+    public List<Player> activePlayersAsOnAdventureFight() {
+        // If already initialized (even if empty), return a copy to reflect current state
+        if (this.activePlayersBuffer != null) {
+            return new ArrayList<>(this.activePlayersBuffer);
+        }
+        // Initialize from the ordered list (first call in a round)
+        List<Player> base = adventurerOrderedListObject.getPlayerList();
+        if (base == null || base.isEmpty()) {
+            base = adventurersOrderedList();
+        }
+        List<Player> active = new ArrayList<>();
+        for (Player p : base) {
+            if (Boolean.TRUE.equals(p.getIsActive())) {
+                active.add(p);
             }
+        }
+        // store for subsequent consumption
+        this.activePlayersBuffer = new ArrayList<>(active);
+        return new ArrayList<>(this.activePlayersBuffer);
+    }
 
-            String defenderCharacterId = attacker.getTarget().toString();
-            Player defender = playerRepository.findByCharacterId(defenderCharacterId);
+    //picks the next ACTIVE player from the provided list as attacker, and its target, put them into a list and wrap the list into an object
+    @Override
+    public NextTwoPlayersToFigthObject nextPlayersToFight(List<Player> activePlayers) throws Exception { //TODO atalakitani hogz nextTwoPlayerObjectet adjon vissza + vegigkovetni a valtozat mashol is
 
-            List<Player> nextTwoPLayersToFight = new ArrayList<>();
-            nextTwoPLayersToFight.add(attacker);
-            nextTwoPLayersToFight.add(defender);
-
-            nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
-
+        // Do NOT initialize from the provided list; buffer is managed by the service lifecycle
+        if (this.activePlayersBuffer == null || this.activePlayersBuffer.isEmpty()) {
+            nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(Collections.emptyList());
             return nextTwoPlayersToFigthObject;
-        } else return nextTwoPlayersToFigthObject;
+        }
+
+        Player attackerFromList = this.activePlayersBuffer.get(0);
+        Player attacker = playerRepository.findByCharacterId(attackerFromList.getCharacterId());
+
+        String defenderCharacterId = attacker.getTarget().toString();
+        Player defender = playerRepository.findByCharacterId(defenderCharacterId);
+
+        List<Player> nextTwoPLayersToFight = new ArrayList<>();
+        nextTwoPLayersToFight.add(attacker);
+        nextTwoPLayersToFight.add(defender);
+
+        nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
+        // consume the attacker from the buffer for subsequent rounds
+        if (!this.activePlayersBuffer.isEmpty()) {
+            this.activePlayersBuffer.remove(0);
+        }
+        return nextTwoPlayersToFigthObject;
+
+
+        //       List<Player> orderedList = adventurerOrderedListObject.getPlayerList();
+//
+//        fightCount.setFightCountMax(orderedList.size());
+//
+//        if (fightCount.getFightCount() <= fightCount.getFightCountMax()) {
+//            Player attacker = orderedList.get(fightCount.getFightCount() - 1);
+//            while (!attacker.getIsActive()) {
+//                fightCount.setFightCount(fightCount.getFightCount() + 1);
+//                if (fightCount.getFightCount() > fightCount.getFightCountMax()) {
+//                    break;
+//                }
+//                attacker = orderedList.get(fightCount.getFightCount() - 1);
+//            }
+
+//            String defenderCharacterId = attacker.getTarget().toString();
+//            Player defender = playerRepository.findByCharacterId(defenderCharacterId);
+
+//            List<Player> nextTwoPLayersToFight = new ArrayList<>();
+//            nextTwoPLayersToFight.add(attacker);
+//            nextTwoPLayersToFight.add(defender);
+
+//            nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(nextTwoPLayersToFight);
+
+//            return nextTwoPlayersToFigthObject;
+//        } else return nextTwoPlayersToFigthObject;
+    }
+
+    // Backward-compatible overload used by legacy MVC controller paths
+    @Override
+    public NextTwoPlayersToFigthObject nextPlayersToFight() throws Exception {
+        // Initialize buffer only if it hasn't been initialized for this round
+        if (this.activePlayersBuffer == null) {
+            List<Player> base = adventurerOrderedListObject.getPlayerList();
+            if (base == null || base.isEmpty()) {
+                base = adventurersOrderedList();
+            }
+            List<Player> active = new ArrayList<>();
+            for (Player p : base) {
+                if (Boolean.TRUE.equals(p.getIsActive())) {
+                    active.add(p);
+                }
+            }
+            this.activePlayersBuffer = new ArrayList<>(active);
+        }
+        return nextPlayersToFight(Collections.emptyList());
     }
 
     @Override
