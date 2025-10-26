@@ -10,6 +10,7 @@ import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,8 @@ public class ApiController {
     private PlayerListObject adventurerOrderedListObject;
     @Autowired
     private Round round;
+    @Autowired
+    private D100Roll d100Roll;
 
     // Players
     @GetMapping("/players")
@@ -103,6 +106,11 @@ public class ApiController {
         attackModifierRepository.deleteByPlayerId(id);
         playerRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/dice/d100")
+    public Integer rollD100() {
+        return d100Roll.d100Random();
     }
 
     // Metadata for enums used in forms

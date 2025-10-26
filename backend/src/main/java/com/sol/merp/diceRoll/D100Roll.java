@@ -1,6 +1,5 @@
 package com.sol.merp.diceRoll;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,7 +17,7 @@ public class D100Roll {
     private Integer d100Roll;
 
     public Integer d100Random() {
-        return new Random().nextInt(101);
+        return new Random().nextInt(100) + 1;
     }
 
     public Integer d100RandomOpen() {
@@ -74,6 +73,6 @@ public class D100Roll {
             }
         }
 
-        return  d100OpenFromRoll;
+        return d100OpenFromRoll;
     }
 }
