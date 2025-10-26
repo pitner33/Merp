@@ -6,6 +6,7 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
+import com.sol.merp.modifiers.AttackModifierRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,8 @@ public class ApiController {
     private PlayerRepository playerRepository;
     @Autowired
     private PlayerService playerService;
+    @Autowired
+    private AttackModifierRepository attackModifierRepository;
 
     // Players
     @GetMapping("/players")
@@ -78,6 +81,8 @@ public class ApiController {
         if (!playerRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
+        // First delete dependent rows, then the player to satisfy FK constraints
+        attackModifierRepository.deleteByPlayerId(id);
         playerRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

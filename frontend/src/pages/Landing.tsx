@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { get, patch, del } from '../api/client';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { get, patch, del, put } from '../api/client';
 import type { Player } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -10,6 +10,43 @@ export default function Landing() {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<keyof Player | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [confirmReviveFor, setConfirmReviveFor] = useState<Player | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [reviving, setReviving] = useState(false);
+  const [reviveError, setReviveError] = useState<string | null>(null);
+  const [confirmDeleteFor, setConfirmDeleteFor] = useState<Player | null>(null);
+  const [closingDelete, setClosingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function hpStyle(p: Player): CSSProperties {
+    const max = Number(p.hpMax) || 0;
+    const cur = Number(p.hpActual) || 0;
+    const ratio = max > 0 ? cur / max : 0;
+    const pct = ratio * 100;
+    let bg = '#2fa84f';
+    let fg = '#ffffff';
+    if (pct === 100) { bg = '#2fa84f'; fg = '#ffffff'; }
+    else if (pct < 100 && pct >= 75) { bg = '#a8e6a1'; fg = '#000000'; }
+    else if (pct < 75 && pct >= 50) { bg = '#ffd966'; fg = '#000000'; }
+    else if (pct < 50 && pct >= 20) { bg = '#f4a261'; fg = '#000000'; }
+    else { bg = '#e76f51'; fg = '#ffffff'; }
+    return { background: bg, color: fg, fontWeight: 600, textAlign: 'center' };
+  }
+
+  function hpTitle(p: Player): string {
+    const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
+    return `${pct}%`;
+  }
+
+  function isRevived(p: Player): boolean {
+    return (
+      Number(p.hpActual) === Number(p.hpMax) &&
+      (p.stunnedForRounds ?? 0) === 0 &&
+      (p.penaltyOfActions ?? 0) === 0 &&
+      (p.hpLossPerRound ?? 0) === 0
+    );
+  }
 
   async function load() {
     try {
@@ -33,8 +70,19 @@ export default function Landing() {
   }
 
   async function remove(id: number) {
-    if (!confirm('Delete player?')) return;
     await del(`/players/${id}`);
+    await load();
+  }
+
+  async function revive(p: Player) {
+    const body: Player = {
+      ...p,
+      hpActual: p.hpMax,
+      stunnedForRounds: 0,
+      penaltyOfActions: 0,
+      hpLossPerRound: 0,
+    };
+    await put<Player>(`/players/${p.id}`, body);
     await load();
   }
 
@@ -94,6 +142,10 @@ export default function Landing() {
           .actions-cell { white-space: nowrap; }
           .center { text-align: center; }
           .right { text-align: right; }
+          @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes dialogPopIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+          @keyframes overlayFadeOut { from { opacity: 1; } to { opacity: 0; } }
+          @keyframes dialogPopOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(8px) scale(0.98); } }
         `}
       </style>
       <table className="table">
@@ -108,6 +160,7 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('lvl')}>lvl {sortKey==='lvl' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('xp')}>XP {sortKey==='xp' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('hpMax' as keyof Player)}>max HP {sortKey==='hpMax' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}>HP</th>
             <th rowSpan={2}><button onClick={() => toggleSort('attackType' as keyof Player)}>Attack {sortKey==='attackType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('critType' as keyof Player)}>Crit {sortKey==='critType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('armorType' as keyof Player)}>Armor {sortKey==='armorType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -158,6 +211,10 @@ export default function Landing() {
               <td className="right">{p.lvl}</td>
               <td className="right">{p.xp}</td>
               <td className="right">{p.hpMax}</td>
+              <td style={hpStyle(p)} title={hpTitle(p)}>
+                <div>{p.hpActual}</div>
+                <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+              </td>
               <td>{p.attackType}</td>
               <td>{p.critType}</td>
               <td>{p.armorType}</td>
@@ -185,6 +242,75 @@ export default function Landing() {
                     </svg>
                   </span>
                 )}
+      {confirmDeleteFor && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 50,
+            animation: (closingDelete ? 'overlayFadeOut 140ms ease-in forwards' : 'overlayFadeIn 160ms ease-out'),
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 8,
+              width: 'min(420px, 92vw)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: (closingDelete ? 'dialogPopOut 140ms ease-in forwards' : 'dialogPopIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1)'),
+            }}
+          >
+            <div style={{ padding: '16px 16px 8px 16px', borderBottom: '1px solid #e6e6e6', background: '#7a1f1f', color: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Delete player</h3>
+            </div>
+            <div style={{ padding: 16, color: '#111' }}>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>Delete character <strong>{confirmDeleteFor.characterId}</strong>?</p>
+              <p style={{ margin: '8px 0 0 0', lineHeight: 1.6 }}>This action cannot be undone.</p>
+              {deleteError && (
+                <p style={{ margin: '12px 0 0 0', color: '#b00020' }}>{deleteError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 16, background: '#f5f5f5', borderTop: '1px solid #e6e6e6' }}>
+              <button
+                onClick={() => {
+                  setClosingDelete(true);
+                  setTimeout(() => { setConfirmDeleteFor(null); setClosingDelete(false); }, 160);
+                }}
+                disabled={deleting}
+                style={{ padding: '8px 12px', background: '#ffffff', color: '#111', border: '1px solid #444', borderRadius: 4, fontWeight: 600, opacity: deleting ? 0.7 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirmDeleteFor) return;
+                  try {
+                    setDeleting(true);
+                    setDeleteError(null);
+                    await remove(confirmDeleteFor.id);
+                    setClosingDelete(true);
+                    setTimeout(() => { setConfirmDeleteFor(null); setClosingDelete(false); setDeleting(false); }, 180);
+                  } catch (e) {
+                    setDeleteError('Failed to delete player. Please try again.');
+                    setDeleting(false);
+                  }
+                }}
+                disabled={deleting}
+                style={{ padding: '8px 12px', background: '#7a1f1f', color: '#fff', border: '1px solid #651a1a', borderRadius: 4, fontWeight: 700, opacity: deleting ? 0.8 : 1 }}
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
               </td>
               <td className="right">{p.mm}</td>
               <td className="right">{p.agilityBonus}</td>
@@ -213,9 +339,27 @@ export default function Landing() {
                     </button>
                   </Link>
                   <button
+                    aria-label="Revive"
+                    title="Revive"
+                    onClick={() => {
+                      if (isRevived(p)) return;
+                      setClosing(false);
+                      setReviveError(null);
+                      setReviving(false);
+                      setConfirmReviveFor(p);
+                    }}
+                    disabled={isRevived(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
+                      <path d="M9 12h6" />
+                    </svg>
+                  </button>
+                  <button
                     aria-label="Delete"
                     title="Delete"
-                    onClick={() => remove(p.id)}
+                    onClick={() => { setDeleting(false); setClosingDelete(false); setDeleteError(null); setConfirmDeleteFor(p); }}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -232,6 +376,77 @@ export default function Landing() {
           ))}
         </tbody>
       </table>
+      {confirmReviveFor && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 50,
+            animation: (closing ? 'overlayFadeOut 140ms ease-in forwards' : 'overlayFadeIn 160ms ease-out'),
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 8,
+              width: 'min(420px, 92vw)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: (closing ? 'dialogPopOut 140ms ease-in forwards' : 'dialogPopIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1)'),
+            }}
+          >
+            <div style={{ padding: '16px 16px 8px 16px', borderBottom: '1px solid #e6e6e6', background: '#1f3b6e', color: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Revive player</h3>
+            </div>
+            <div style={{ padding: 16, color: '#111' }}>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>Revive character <strong>{confirmReviveFor.characterId}</strong>?</p>
+              <p style={{ margin: '8px 0 0 0', lineHeight: 1.6 }}>
+                This will set HP to max and clear stunned rounds, penalty, and HP loss per round.
+              </p>
+              {reviveError && (
+                <p style={{ margin: '12px 0 0 0', color: '#b00020' }}>{reviveError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 16, background: '#f5f5f5', borderTop: '1px solid #e6e6e6' }}>
+              <button
+                onClick={() => {
+                  setClosing(true);
+                  setTimeout(() => { setConfirmReviveFor(null); setClosing(false); }, 160);
+                }}
+                disabled={reviving}
+                style={{ padding: '8px 12px', background: '#ffffff', color: '#111', border: '1px solid #444', borderRadius: 4, fontWeight: 600, opacity: reviving ? 0.7 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirmReviveFor) return;
+                  try {
+                    setReviveError(null);
+                    setReviving(true);
+                    await revive(confirmReviveFor);
+                    setClosing(true);
+                    setTimeout(() => { setConfirmReviveFor(null); setClosing(false); setReviving(false); }, 180);
+                  } catch (e) {
+                    setReviveError('Failed to revive player. Please try again.');
+                    setReviving(false);
+                  }
+                }}
+                disabled={reviving}
+                style={{ padding: '8px 12px', background: '#1f3b6e', color: '#fff', border: '1px solid #1a305a', borderRadius: 4, fontWeight: 700, opacity: reviving ? 0.8 : 1 }}
+              >
+                {reviving ? 'Reviving…' : 'Revive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
