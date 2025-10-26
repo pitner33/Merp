@@ -1,10 +1,82 @@
 import { useLocation, Link } from 'react-router-dom';
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 
 export default function AdventureMain() {
   const location = useLocation();
   const players = (location.state as { players?: Player[] } | undefined)?.players || [];
+  const [rows, setRows] = useState<Player[]>(players);
+  const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
+
+  function showToast(message: string, x?: number, y?: number) {
+    let nx = x;
+    let ny = y;
+    const margin = 16;
+    if (typeof nx === 'number' && typeof ny === 'number') {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      nx = Math.min(Math.max(margin, nx + 8), vw - margin);
+      ny = Math.min(Math.max(margin, ny + 8), vh - margin);
+    }
+    setToast({ message, x: nx, y: ny });
+    window.setTimeout(() => setToast(null), 2000);
+  }
+
+  const activityOptions = [
+    { value: '_1PerformMagic', label: 'Perform Magic' },
+    { value: '_2RangedAttack', label: 'Ranged Attack' },
+    { value: '_3PhisicalAttackOrMovement', label: 'Attack or Movement' },
+    { value: '_4PrepareMagic', label: 'Prepare Magic' },
+    { value: '_5DoNothing', label: 'Do Nothing' },
+  ];
+
+  const attackOptions = [
+    { value: 'slashing', label: 'Slashing' },
+    { value: 'blunt', label: 'Blunt' },
+    { value: 'twoHanded', label: 'Two-handed' },
+    { value: 'ranged', label: 'Ranged' },
+    { value: 'clawsAndFangs', label: 'Claws and Fangs' },
+    { value: 'grabOrBalance', label: 'Grab or Balance' },
+    { value: 'baseMagic', label: 'Base Magic' },
+    { value: 'magicBall', label: 'Magic Ball' },
+    { value: 'magicProjectile', label: 'Magic Projectile' },
+  ];
+
+  const critOptions = [
+    { value: 'none', label: 'None' },
+    { value: 'slashing', label: 'Slashing' },
+    { value: 'blunt', label: 'Blunt' },
+    { value: 'piercing', label: 'Piercing' },
+    { value: 'heat', label: 'Heat' },
+    { value: 'cold', label: 'Cold' },
+    { value: 'electricity', label: 'Electricity' },
+    { value: 'balance', label: 'Balance' },
+    { value: 'crushing', label: 'Crushing' },
+    { value: 'grab', label: 'Grab' },
+    { value: 'bigCreaturePhisical', label: 'Big Creature Physical' },
+    { value: 'bigCreatureMagic', label: 'Big Creature Magic' },
+  ];
+
+  const critByAttack: Record<string, string[]> = {
+    slashing: ['none', 'slashing', 'bigCreaturePhisical'],
+    blunt: ['none', 'blunt', 'bigCreaturePhisical'],
+    twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+    ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
+    clawsAndFangs: ['none', 'slashing', 'piercing', 'crushing', 'grab', 'bigCreaturePhisical'],
+    grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
+    baseMagic: ['none', 'heat', 'cold', 'electricity', 'balance', 'crushing', 'grab', 'bigCreatureMagic'],
+    magicBall: ['none', 'heat', 'cold', 'electricity', 'bigCreatureMagic'],
+    magicProjectile: ['none', 'heat', 'cold', 'electricity', 'bigCreatureMagic'],
+  };
+
+  const armorOptions = [
+    { value: 'none', label: 'None' },
+    { value: 'leather', label: 'Leather' },
+    { value: 'heavyLeather', label: 'Heavy Leather' },
+    { value: 'chainmail', label: 'Chainmail' },
+    { value: 'plate', label: 'Plate' },
+  ];
 
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
@@ -26,6 +98,44 @@ export default function AdventureMain() {
     return `${pct}%`;
   }
 
+  function computeTb(p: Player): number | undefined {
+    const a = p.attackType ?? 'slashing';
+    switch (a) {
+      case 'slashing':
+      case 'blunt':
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        return p.tbOneHanded;
+      case 'twoHanded':
+        return p.tbTwoHanded;
+      case 'ranged':
+        return p.tbRanged;
+      case 'baseMagic':
+        return p.tbBaseMagic;
+      case 'magicBall':
+      case 'magicProjectile':
+        return p.tbTargetMagic;
+      default:
+        return p.tb;
+    }
+  }
+
+  const shieldAllowedFor: Record<string, boolean> = {
+    slashing: true,
+    blunt: true,
+    grabOrBalance: true,
+    twoHanded: false,
+    ranged: false,
+    clawsAndFangs: false,
+    baseMagic: false,
+    magicBall: false,
+    magicProjectile: false,
+  };
+
+  function canUseShield(attackType?: string): boolean {
+    return attackType ? !!shieldAllowedFor[attackType] : false;
+  }
+
   return (
     <div style={{ padding: 16 }}>
       <h1>Adventure</h1>
@@ -45,8 +155,23 @@ export default function AdventureMain() {
               .actions-cell { white-space: nowrap; }
               .center { text-align: center; }
               .right { text-align: right; }
+              .toast { position: fixed; background: rgba(0,0,0,0.85); color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; font-size: 14px; }
             `}
           </style>
+          {toast && (
+            <div
+              className="toast"
+              role="status"
+              aria-live="polite"
+              style={
+                typeof toast.x === 'number' && typeof toast.y === 'number'
+                  ? { left: toast.x, top: toast.y }
+                  : { right: 16, bottom: 16 }
+              }
+            >
+              {toast.message}
+            </div>
+          )}
           <table className="table">
             <thead>
               <tr>
@@ -98,14 +223,39 @@ export default function AdventureMain() {
               </tr>
             </thead>
             <tbody>
-              {players.map((p) => (
+              {rows.map((p) => (
                 <tr key={p.id}>
                   <td className="center">
                     <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
                   </td>
                   <td>{p.characterId}</td>
                   <td>{p.name}</td>
-                  <td>{p.target}</td>
+                  <td>
+                    <select
+                      value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRows((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== p.id) return r;
+                            if (value === 'none') return { ...r, target: undefined };
+                            if (value === 'self') return { ...r, target: r.characterId };
+                            return { ...r, target: value };
+                          })
+                        );
+                      }}
+                    >
+                      <option value="none">none</option>
+                      <option value="self">self</option>
+                      {rows
+                        .filter((o) => o.id !== p.id)
+                        .map((o) => (
+                          <option key={o.id} value={o.characterId}>
+                            {o.characterId}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
                   <td className="right">{p.hpMax}</td>
                   <td style={hpStyle(p)} title={hpTitle(p)}>
                     <div>{p.hpActual}</div>
@@ -144,11 +294,94 @@ export default function AdventureMain() {
                       </span>
                     )}
                   </td>
-                  <td>{p.playerActivity}</td>
-                  <td>{p.attackType}</td>
-                  <td>{p.critType}</td>
-                  <td>{p.armorType}</td>
-                  <td className="right">{p.tb}</td>
+                  <td>
+                    <select
+                      value={p.playerActivity ?? '_5DoNothing'}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRows((prev) =>
+                          prev.map((r) =>
+                            r.id === p.id ? { ...r, playerActivity: value } : r
+                          )
+                        );
+                      }}
+                    >
+                      {activityOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={p.attackType ?? 'slashing'}
+                      onChange={(e) => {
+                        const newAttack = e.target.value;
+                        setRows((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== p.id) return r;
+                            const allowedCrits = critByAttack[newAttack] ?? ['none'];
+                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                            const nextShield = canUseShield(newAttack) ? r.shield : false;
+                            return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield };
+                          })
+                        );
+                      }}
+                    >
+                      {attackOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    {(() => {
+                      const allowed = critByAttack[p.attackType ?? 'slashing'] ?? ['none'];
+                      return (
+                        <select
+                          value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setRows((prev) =>
+                              prev.map((r) =>
+                                r.id === p.id ? { ...r, critType: value } : r
+                              )
+                            );
+                          }}
+                        >
+                          {critOptions
+                            .filter((opt) => allowed.includes(opt.value))
+                            .map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                        </select>
+                      );
+                    })()}
+                  </td>
+                  <td>
+                    <select
+                      value={p.armorType ?? 'none'}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRows((prev) =>
+                          prev.map((r) =>
+                            r.id === p.id ? { ...r, armorType: value } : r
+                          )
+                        );
+                      }}
+                    >
+                      {armorOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="right">{computeTb(p)}</td>
                   <td className="right">{p.tbOneHanded}</td>
                   <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>
@@ -157,21 +390,40 @@ export default function AdventureMain() {
                   <td className="right">{p.tbTargetMagic}</td>
                   <td className="right">{p.vb}</td>
                   <td>
-                    {p.shield ? (
-                      <span title="Shield: Yes" aria-label="Shield: Yes">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        setRows((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== p.id) return r;
+                            if (!canUseShield(r.attackType)) {
+                              if (r.shield) {
+                                return { ...r, shield: false };
+                              }
+                              const evt = e as React.MouseEvent;
+                              showToast('Can not use shield', evt.clientX, evt.clientY);
+                              return r;
+                            }
+                            return { ...r, shield: !r.shield };
+                          })
+                        );
+                      }}
+                      title={p.shield ? 'Shield: Yes' : 'Shield: No'}
+                      aria-label={p.shield ? 'Shield: Yes' : 'Shield: No'}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {p.shield ? (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="#2f5597" stroke="#2f5597" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 3l7 3v5c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-3z"/>
                           <path d="M9 12l2 2 4-4" fill="none"/>
                         </svg>
-                      </span>
-                    ) : (
-                      <span title="Shield: No" aria-label="Shield: No">
+                      ) : (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M12 3l7 3v5c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-3z"/>
                           <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
-                      </span>
-                    )}
+                      )}
+                    </button>
                   </td>
                   <td className="right">{p.stunnedForRounds}</td>
                   <td className="right">{p.penaltyOfActions}</td>
