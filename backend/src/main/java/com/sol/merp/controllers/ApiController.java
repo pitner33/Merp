@@ -40,6 +40,8 @@ public class ApiController {
     @Autowired
     private PlayerListObject adventurerOrderedListObject;
     @Autowired
+    private NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
+    @Autowired
     private Round round;
     @Autowired
     private D100Roll d100Roll;
@@ -125,6 +127,47 @@ public class ApiController {
         }
         FightServiceImpl.ModifiedRollResult res = fightServiceImpl.computeModifiedRoll(openTotal);
         return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/fight/resolve-attack")
+    public ResponseEntity<AttackResultResponse> resolveAttack(@RequestParam(name = "total") Integer total) {
+        if (total == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
+
+        log.info("RESOLVE: attacker.id={} attacker.attackType={} defender.id={} defender.armorType={} inputTotal={}",
+                attacker != null ? attacker.getId() : null,
+                attacker != null ? attacker.getAttackType() : null,
+                defender != null ? defender.getId() : null,
+                defender != null ? defender.getArmorType() : null,
+                total);
+
+        List<String> row = fightServiceImpl.getAttackResultRowByAttackType(attacker, total);
+        if (row == null) {
+            log.warn("RESOLVE: GS row is null for attackType={} total={} (after internal clamping)",
+                    attacker != null ? attacker.getAttackType() : null, total);
+            return ResponseEntity.badRequest().build();
+        }
+        if (row.size() < 5) {
+            log.warn("RESOLVE: GS row has insufficient columns size={} for attackType={} total={}", row.size(),
+                    attacker != null ? attacker.getAttackType() : null, total);
+            return ResponseEntity.badRequest().build();
+        }
+
+        String result = fightServiceImpl.getAttackResultFromRowByDefenderArmor(row, defender);
+        log.info("RESOLVE: result={} row[0..4]={}", result, row.subList(0, 5));
+
+        AttackResultResponse resp = new AttackResultResponse();
+        resp.setResult(result);
+        resp.setRow(row);
+        resp.setTotal(total);
+        return ResponseEntity.ok(resp);
     }
 
     // Metadata for enums used in forms
@@ -265,5 +308,18 @@ public class ApiController {
         public void setNotFound(List<Long> notFound) {
             this.notFound = notFound;
         }
+    }
+
+    public static class AttackResultResponse {
+        private String result;
+        private List<String> row;
+        private Integer total;
+
+        public String getResult() { return result; }
+        public void setResult(String result) { this.result = result; }
+        public List<String> getRow() { return row; }
+        public void setRow(List<String> row) { this.row = row; }
+        public Integer getTotal() { return total; }
+        public void setTotal(Integer total) { this.total = total; }
     }
 }

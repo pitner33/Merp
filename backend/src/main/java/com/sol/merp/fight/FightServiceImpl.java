@@ -87,8 +87,25 @@ public class FightServiceImpl implements FightService {
     }
 
     public ModifiedRollResult computeModifiedRoll(int openTotal) {
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
-        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        List<Player> pairSafe = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pairSafe == null || pairSafe.size() < 2) {
+            logger.warn("computeModifiedRoll called without an active pair; returning minimal result. openTotal={}", openTotal);
+            ModifiedRollResult res = new ModifiedRollResult();
+            res.open = openTotal;
+            res.attackerTb = 0;
+            res.attackerTbForDefense = 0;
+            res.attackerPenalty = 0;
+            res.defenderVb = 0;
+            res.defenderTbForDefense = 0;
+            res.defenderShield = 0;
+            res.defenderPenalty = 0;
+            res.modifiers = 0;
+            res.total = openTotal;
+            return res;
+        }
+
+        Player attacker = pairSafe.get(0);
+        Player defender = pairSafe.get(1);
 
         int attackerTbBase = attacker != null ? (computeTb(attacker) != null ? computeTb(attacker) : 0) : 0;
         int cAttackerTBForDefense = -Math.abs(attacker != null ? (attacker.getTbUsedForDefense() != null ? attacker.getTbUsedForDefense() : 0) : 0);

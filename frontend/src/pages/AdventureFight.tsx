@@ -83,6 +83,7 @@ export default function AdventureFight() {
   ];
 
   const attackOptions = [
+    { value: 'none', label: 'None' },
     { value: 'slashing', label: 'Slashing' },
     { value: 'blunt', label: 'Blunt' },
     { value: 'twoHanded', label: 'Two-handed' },
@@ -110,6 +111,7 @@ export default function AdventureFight() {
   ];
 
   const critByAttack: Record<string, string[]> = {
+    none: ['none'],
     slashing: ['none', 'slashing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisical'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
@@ -130,6 +132,7 @@ export default function AdventureFight() {
   ];
 
   const shieldAllowedFor: Record<string, boolean> = {
+    none: false,
     slashing: true,
     blunt: true,
     grabOrBalance: true,
@@ -186,6 +189,41 @@ export default function AdventureFight() {
         return p.tb;
     }
   }
+
+  function attacksByActivity(activity?: string): string[] {
+    switch (activity) {
+      case '_1PerformMagic':
+        return ['baseMagic', 'magicBall', 'magicProjectile'];
+      case '_2RangedAttack':
+        return ['ranged'];
+      case '_3PhisicalAttackOrMovement':
+        return ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+      case '_4PrepareMagic':
+      case '_5DoNothing':
+      default:
+        return ['none'];
+    }
+  }
+
+  function allowedActivitiesByTarget(target?: string): string[] {
+    const all = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'];
+    if (!target) return ['_5DoNothing', '_4PrepareMagic'];
+    return all;
+  }
+
+  function maxLen(arr: string[]): number {
+    return arr.reduce((m, s) => Math.max(m, (s || '').length), 0);
+  }
+
+  const activityWidthCh = maxLen(activityOptions.map((o) => o.label));
+  const attackWidthCh = maxLen(attackOptions.map((o) => o.label));
+  const critWidthCh = maxLen(critOptions.map((o) => o.label));
+  const armorWidthCh = maxLen(armorOptions.map((o) => o.label));
+  const targetWidthCh = (() => {
+    const base = ['none', 'self'];
+    const ids = rows.map((r) => r.characterId || '');
+    return maxLen(base.concat(ids));
+  })();
 
   return (
     <div style={{ padding: 16 }}>
@@ -293,6 +331,12 @@ export default function AdventureFight() {
               .center { text-align: center; }
               .right { text-align: right; }
               .toast { position: fixed; background: rgba(0,0,0,0.85); color: #fff; padding: 8px 12px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1000; font-size: 14px; }
+              /* Dropdown widths are set inline based on longest option text */
+              .sel-target {}
+              .sel-activity {}
+              .sel-attack {}
+              .sel-crit {}
+              .sel-armor {}
             `}
           </style>
           {toast && (
@@ -370,15 +414,29 @@ export default function AdventureFight() {
                   <td>{p.name}</td>
                   <td>
                     <select
+                      className="sel-target"
+                      style={{ width: `${targetWidthCh + 4}ch` }}
                       value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRows((prev) =>
                           prev.map((r) => {
                             if (r.id !== p.id) return r;
-                            if (value === 'none') return { ...r, target: undefined };
-                            if (value === 'self') return { ...r, target: r.characterId };
-                            return { ...r, target: value };
+                            let nextTarget: string | undefined;
+                            if (value === 'none') nextTarget = undefined;
+                            else if (value === 'self') nextTarget = r.characterId;
+                            else nextTarget = value;
+
+                            // Enforce allowed activities based on target
+                            const allowedActs = allowedActivitiesByTarget(nextTarget);
+                            const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
+                            const allowedAttacks = attacksByActivity(enforcedAct);
+                            const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                            const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                            const nextShield = canUseShield(nextAttack) ? r.shield : false;
+
+                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
                           })
                         );
                       }}
@@ -433,27 +491,46 @@ export default function AdventureFight() {
                     )}
                   </td>
                   <td>
-                    <select
-                      value={p.playerActivity ?? '_5DoNothing'}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) =>
-                            r.id === p.id ? { ...r, playerActivity: value } : r
-                          )
-                        );
-                      }}
-                    >
-                      {activityOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const allowedActs = allowedActivitiesByTarget(p.target);
+                      const curAct = (p.playerActivity && allowedActs.includes(p.playerActivity)) ? p.playerActivity : allowedActs[0];
+                      return (
+                        <select
+                          className="sel-activity"
+                          style={{ width: `${activityWidthCh + 2}ch` }}
+                          value={curAct}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setRows((prev) =>
+                              prev.map((r) => {
+                                if (r.id !== p.id) return r;
+                                const enforcedAct = allowedActivitiesByTarget(r.target).includes(value) ? value : allowedActivitiesByTarget(r.target)[0];
+                                const allowedAttacks = attacksByActivity(enforcedAct);
+                                const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                                const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                                const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                                const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                              })
+                            );
+                          }}
+                        >
+                          {activityOptions
+                            .filter((opt) => allowedActs.includes(opt.value))
+                            .map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                        </select>
+                      );
+                    })()}
                   </td>
                   <td>
                     <select
-                      value={p.attackType ?? 'slashing'}
+                      className="sel-attack"
+                      style={{ width: `${attackWidthCh + 2}ch` }}
+                      value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
                       onChange={(e) => {
                         const newAttack = e.target.value;
                         setRows((prev) =>
@@ -467,18 +544,23 @@ export default function AdventureFight() {
                         );
                       }}
                     >
-                      {attackOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
+                      {attackOptions
+                        .filter((opt) => attacksByActivity(p.playerActivity).includes(opt.value))
+                        .map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
                     </select>
                   </td>
                   <td>
                     {(() => {
-                      const allowed = critByAttack[p.attackType ?? 'slashing'] ?? ['none'];
+                      const curAttack = (attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none';
+                      const allowed = critByAttack[curAttack ?? 'none'] ?? ['none'];
                       return (
                         <select
+                          className="sel-crit"
+                          style={{ width: `${critWidthCh + 2}ch` }}
                           value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
                           onChange={(e) => {
                             const value = e.target.value;
@@ -502,6 +584,8 @@ export default function AdventureFight() {
                   </td>
                   <td>
                     <select
+                      className="sel-armor"
+                      style={{ width: `${armorWidthCh + 2}ch` }}
                       value={p.armorType ?? 'none'}
                       onChange={(e) => {
                         const value = e.target.value;

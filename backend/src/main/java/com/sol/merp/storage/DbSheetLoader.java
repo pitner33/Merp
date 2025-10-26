@@ -13,18 +13,26 @@ public class DbSheetLoader {
     private JdbcTemplate jdbcTemplate;
 
     public Map<Integer, List<String>> loadTable(String tableName) {
-        String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        String schema = jdbcTemplate.queryForObject("SELECT SCHEMA()", String.class);
+        if (schema == null || schema.isBlank()) schema = "PUBLIC";
+
+        // Case-insensitive discovery of COL* columns for the target table
         List<String> cols = jdbcTemplate.query(
-                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME LIKE 'col%' ORDER BY ORDINAL_POSITION",
+                "SELECT COLUMN_NAME " +
+                        "FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE UPPER(TABLE_SCHEMA)=UPPER(?) AND UPPER(TABLE_NAME)=UPPER(?) " +
+                        "AND UPPER(COLUMN_NAME) LIKE 'COL%' " +
+                        "ORDER BY ORDINAL_POSITION",
                 new Object[]{schema, tableName},
-                (rs, i) -> rs.getString(1)
+                (rs, i) -> rs.getString(1).toUpperCase()
         );
         if (cols.isEmpty()) {
             return Collections.emptyMap();
         }
-        StringBuilder sql = new StringBuilder("SELECT row_key");
-        for (String c : cols) sql.append(", `").append(c).append("`");
-        sql.append(" FROM `").append(tableName).append("` ORDER BY row_key");
+        // Build a case-insensitive SELECT by using unquoted identifiers (H2 uppercases them)
+        StringBuilder sql = new StringBuilder("SELECT ROW_KEY");
+        for (String c : cols) sql.append(", ").append(c);
+        sql.append(" FROM ").append(tableName).append(" ORDER BY ROW_KEY");
 
         Map<Integer, List<String>> map = new LinkedHashMap<>();
         jdbcTemplate.query(sql.toString(), rs -> {

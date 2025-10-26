@@ -32,6 +32,22 @@ export default function AdventureFightRound() {
     modifierByGameMaster: 0,
   });
 
+  const [beRoll, setBeRoll] = useState<null | {
+    open: number;
+    attackerTb: number;
+    attackerTbForDefense: number;
+    attackerPenalty: number;
+    defenderVb: number;
+    defenderTbForDefense: number;
+    defenderShield: number;
+    defenderPenalty: number;
+    modifiers: number;
+    total: number;
+  }>(null);
+  const [attackRes, setAttackRes] = useState<null | { result: string; row: string[]; total: number }>(null);
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Ranged/Magic modifiers state
   const [rm, setRm] = useState({
     distanceOfAttack: '_3_15m' as '_0_3m' | '_3_15m' | '_15_30m' | '_30_60m' | '_60_90m' | '_90m_plus',
@@ -105,6 +121,9 @@ export default function AdventureFightRound() {
     setOpenSign(0);
     setOpenTotal(null);
     setLastRoll(null);
+    setBeRoll(null);
+    setAttackRes(null);
+    setError(null);
   }
 
   function meleeLabel(base: string, active: boolean, amt: number): string {
@@ -213,6 +232,67 @@ export default function AdventureFightRound() {
     return v && map[v] ? map[v] : (v || '');
   }
 
+  function computeLocalModifiedTotal(): number | null {
+    if (openTotal == null) return null;
+    const activity = attacker?.playerActivity as string | undefined;
+    const attackType = attacker?.attackType as string | undefined;
+    const usingMelee = activity === '_3PhisicalAttackOrMovement';
+    const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
+    const isPerformMagic = activity === '_1PerformMagic';
+
+    let modSum = 0;
+    if (usingMelee) {
+      if (mod.attackFromWeakSide) modSum += 15;
+      if (mod.attackFromBehind) modSum += 20;
+      if (mod.defenderSurprised) modSum += 20;
+      if (autoDefenderStunned) modSum += 20;
+      if (mod.attackerWeaponChange) modSum -= 30;
+      if (autoAttackerHPBelow50) modSum -= 20;
+      if (mod.attackerMoreThan3MetersMovement) modSum -= 10;
+      modSum += Number(mod.modifierByGameMaster) || 0;
+    } else if (usingRanged) {
+      switch (rm.distanceOfAttack) {
+        case '_0_3m': modSum += 35; break;
+        case '_3_15m': modSum += 0; break;
+        case '_15_30m': modSum -= 20; break;
+        case '_30_60m': modSum -= 40; break;
+        case '_60_90m': modSum -= 55; break;
+        case '_90m_plus': modSum -= 75; break;
+      }
+      if (isPerformMagic) {
+        const r = Math.max(0, Math.min(4, Math.floor(Number(rm.prepareRounds) || 0)));
+        if (r === 0) modSum -= 20; else if (r === 1) modSum -= 10; else if (r === 2) modSum += 0; else if (r === 3) modSum += 10; else if (r === 4) modSum += 20;
+      }
+      modSum += Math.floor(Number(rm.coverPenalty) || 0);
+      const defenderHasShield = !!defender?.shield;
+      if (!rm.shieldInLoS && defenderHasShield) modSum += 25;
+      if (attackType === 'magicBall') {
+        if (rm.inMiddleOfMagicBall) modSum += 20;
+        if (rm.targetAware) modSum -= 10;
+      }
+      if (rm.targetNotMoving) modSum += 10;
+      if (attackType === 'baseMagic') {
+        if (rm.baseMageType === 'kapcsolat') modSum -= 10;
+        if (rm.mdBonus) modSum += 50;
+        if (rm.agreeingTarget) modSum -= 50;
+      }
+      modSum += Number(rm.gmModifier) || 0;
+    }
+
+    const attackerTb = attacker ? (computeTb(attacker) || 0) : 0;
+    const cAttackerTB = attackerTb;
+    const cAttackerTBForDefense = -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
+    const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
+    const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
+    const cDefenderTBForDefense = -Math.abs(Number(defender?.tbUsedForDefense) || 0);
+    const cDefenderShield = defender?.shield ? -25 : 0;
+    const cDefenderPenalty = Math.abs(Number(defender?.penaltyOfActions) || 0);
+
+    const open = openTotal;
+    const total = open + cAttackerTB + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + modSum;
+    return total;
+  }
+
   async function handleRoll() {
     if (rolling) return;
     setRolling(true);
@@ -255,6 +335,10 @@ export default function AdventureFightRound() {
           if (openSign === -1) return base - value;
           return base;
         });
+        // If the follow-up roll does not continue the open-ended sequence,
+        // close the sequence so Resolve can be used
+        if (openSign === 1 && value < 96) setOpenSign(0);
+        if (openSign === -1 && value > 4) setOpenSign(0);
       }
     } catch (e) {
     } finally {
@@ -263,6 +347,30 @@ export default function AdventureFightRound() {
         intervalRef.current = null;
       }
       setRolling(false);
+    }
+  }
+
+  async function resolveBackend() {
+    try {
+      setResolving(true);
+      setError(null);
+      setAttackRes(null);
+      setBeRoll(null);
+      if (openTotal == null) return;
+      const r1 = await fetch(`http://localhost:8081/api/fight/compute-modified-roll?open=${openTotal}`);
+      if (!r1.ok) throw new Error('compute-modified-roll failed');
+      const be = await r1.json();
+      setBeRoll(be);
+      const localTotal = computeLocalModifiedTotal();
+      const usedTotal = typeof localTotal === 'number' ? localTotal : be.total;
+      const r2 = await fetch(`http://localhost:8081/api/fight/resolve-attack?total=${usedTotal}`);
+      if (!r2.ok) throw new Error('resolve-attack failed');
+      const ar = await r2.json();
+      setAttackRes(ar);
+    } catch (e: any) {
+      setError(e?.message || 'Resolve failed');
+    } finally {
+      setResolving(false);
     }
   }
 
@@ -700,7 +808,7 @@ export default function AdventureFightRound() {
               ? true
               : openSign === 0
               ? false
-              : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 95);
+              : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96);
           const disabled = rolling || !canRollNow;
           const showGate = !readyToRoll && openTotal == null;
           return (
@@ -835,6 +943,21 @@ export default function AdventureFightRound() {
                 })()
               }</span>
             </div>
+            {(() => {
+              const openStarted = openTotal != null && openSign !== 0;
+              const firstOpenAwaitingReroll = openStarted && (lastRoll == null || lastRoll === openTotal);
+              const canResolve = openTotal != null && (openSign === 0) && !rolling && !firstOpenAwaitingReroll;
+              return (
+                <button
+                  type="button"
+                  onClick={resolveBackend}
+                  disabled={!canResolve || resolving}
+                  style={{ marginTop: 6, background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!canResolve || resolving) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                >
+                  {resolving ? 'Resolving…' : 'Resolve result'}
+                </button>
+              );
+            })()}
           </div>
           {(() => {
             const activity = attacker?.playerActivity as string | undefined;
@@ -922,6 +1045,55 @@ export default function AdventureFightRound() {
             );
           })()}
         </div>
+
+        {error ? (
+          <div style={{ marginTop: 8, color: '#b91c1c', fontWeight: 600 }}>Error: {error}</div>
+        ) : null}
+
+        {attackRes ? (
+          <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <div className="result-col">
+                <span className="result-label">Attack result</span>
+                <div className="result-box">
+                  <span className="result-value">{attackRes.result}</span>
+                </div>
+              </div>
+              <div className="result-col">
+                <span className="result-label">Used total</span>
+                <div className="result-box">
+                  <span className="result-value">{attackRes.total}</span>
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>GS row by armor</div>
+              <table className="table" style={{ maxWidth: 560 }}>
+                <thead>
+                  <tr>
+                    <th>Plate</th>
+                    <th>Chainmail</th>
+                    <th>Heavy Leather</th>
+                    <th>Leather</th>
+                    <th>None</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {(['plate','chainmail','heavyLeather','leather','none'] as const).map((armorKey, idx) => {
+                      const isDef = defender?.armorType === armorKey;
+                      return (
+                        <td key={armorKey} style={{ fontWeight: isDef ? 900 : 600, background: isDef ? '#d1fae5' : undefined, color: '#111' }}>
+                          {attackRes.row?.[idx] ?? ''}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
