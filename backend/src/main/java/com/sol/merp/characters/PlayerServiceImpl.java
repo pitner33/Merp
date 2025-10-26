@@ -105,13 +105,15 @@ public class PlayerServiceImpl implements PlayerService {
     public List<Player> adventurersOrderedList() {
         List<Player> allWhoPlays = playerRepository.findAllByIsPlayingIsTrue();
 
-        Comparator<Player> orderByIsActiveThenActivityThenMM = Comparator
-                .comparing(this::playerDead)
-                .thenComparing(Player::getIsStunned).reversed()
-                .thenComparing(Player::getIsActive).reversed()
-                .thenComparing(Player::getPlayerActivity).reversed()
-                .thenComparing(Player::getMm).reversed();
-        Collections.sort(allWhoPlays, orderByIsActiveThenActivityThenMM);
+        Comparator<Player> orderByStatusActivityMm =
+                Comparator
+                        .comparing((Player p) -> this.playerDead(p))                  // false (alive) first
+                        .thenComparing(Player::getIsStunned)                          // false (not stunned) first
+                        .thenComparing((Player p) -> !p.getIsActive())                // false (active) first
+                        .thenComparing(p -> p.getPlayerActivity().ordinal())          // activity 1..5
+                        .thenComparing(Player::getMm, Comparator.reverseOrder());     // MM high->low
+
+        allWhoPlays.sort(orderByStatusActivityMm);
         System.out.println(allWhoPlays.toString());
         System.out.println(allWhoPlays.getClass());
         adventurerOrderedListObject.setPlayerList(allWhoPlays);

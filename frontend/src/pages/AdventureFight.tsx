@@ -1,14 +1,37 @@
-import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useLocation, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 
-export default function AdventureMain() {
+export default function AdventureFight() {
   const location = useLocation();
-  const navigate = useNavigate();
   const players = (location.state as { players?: Player[] } | undefined)?.players || [];
   const [rows, setRows] = useState<Player[]>(players);
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadOrdered() {
+      try {
+        setLoading(true);
+        const res = await fetch('http://localhost:8081/api/players/ordered');
+        if (!res.ok) throw new Error(`Failed to load ordered players (${res.status})`);
+        const data = (await res.json()) as Player[];
+        if (isMounted && Array.isArray(data)) {
+          setRows(data);
+        }
+      } catch (e) {
+        // Fallback: keep navigation state order if fetch fails
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadOrdered();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function showToast(message: string, x?: number, y?: number) {
     let nx = x;
@@ -22,13 +45,6 @@ export default function AdventureMain() {
     }
     setToast({ message, x: nx, y: ny });
     window.setTimeout(() => setToast(null), 2000);
-  }
-
-  function isValidPlayerTarget(token: string): boolean {
-    // Valid values: none, JK1..JK15, NJK1..NJK15
-    if (token === 'none') return true;
-    const re = /^(?:JK|NJK)(?:[1-9]|1[0-5])$/;
-    return re.test(token);
   }
 
   const activityOptions = [
@@ -86,6 +102,22 @@ export default function AdventureMain() {
     { value: 'plate', label: 'Plate' },
   ];
 
+  const shieldAllowedFor: Record<string, boolean> = {
+    slashing: true,
+    blunt: true,
+    grabOrBalance: true,
+    twoHanded: false,
+    ranged: false,
+    clawsAndFangs: false,
+    baseMagic: false,
+    magicBall: false,
+    magicProjectile: false,
+  };
+
+  function canUseShield(attackType?: string): boolean {
+    return attackType ? !!shieldAllowedFor[attackType] : false;
+  }
+
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
     const cur = Number(p.hpActual) || 0;
@@ -128,66 +160,16 @@ export default function AdventureMain() {
     }
   }
 
-  const shieldAllowedFor: Record<string, boolean> = {
-    slashing: true,
-    blunt: true,
-    grabOrBalance: true,
-    twoHanded: false,
-    ranged: false,
-    clawsAndFangs: false,
-    baseMagic: false,
-    magicBall: false,
-    magicProjectile: false,
-  };
-
-  function canUseShield(attackType?: string): boolean {
-    return attackType ? !!shieldAllowedFor[attackType] : false;
-  }
-
   return (
     <div style={{ padding: 16 }}>
-      <h1>Adventure</h1>
+      <h1>Fight</h1>
       <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Link to="/home">&larr; Back to Home</Link>
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const payload = rows.map((r) => {
-                const candidate = r.target ?? 'none';
-                const targetToken = isValidPlayerTarget(candidate) ? candidate : 'none';
-                return {
-                  ...r,
-                  // Persist main TB explicitly
-                  tb: computeTb(r) ?? r.tb,
-                  // Send backend enum token for target
-                  target: targetToken,
-                };
-              });
-              const res = await fetch('http://localhost:8081/api/players/bulk-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-              });
-              if (!res.ok) {
-                throw new Error(`Save failed (${res.status})`);
-              }
-              const data = await res.json();
-              const savedCount = Array.isArray(data?.saved) ? data.saved.length : 0;
-              const missing = Array.isArray(data?.notFound) ? data.notFound.length : 0;
-              showToast(`Saved ${savedCount} player(s)` + (missing ? `, ${missing} not found` : ''));
-              navigate('/adventure/fight', { state: { players: rows } });
-            } catch (e) {
-              showToast('Failed to save to server.');
-            }
-          }}
-          style={{ padding: '6px 12px', background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-        >
-          FIGHT
-        </button>
+        <Link to="/adventure/main">&larr; Back to Adventure</Link>
       </div>
-      {players.length === 0 ? (
-        <p>No players were selected for play.</p>
+      {loading ? (
+        <p>Loading...</p>
+      ) : rows.length === 0 ? (
+        <p>No players were provided. Go back to Adventure and press FIGHT.</p>
       ) : (
         <>
           <style>

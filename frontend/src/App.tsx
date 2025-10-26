@@ -5,6 +5,7 @@ import EditPlayer from './pages/EditPlayer';
 import CreateCharacter from './pages/CreateCharacter';
 import Landing from './pages/Landing';
 import AdventureMain from './pages/AdventureMain';
+import AdventureFight from './pages/AdventureFight';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/players/:id/edit" element={<EditPlayer />} />
         <Route path="/create-character" element={<CreateCharacter />} />
         <Route path="/adventure/main" element={<AdventureMain />} />
+        <Route path="/adventure/fight" element={<AdventureFight />} />
         <Route path="*" element={<p>Not Found</p>} />
       </Routes>
     </div>
