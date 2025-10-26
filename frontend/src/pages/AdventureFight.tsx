@@ -40,7 +40,7 @@ export default function AdventureFight() {
         if (!res.ok) throw new Error(`Failed to load ordered players (${res.status})`);
         const data = (await res.json()) as Player[];
         if (isMounted && Array.isArray(data)) {
-          setRows(data);
+          setRows(data.map((p) => ({ ...p, tbUsedForDefense: 0 })));
         }
       } catch (e) {
         // Fallback: keep navigation state order if fetch fails
@@ -53,6 +53,11 @@ export default function AdventureFight() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Reset TB used for defense on landing
+  useEffect(() => {
+    setRows((prev) => prev.map((p) => ({ ...p, tbUsedForDefense: 0 })));
   }, []);
 
   function showToast(message: string, x?: number, y?: number) {
@@ -320,6 +325,7 @@ export default function AdventureFight() {
                 <th rowSpan={2}>Crit</th>
                 <th rowSpan={2}>Armor</th>
                 <th rowSpan={2}>TB</th>
+                <th rowSpan={2}>TB for Defense</th>
                 <th colSpan={6} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
@@ -456,7 +462,7 @@ export default function AdventureFight() {
                             const allowedCrits = critByAttack[newAttack] ?? ['none'];
                             const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                             const nextShield = canUseShield(newAttack) ? r.shield : false;
-                            return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield };
+                            return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
                           })
                         );
                       }}
@@ -514,6 +520,29 @@ export default function AdventureFight() {
                     </select>
                   </td>
                   <td className="right">{computeTb(p)}</td>
+                  <td>
+                    {(() => {
+                      const tb = computeTb(p) ?? 0;
+                      const max = Math.floor(tb * 0.5);
+                      return (
+                        <input
+                          type="number"
+                          min={0}
+                          max={max}
+                          step={1}
+                          value={Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max)}
+                          onChange={(e) => {
+                            const raw = Number(e.target.value);
+                            const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
+                            setRows((prev) => prev.map((r) => (r.id === p.id ? { ...r, tbUsedForDefense: val } : r)));
+                          }}
+                          style={{ width: 70, textAlign: 'right' }}
+                          aria-label="TB used for defense"
+                          title={`Max ${max} (50% of TB)`}
+                        />
+                      );
+                    })()}
+                  </td>
                   <td className="right">{p.tbOneHanded}</td>
                   <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>

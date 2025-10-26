@@ -9,6 +9,7 @@ import com.sol.merp.characters.PlayerService;
 import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
+import com.sol.merp.fight.FightServiceImpl;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,9 @@ public class ApiController {
     private Round round;
     @Autowired
     private D100Roll d100Roll;
+
+    @Autowired
+    private FightServiceImpl fightServiceImpl;
 
     // Players
     @GetMapping("/players")
@@ -111,6 +115,16 @@ public class ApiController {
     @GetMapping("/dice/d100")
     public Integer rollD100() {
         return d100Roll.d100Random();
+    }
+
+    // Compute Modified Roll
+    @GetMapping("/fight/compute-modified-roll")
+    public ResponseEntity<FightServiceImpl.ModifiedRollResult> computeModifiedRoll(@RequestParam(name = "open") Integer openTotal) {
+        if (openTotal == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        FightServiceImpl.ModifiedRollResult res = fightServiceImpl.computeModifiedRoll(openTotal);
+        return ResponseEntity.ok(res);
     }
 
     // Metadata for enums used in forms

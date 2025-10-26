@@ -12,6 +12,7 @@ import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifierService;
+import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,88 @@ public class FightServiceImpl implements FightService {
 
     @Autowired
     AttackModifierService attackModifierService;
+
+    @Autowired
+    com.sol.merp.modifiers.RangedMagicModifierService rangedMagicModifierService;
+
+    @Autowired
+    NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
+
+    private Integer computeTb(Player p) {
+        if (p == null || p.getAttackType() == null) return p != null ? p.getTb() : null;
+        switch (p.getAttackType()) {
+            case slashing:
+            case blunt:
+            case clawsAndFangs:
+            case grabOrBalance:
+                return p.getTbOneHanded();
+            case twoHanded:
+                return p.getTbTwoHanded();
+            case ranged:
+                return p.getTbRanged();
+            case baseMagic:
+                return p.getTbBaseMagic();
+            case magicBall:
+            case magicProjectile:
+                return p.getTbTargetMagic();
+            default:
+                return p.getTb();
+        }
+    }
+
+    public static class ModifiedRollResult {
+        public int open;
+        public int attackerTb;
+        public int attackerTbForDefense; // negative in total
+        public int attackerPenalty; // negative in total
+        public int defenderVb; // negative in total
+        public int defenderTbForDefense; // negative in total
+        public int defenderShield; // -25 if has shield
+        public int defenderPenalty; // positive in total
+        public int modifiers; // melee or ranged/magic
+        public int total;
+    }
+
+    public ModifiedRollResult computeModifiedRoll(int openTotal) {
+        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+
+        int attackerTbBase = attacker != null ? (computeTb(attacker) != null ? computeTb(attacker) : 0) : 0;
+        int cAttackerTBForDefense = -Math.abs(attacker != null ? (attacker.getTbUsedForDefense() != null ? attacker.getTbUsedForDefense() : 0) : 0);
+        int cAttackerPenalty = -Math.abs(attacker != null ? (attacker.getPenaltyOfActions() != null ? attacker.getPenaltyOfActions() : 0) : 0);
+        int cDefenderVB = -Math.abs(defender != null ? (defender.getVb() != null ? defender.getVb() : 0) : 0);
+        int cDefenderTbForDefense = -Math.abs(defender != null ? (defender.getTbUsedForDefense() != null ? defender.getTbUsedForDefense() : 0) : 0);
+        int cDefenderShield = (defender != null && Boolean.TRUE.equals(defender.getShield())) ? -25 : 0;
+        int cDefenderPenalty = Math.abs(defender != null ? (defender.getPenaltyOfActions() != null ? defender.getPenaltyOfActions() : 0) : 0);
+
+        // Modifiers by activity
+        int modifiers = 0;
+        if (attacker != null && attacker.getPlayerActivity() != null) {
+            if (attacker.getPlayerActivity().equals(PlayerActivity._3PhisicalAttackOrMovement)) {
+                modifiers = attackModifierService.countAttackModifier();
+            } else if (attacker.getPlayerActivity().equals(PlayerActivity._2RangedAttack)
+                    || attacker.getPlayerActivity().equals(PlayerActivity._1PerformMagic)) {
+                modifiers = rangedMagicModifierService.countRangedMagicModifier();
+            }
+        } else {
+            modifiers = attackModifierService.countAttackModifier();
+        }
+
+        int total = openTotal + attackerTbBase + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTbForDefense + cDefenderShield + cDefenderPenalty + modifiers;
+
+        ModifiedRollResult res = new ModifiedRollResult();
+        res.open = openTotal;
+        res.attackerTb = attackerTbBase;
+        res.attackerTbForDefense = cAttackerTBForDefense;
+        res.attackerPenalty = cAttackerPenalty;
+        res.defenderVb = cDefenderVB;
+        res.defenderTbForDefense = cDefenderTbForDefense;
+        res.defenderShield = cDefenderShield;
+        res.defenderPenalty = cDefenderPenalty;
+        res.modifiers = modifiers;
+        res.total = total;
+        return res;
+    }
 
     @Override
     public void attack(Player attacker, Player defender) {
@@ -221,12 +304,23 @@ public class FightServiceImpl implements FightService {
                 IF fail:
                     failmodifier
 TODO      */
-        Integer attackModifierValue = attackModifierService.countAttackModifier();
-        logger.info("modifier {}", attackModifierService.countAttackModifier());
+        Integer meleeOrRangedMagicModifier = 0;
+        if (attacker.getPlayerActivity() != null) {
+            if (attacker.getPlayerActivity().equals(PlayerActivity._3PhisicalAttackOrMovement)) {
+                meleeOrRangedMagicModifier = attackModifierService.countAttackModifier();
+            } else if (attacker.getPlayerActivity().equals(PlayerActivity._2RangedAttack)
+                    || attacker.getPlayerActivity().equals(PlayerActivity._1PerformMagic)) {
+                meleeOrRangedMagicModifier = rangedMagicModifierService.countRangedMagicModifier();
+            }
+        } else {
+            meleeOrRangedMagicModifier = attackModifierService.countAttackModifier();
+        }
+
+        logger.info("modifier {}", meleeOrRangedMagicModifier);
         logger.info("TB player {}", attacker.getTb());
-        logger.info("TB count {}", attacker.getTb() - attacker.getTbUsedForDefense() + attackModifierValue);
+        logger.info("TB count {}", attacker.getTb() - attacker.getTbUsedForDefense() + meleeOrRangedMagicModifier);
         logger.info("TB counted: " + (attacker.getTb() - attacker.getTbUsedForDefense()));
-        return attacker.getTb() - attacker.getTbUsedForDefense() + attackModifierValue;
+        return attacker.getTb() - attacker.getTbUsedForDefense() + meleeOrRangedMagicModifier;
     }
 
     @Override
