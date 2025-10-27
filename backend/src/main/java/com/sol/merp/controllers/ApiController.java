@@ -3,6 +3,7 @@ package com.sol.merp.controllers;
 import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.attributes.PlayerActivity;
+import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
@@ -25,7 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
 @RequestMapping("/api")
 public class ApiController {
 
@@ -188,7 +189,6 @@ public class ApiController {
 
     // Bulk update players from the Adventure page
     @PostMapping("/players/bulk-update")
-    @Transactional
     public ResponseEntity<BulkUpdateResult> bulkUpdatePlayers(@RequestBody List<Player> updates) {
         List<Player> saved = new ArrayList<>();
         List<Long> notFound = new ArrayList<>();
@@ -219,10 +219,124 @@ public class ApiController {
             Integer computedTb = computeTb(incoming);
             incoming.setTb(computedTb);
 
-            Player persisted = playerRepository.saveAndFlush(incoming);
-            playerService.checkAndSetStats(persisted);
-            saved.add(persisted);
-            log.info("Updated player id={} characterId={} tb={}", persisted.getId(), persisted.getCharacterId(), persisted.getTb());
+            // Normalize fields to satisfy DB CHECK constraints before persisting
+            // 1) TB used for defense: [0, tb/2], and if TB < 0 -> 0 immediately
+            Integer tbUsed = incoming.getTbUsedForDefense();
+            if (tbUsed == null) tbUsed = 0;
+            if (tbUsed < 0) tbUsed = 0;
+            Integer tbVal = incoming.getTb();
+            int maxDef = (tbVal != null ? tbVal : 0) / 2;
+            if (tbVal != null && tbVal < 0) {
+                tbUsed = 0;
+            } else {
+                if (maxDef < 0) maxDef = 0;
+                if (tbUsed > maxDef) tbUsed = maxDef;
+            }
+            incoming.setTbUsedForDefense(tbUsed);
+
+            // 2) HP actual range and alive flags
+            Double hpAct = incoming.getHpActual();
+            Double hpMax = incoming.getHpMax();
+            if (hpAct == null) hpAct = 0D;
+            if (hpAct < 0D) hpAct = 0D;
+            if (hpMax != null && hpAct > hpMax) hpAct = hpMax;
+            incoming.setHpActual(hpAct);
+
+            if (hpAct <= 0D) {
+                incoming.setIsAlive(false);
+                incoming.setIsActive(false);
+                incoming.setIsStunned(false);
+                incoming.setStunnedForRounds(0);
+                incoming.setPlayerActivity(PlayerActivity._5DoNothing);
+            }
+
+            // 3) Non-negative counters
+            if (incoming.getStunnedForRounds() == null || incoming.getStunnedForRounds() < 0)
+                incoming.setStunnedForRounds(0);
+            if (incoming.getPenaltyOfActions() == null || incoming.getPenaltyOfActions() < 0)
+                incoming.setPenaltyOfActions(0);
+            if (incoming.getHpLossPerRound() == null || incoming.getHpLossPerRound() < 0)
+                incoming.setHpLossPerRound(0);
+
+            // 3/b) Clamp detailed TBs to non-negative (schema may enforce >= 0)
+            if (incoming.getTbOneHanded() == null || incoming.getTbOneHanded() < 0) incoming.setTbOneHanded(0);
+            if (incoming.getTbTwoHanded() == null || incoming.getTbTwoHanded() < 0) incoming.setTbTwoHanded(0);
+            if (incoming.getTbRanged() == null || incoming.getTbRanged() < 0) incoming.setTbRanged(0);
+            if (incoming.getTbBaseMagic() == null || incoming.getTbBaseMagic() < 0) incoming.setTbBaseMagic(0);
+            if (incoming.getTbTargetMagic() == null || incoming.getTbTargetMagic() < 0) incoming.setTbTargetMagic(0);
+
+            // 4) Derive isActive from activity if alive
+            if (Boolean.TRUE.equals(incoming.getIsAlive())) {
+                boolean notActing = incoming.getPlayerActivity() == PlayerActivity._4PrepareMagic ||
+                        incoming.getPlayerActivity() == PlayerActivity._5DoNothing;
+                if (notActing) {
+                    incoming.setIsActive(false);
+                    // When not acting: enforce neutral combat state
+                    incoming.setAttackType(AttackType.none);
+                    incoming.setTarget(PlayerTarget.none);
+                    incoming.setTb(0);
+                } else {
+                    incoming.setIsActive(true);
+                }
+            }
+            // If attack type is none, enforce neutral combat state
+            if (incoming.getAttackType() == AttackType.none) {
+                incoming.setTarget(PlayerTarget.none);
+                incoming.setTb(0);
+                incoming.setTbUsedForDefense(0);
+            }
+            // Coerce null enums to 'none' to satisfy NOT NULL/CHECKs
+            if (incoming.getAttackType() == null) incoming.setAttackType(AttackType.none);
+            if (incoming.getCritType() == null) incoming.setCritType(CritType.none);
+            if (incoming.getArmorType() == null) incoming.setArmorType(com.sol.merp.attributes.ArmorType.none);
+            try {
+                // Apply only normalized fields onto the existing entity to avoid violating unrelated constraints
+                boolean incomingNeutral = incoming.getPlayerActivity() == PlayerActivity._4PrepareMagic ||
+                        incoming.getPlayerActivity() == PlayerActivity._5DoNothing;
+                boolean existingNeutral = existing.getPlayerActivity() == PlayerActivity._4PrepareMagic ||
+                        existing.getPlayerActivity() == PlayerActivity._5DoNothing;
+
+                // Apply incoming core combat fields
+                existing.setPlayerActivity(incoming.getPlayerActivity());
+                existing.setAttackType(incoming.getAttackType());
+                existing.setCritType(incoming.getCritType());
+                existing.setArmorType(incoming.getArmorType());
+                existing.setTarget(incoming.getTarget());
+                existing.setShield(incoming.getShield());
+                existing.setTb(incoming.getTb());
+                existing.setTbUsedForDefense(incoming.getTbUsedForDefense());
+                // HP may change alive state; set here and let service derive status safely
+                if (incoming.getHpActual() != null) existing.setHpActual(incoming.getHpActual());
+
+                // Minimal pre-derivations to satisfy invariants before service derivation
+                if (existing.getTarget() == PlayerTarget.none) {
+                    existing.setPlayerActivity(PlayerActivity._5DoNothing);
+                }
+                if (existing.getPlayerActivity() == PlayerActivity._5DoNothing) {
+                    existing.setAttackType(AttackType.none);
+                    existing.setCritType(CritType.none);
+                }
+
+                // Let the domain service finalize invariants and persist (it calls repository.save)
+                playerService.checkAndSetStats(existing);
+                saved.add(existing);
+                log.info("Updated player id={} characterId={} tb={}", existing.getId(), existing.getCharacterId(), existing.getTb());
+            } catch (Exception ex) {
+                notFound.add(incoming.getId());
+                log.warn("bulk-update failed for id={} charId={} with ex: {}. Fields: atkType={} crit={} armor={} target={} hpAct={} hpMax={} tb={} tbUsedDef={} act={} alive={} active={}",
+                        incoming.getId(), incoming.getCharacterId(), ex.toString(),
+                        incoming.getAttackType(), incoming.getCritType(), incoming.getArmorType(), incoming.getTarget(),
+                        incoming.getHpActual(), incoming.getHpMax(), incoming.getTb(), incoming.getTbUsedForDefense(),
+                        incoming.getPlayerActivity(), incoming.getIsAlive(), incoming.getIsActive());
+                try {
+                    Optional<Player> exOpt = playerRepository.findById(incoming.getId());
+                    if (exOpt.isPresent()) {
+                        Player e = exOpt.get();
+                        log.warn("existing row snapshot id={} isPlaying={} isActive={} isAlive={} activity={} atkType={} crit={} target={} tb={} tbUsedDef={} hpAct={} hpMax={} penaltyOfActions={} stunned={} stunnedRounds={} armor={}",
+                                e.getId(), e.getIsPlaying(), e.getIsActive(), e.getIsAlive(), e.getPlayerActivity(), e.getAttackType(), e.getCritType(), e.getTarget(), e.getTb(), e.getTbUsedForDefense(), e.getHpActual(), e.getHpMax(), e.getPenaltyOfActions(), e.getIsStunned(), e.getStunnedForRounds(), e.getArmorType());
+                    }
+                } catch (Exception ignore) {}
+            }
         }
 
         log.info("bulk-update finished: saved={}, notFound={}", saved.size(), notFound.size());

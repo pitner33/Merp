@@ -148,6 +148,15 @@ export default function AdventureFight() {
     return attackType ? !!shieldAllowedFor[attackType] : false;
   }
 
+  function deriveActive(activity?: string, isAlive?: boolean, stunnedForRounds?: number): boolean {
+    const alive = isAlive !== false;
+    const stunned = (stunnedForRounds ?? 0) > 0;
+    if (!alive) return false;
+    if (stunned) return false;
+    if (activity === '_5DoNothing' || activity === '_4PrepareMagic') return false;
+    return true;
+  }
+
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
     const cur = Number(p.hpActual) || 0;
@@ -171,6 +180,8 @@ export default function AdventureFight() {
   function computeTb(p: Player): number | undefined {
     const a = p.attackType ?? 'slashing';
     switch (a) {
+      case 'none':
+        return 0;
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
@@ -234,10 +245,26 @@ export default function AdventureFight() {
           onClick={async () => {
             try {
               setLoading(true);
+              // Normalize payload like in AdventureMain
+              const payload = rows.map((r) => {
+                const candidate = r.target ?? 'none';
+                const targetToken = candidate ?? 'none';
+                let act = r.playerActivity;
+                if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
+                let atk = r.attackType;
+                let crit = r.critType;
+                if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+                let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+                if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
+                const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
+                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+              });
               const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(rows),
+                body: JSON.stringify(payload),
               });
               if (!upd.ok) throw new Error(`Bulk update failed (${upd.status})`);
               const res = await fetch('http://localhost:8081/api/players/ordered');
@@ -435,8 +462,10 @@ export default function AdventureFight() {
                             const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                             const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                             const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
 
-                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
                           })
                         );
                       }}
@@ -510,7 +539,9 @@ export default function AdventureFight() {
                                 const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                                const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
                               })
                             );
                           }}
@@ -607,22 +638,26 @@ export default function AdventureFight() {
                   <td>
                     {(() => {
                       const tb = computeTb(p) ?? 0;
-                      const max = Math.floor(tb * 0.5);
+                      const neg = tb < 0;
+                      const max = Math.floor(Math.max(0, tb) * 0.5);
+                      const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
                       return (
                         <input
                           type="number"
                           min={0}
                           max={max}
                           step={1}
-                          value={Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max)}
+                          disabled={neg}
+                          value={value}
                           onChange={(e) => {
+                            if (neg) return;
                             const raw = Number(e.target.value);
                             const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
                             setRows((prev) => prev.map((r) => (r.id === p.id ? { ...r, tbUsedForDefense: val } : r)));
                           }}
                           style={{ width: 70, textAlign: 'right' }}
                           aria-label="TB used for defense"
-                          title={`Max ${max} (50% of TB)`}
+                          title={neg ? 'TB < 0 ➜ Defense TB fixed at 0' : `Max ${max} (50% of TB)`}
                         />
                       );
                     })()}

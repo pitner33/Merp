@@ -3,6 +3,7 @@ package com.sol.merp.characters;
 import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
+import com.sol.merp.attributes.CritType;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.fight.FightCount;
 import com.sol.merp.modifiers.AttackModifierService;
@@ -295,14 +296,25 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     public void checkAndSetStats(Player player) {
-        if (!player.getIsAlive()) {
+        // Normalize nulls
+        if (player.getHpActual() == null) player.setHpActual(0D);
+        if (player.getStunnedForRounds() == null) player.setStunnedForRounds(0);
+
+        // If already marked dead, enforce dead invariants
+        if (Boolean.FALSE.equals(player.getIsAlive())) {
             player.setHpActual(0D);
             player.setIsActive(false);
             player.setIsStunned(false);
             player.setStunnedForRounds(0);
             player.setPlayerActivity(PlayerActivity._5DoNothing);
+            player.setAttackType(AttackType.none);
+            player.setCritType(CritType.none);
+            player.setTarget(PlayerTarget.none);
+            player.setTb(0);
+            player.setTbUsedForDefense(0);
         }
 
+        // HP reaching 0 -> dead, and enforce dead invariants
         if (player.getHpActual() <= 0) {
             player.setHpActual(0D);
             player.setIsAlive(false);
@@ -310,8 +322,14 @@ public class PlayerServiceImpl implements PlayerService {
             player.setIsStunned(false);
             player.setStunnedForRounds(0);
             player.setPlayerActivity(PlayerActivity._5DoNothing);
+            player.setAttackType(AttackType.none);
+            player.setCritType(CritType.none);
+            player.setTarget(PlayerTarget.none);
+            player.setTb(0);
+            player.setTbUsedForDefense(0);
         }
 
+        // Stunned logic
         if (player.getStunnedForRounds() <= 0) {
             player.setStunnedForRounds(0);
             player.setIsStunned(false);
@@ -321,41 +339,76 @@ public class PlayerServiceImpl implements PlayerService {
             player.setIsActive(false);
         }
 
-        if ((player.getPlayerActivity().equals(PlayerActivity._4PrepareMagic)) ||
-                player.getPlayerActivity().equals(PlayerActivity._5DoNothing)) {
+        // Target none -> default to DoNothing (unless explicitly PrepareMagic)
+        if (player.getTarget() == PlayerTarget.none && player.getPlayerActivity() != PlayerActivity._4PrepareMagic) {
+            player.setPlayerActivity(PlayerActivity._5DoNothing);
+        }
+
+        // Activity rules: DoNothing -> Attack none, Crit none; also affects active flag
+        if (player.getPlayerActivity() == PlayerActivity._5DoNothing) {
+            player.setAttackType(AttackType.none);
+            player.setCritType(CritType.none);
+            player.setIsActive(false);
+        } else if (player.getPlayerActivity() == PlayerActivity._4PrepareMagic) {
             player.setIsActive(false);
         } else {
             player.setIsActive(true);
         }
 
+        // Set TB by attack selection
         setTbBasedOnAttackType(player);
 
-        if (player.getTbUsedForDefense() > player.getTb() / 2) {
-            player.setTbUsedForDefense(player.getTb() / 2);
+        // Cap TB used for defense: if TB < 0 -> set to 0 immediately; else clamp to [0, tb/2]
+        Integer tb = player.getTb();
+        Integer tbDef = player.getTbUsedForDefense();
+        if (tbDef == null) tbDef = 0;
+        if (tb != null && tb < 0) {
+            tbDef = 0;
+        } else {
+            if (tbDef < 0) tbDef = 0;
+            int maxDef = (tb != null ? tb : 0) / 2;
+            if (maxDef < 0) maxDef = 0;
+            if (tbDef > maxDef) tbDef = maxDef;
         }
-
+        player.setTbUsedForDefense(tbDef);
 
         playerRepository.save(player);
     }
 
     @Override
     public void setTbBasedOnAttackType(Player player) {
-        if ((player.getAttackType().equals(AttackType.slashing)) ||
-                (player.getAttackType().equals(AttackType.blunt)) ||
-                (player.getAttackType().equals(AttackType.clawsAndFangs)) ||
-                (player.getAttackType().equals(AttackType.grabOrBalance))) {
-            player.setTb(player.getTbOneHanded());
-        } else if (player.getAttackType().equals(AttackType.twoHanded)) {
-            player.setTb(player.getTbTwoHanded());
-        } else if (player.getAttackType().equals(AttackType.ranged)) {
-            player.setTb(player.getTbRanged());
-        } else if (player.getAttackType().equals(AttackType.baseMagic)) {
-            player.setTb(player.getTbBaseMagic());
-        } else if ((player.getAttackType().equals(AttackType.magicBall)) ||
-                (player.getAttackType().equals(AttackType.magicProjectile))) {
-            player.setTb(player.getTbTargetMagic());
-        } else player.setTb(0);
-
+        AttackType at = player.getAttackType();
+        if (at == null) {
+            // Keep existing TB when attack type is not set (consistent with ApiController.computeTb)
+            return;
+        }
+        switch (at) {
+            case slashing:
+            case blunt:
+            case clawsAndFangs:
+            case grabOrBalance:
+                player.setTb(player.getTbOneHanded());
+                break;
+            case twoHanded:
+                player.setTb(player.getTbTwoHanded());
+                break;
+            case ranged:
+                player.setTb(player.getTbRanged());
+                break;
+            case baseMagic:
+                player.setTb(player.getTbBaseMagic());
+                break;
+            case magicBall:
+            case magicProjectile:
+                player.setTb(player.getTbTargetMagic());
+                break;
+            case none:
+                player.setTb(0);
+                player.setCritType(CritType.none);
+                break;
+            default:
+                player.setTb(0);
+        }
 
     }
 

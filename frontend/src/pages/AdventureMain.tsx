@@ -1,4 +1,4 @@
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
@@ -111,6 +111,8 @@ export default function AdventureMain() {
   function computeTb(p: Player): number | undefined {
     const a = p.attackType ?? 'slashing';
     switch (a) {
+      case 'none':
+        return 0;
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
@@ -167,6 +169,15 @@ export default function AdventureMain() {
     return attackType ? !!shieldAllowedFor[attackType] : false;
   }
 
+  function deriveActive(activity?: string, isAlive?: boolean, stunnedForRounds?: number): boolean {
+    const alive = isAlive !== false;
+    const stunned = (stunnedForRounds ?? 0) > 0;
+    if (!alive) return false;
+    if (stunned) return false;
+    if (activity === '_5DoNothing' || activity === '_4PrepareMagic') return false;
+    return true;
+  }
+
   function maxLen(arr: string[]): number {
     return arr.reduce((m, s) => Math.max(m, (s || '').length), 0);
   }
@@ -185,7 +196,6 @@ export default function AdventureMain() {
     <div style={{ padding: 16 }}>
       <h1>Adventure</h1>
       <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Link to="/home">&larr; Back to Home</Link>
         <button
           type="button"
           onClick={async () => {
@@ -193,15 +203,59 @@ export default function AdventureMain() {
               const payload = rows.map((r) => {
                 const candidate = r.target ?? 'none';
                 const targetToken = isValidPlayerTarget(candidate) ? candidate : 'none';
-                const normalizedAttack = r.attackType === 'none' ? undefined : r.attackType;
-                return {
-                  ...r,
-                  attackType: normalizedAttack,
-                  // Persist main TB explicitly
-                  tb: computeTb(r) ?? r.tb,
-                  // Send backend enum token for target
-                  target: targetToken,
-                } as Player;
+                let act = r.playerActivity;
+                if (targetToken === 'none' && act !== '_4PrepareMagic') act = '_5DoNothing';
+                let atk = r.attackType;
+                let crit = r.critType;
+                if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+                let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+                if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
+                const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
+                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+              });
+              const res = await fetch('http://localhost:8081/api/players/bulk-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+              if (!res.ok) {
+                throw new Error(`Save failed (${res.status})`);
+              }
+              const data = await res.json().catch(() => null);
+              const savedCount = Array.isArray(data?.saved) ? data.saved.length : 0;
+              const missing = Array.isArray(data?.notFound) ? data.notFound.length : 0;
+              if (missing > 0 || savedCount !== payload.length) {
+                showToast(`Saved ${savedCount}/${payload.length}. ${missing} failed.`);
+                return;
+              }
+              navigate('/home');
+            } catch (e) {
+              showToast('Failed to save to server.');
+            }
+          }}
+          style={{ padding: '6px 12px', background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+        >
+          Back to Home
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const payload = rows.map((r) => {
+                const candidate = r.target ?? 'none';
+                const targetToken = isValidPlayerTarget(candidate) ? candidate : 'none';
+                let act = r.playerActivity;
+                if (targetToken === 'none' && act !== '_4PrepareMagic') act = '_5DoNothing';
+                let atk = r.attackType;
+                let crit = r.critType;
+                if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+                const tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+                const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
+                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
               });
               const res = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
@@ -341,8 +395,9 @@ export default function AdventureMain() {
                             const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                             const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                             const nextShield = canUseShield(nextAttack) ? r.shield : false;
-
-                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield };
+                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
                           })
                         );
                       }}
@@ -416,7 +471,9 @@ export default function AdventureMain() {
                                 const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield };
+                                const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
                               })
                             );
                           }}

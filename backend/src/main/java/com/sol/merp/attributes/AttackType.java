@@ -9,7 +9,8 @@ public enum AttackType {
     grabOrBalance("Grab or Balance"),
     baseMagic("Base Magic"),
     magicBall("Magic Ball"),
-    magicProjectile("Magic Projectile");
+    magicProjectile("Magic Projectile"),
+    none("None");
 
     private final String displayName;
 
