@@ -524,6 +524,138 @@ TODO      */
     }
 
     @Override
+    public AttackResultsDTO applyResolvedAttack(Player attacker, Player defender, String attackResult) {
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(attackResult);
+
+        if ("Fail".equals(attackResult)) {
+            attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+            playerRepository.save(defender);
+            failRoll(attacker, attackResultsDTO);
+            return attackResultsDTO;
+        }
+
+        attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResult));
+        attackResultsDTO.setCrit(getCritFromAttackResult(attackResult));
+        logger.info("BaseDamage : {}", attackResultsDTO.getBaseDamage());
+        logger.info("Crit : {}", attackResultsDTO.getCrit());
+
+        if (!"X".equals(attackResultsDTO.getCrit())) {
+            critRoll(attacker, attackResultsDTO.getCrit(), attackResultsDTO);
+        }
+
+        attackResultsDTO.setFullDamageWithoutBleeding(attackResultsDTO.getBaseDamage() + attackResultsDTO.getCritResultAdditionalDamage());
+        logger.info("CRIT: additional damage from crit: {}", attackResultsDTO.getCritResultAdditionalDamage());
+        logger.info("ATTACK: Full damage without bleeding: {}", attackResultsDTO.getFullDamageWithoutBleeding());
+
+        logger.info("CRIT: effect: {}", attackResultsDTO.getCritResultText());
+        logger.info("CRIT: Hp loss per round: {}", attackResultsDTO.getCritResultHPLossPerRound());
+
+        defender.setHpLossPerRound(defender.getHpLossPerRound() + attackResultsDTO.getCritResultHPLossPerRound());
+        attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
+        logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
+
+        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+        logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
+
+        if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
+            defender.setStunnedForRounds(defender.getStunnedForRounds() + attackResultsDTO.getCritResultStunnedForRounds());
+            defender.setIsStunned(true);
+            defender.setPlayerActivity(PlayerActivity._5DoNothing);
+            logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
+        }
+
+        defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+        logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+
+        if (Boolean.TRUE.equals(attackResultsDTO.getCritResultsInstantDeath())) {
+            defender.setIsAlive(false);
+        }
+
+        playerService.refreshAdventurerOrderedListObject(defender);
+        playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
+        playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+        playerService.experienceCounterKill();
+
+        playerRepository.save(defender);
+
+        return attackResultsDTO;
+    }
+
+    @Override
+    public AttackResultsDTO applyResolvedAttackWithCritRoll(Player attacker, Player defender, String attackResult, Integer critRoll) {
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(attackResult);
+
+        if ("Fail".equals(attackResult)) {
+            attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+            playerRepository.save(defender);
+            failRoll(attacker, attackResultsDTO);
+            return attackResultsDTO;
+        }
+
+        attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResult));
+        attackResultsDTO.setCrit(getCritFromAttackResult(attackResult));
+        logger.info("BaseDamage : {}", attackResultsDTO.getBaseDamage());
+        logger.info("Crit : {}", attackResultsDTO.getCrit());
+
+        // If crit exists, use provided critRoll instead of rolling here
+        if (!"X".equals(attackResultsDTO.getCrit())) {
+            Integer modified = getModifiedCritRoll(critRoll != null ? critRoll : 0, attackResultsDTO.getCrit());
+            List<String> row = getCritResultRow(attacker, modified);
+            attackResultsDTO.setCritResultText(row.get(0));
+            attackResultsDTO.setCritResultAdditionalDamage(Integer.parseInt(row.get(1)));
+            attackResultsDTO.setCritResultHPLossPerRound(Integer.parseInt(row.get(2)));
+            attackResultsDTO.setCritResultStunnedForRounds(Integer.parseInt(row.get(3)));
+            attackResultsDTO.setCritResultPenaltyOfActions(Integer.parseInt(row.get(4)));
+            if (row.get(5).equals("1")) {
+                attackResultsDTO.setCritResultsInstantDeath(true);
+            }
+        }
+
+        attackResultsDTO.setFullDamageWithoutBleeding(attackResultsDTO.getBaseDamage() + attackResultsDTO.getCritResultAdditionalDamage());
+        logger.info("CRIT: additional damage from crit: {}", attackResultsDTO.getCritResultAdditionalDamage());
+        logger.info("ATTACK: Full damage without bleeding: {}", attackResultsDTO.getFullDamageWithoutBleeding());
+
+        logger.info("CRIT: effect: {}", attackResultsDTO.getCritResultText());
+        logger.info("CRIT: Hp loss per round: {}", attackResultsDTO.getCritResultHPLossPerRound());
+
+        defender.setHpLossPerRound(defender.getHpLossPerRound() + attackResultsDTO.getCritResultHPLossPerRound());
+        attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
+        logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
+
+        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+        logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
+
+        if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
+            defender.setStunnedForRounds(defender.getStunnedForRounds() + attackResultsDTO.getCritResultStunnedForRounds());
+            defender.setIsStunned(true);
+            defender.setPlayerActivity(PlayerActivity._5DoNothing);
+            logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
+        }
+
+        defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+        logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+
+        if (Boolean.TRUE.equals(attackResultsDTO.getCritResultsInstantDeath())) {
+            defender.setIsAlive(false);
+        }
+
+        playerService.refreshAdventurerOrderedListObject(defender);
+        playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
+        playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+        playerService.experienceCounterKill();
+
+        playerRepository.save(defender);
+
+        return attackResultsDTO;
+    }
+
+    @Override
     public void decreaseStunnedForRoundCounter() {
         adventurerOrderedListObject.getPlayerList()
                 .stream()

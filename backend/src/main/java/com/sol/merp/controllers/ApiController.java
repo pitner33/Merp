@@ -11,6 +11,7 @@ import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.fight.FightServiceImpl;
+import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -169,6 +170,69 @@ public class ApiController {
         resp.setRow(row);
         resp.setTotal(total);
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/fight/apply-attack")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttack(@RequestParam(name = "result") String result) {
+        if (result == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
+
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttack(attacker, defender, result);
+        return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/fight/apply-attack-with-crit")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttackWithCrit(@RequestParam(name = "result") String result,
+                                                                                  @RequestParam(name = "critRoll") Integer critRoll) {
+        if (result == null || critRoll == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
+
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithCritRoll(attacker, defender, result, critRoll);
+        return ResponseEntity.ok(dto);
+    }
+
+    // Compute crit effects for a given crit letter and a provided roll (client-side dice)
+    @GetMapping("/fight/crit-roll-with")
+    public ResponseEntity<AttackResultsDTO> critRollWith(@RequestParam(name = "crit") String crit,
+                                                         @RequestParam(name = "roll") Integer roll) {
+        if (crit == null || crit.isEmpty() || roll == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        Player attacker = pair.get(0);
+
+        int modified = fightServiceImpl.getModifiedCritRoll(roll, crit);
+        java.util.List<String> row = fightServiceImpl.getCritResultRow(attacker, modified);
+        if (row == null || row.size() < 6) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        AttackResultsDTO dto = new AttackResultsDTO();
+        dto.setCrit(crit);
+        dto.setCritResultText(row.get(0));
+        dto.setCritResultAdditionalDamage(Integer.parseInt(row.get(1)));
+        dto.setCritResultHPLossPerRound(Integer.parseInt(row.get(2)));
+        dto.setCritResultStunnedForRounds(Integer.parseInt(row.get(3)));
+        dto.setCritResultPenaltyOfActions(Integer.parseInt(row.get(4)));
+        dto.setCritResultsInstantDeath("1".equals(row.get(5)));
+        return ResponseEntity.ok(dto);
     }
 
     // Metadata for enums used in forms

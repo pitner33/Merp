@@ -391,6 +391,7 @@ export default function AdventureFight() {
                 <th rowSpan={2}>HP</th>
                 <th rowSpan={2}>Alive</th>
                 <th rowSpan={2}>Active</th>
+                <th rowSpan={2}>Stunned</th>
                 <th rowSpan={2}>Activity</th>
                 <th rowSpan={2}>Attack</th>
                 <th rowSpan={2}>Crit</th>
@@ -515,6 +516,21 @@ export default function AdventureFight() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <circle cx="12" cy="12" r="6" />
                           <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {p.isStunned ? (
+                      <span title="Stunned" aria-label="Stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Not stunned" aria-label="Not stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="8" />
                         </svg>
                       </span>
                     )}
@@ -705,7 +721,7 @@ export default function AdventureFight() {
                       )}
                     </button>
                   </td>
-                  <td className="right">{p.stunnedForRounds}</td>
+                  <td className="right">{p.stunnedForRounds ?? 0}</td>
                   <td className="right">{p.penaltyOfActions}</td>
                   <td className="right">{p.hpLossPerRound}</td>
                   <td className="right">{p.mm}</td>

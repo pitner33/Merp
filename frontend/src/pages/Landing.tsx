@@ -78,6 +78,7 @@ export default function Landing() {
     const body: Player = {
       ...p,
       hpActual: p.hpMax,
+      isAlive: true,
       stunnedForRounds: 0,
       penaltyOfActions: 0,
       hpLossPerRound: 0,

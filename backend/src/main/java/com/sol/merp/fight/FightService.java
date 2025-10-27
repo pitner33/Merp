@@ -66,4 +66,8 @@ public interface FightService {
     Integer critPenaltyForActivities(Integer critRoll);
 
     Boolean critDefenderStunned(Integer critRoll);
+
+    AttackResultsDTO applyResolvedAttack(Player attacker, Player defender, String attackResult);
+
+    AttackResultsDTO applyResolvedAttackWithCritRoll(Player attacker, Player defender, String attackResult, Integer critRoll);
 }
