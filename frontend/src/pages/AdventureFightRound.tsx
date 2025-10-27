@@ -67,6 +67,9 @@ export default function AdventureFightRound() {
     critResultStunnedForRounds: number | null;
     critResultPenaltyOfActions: number | null;
     critResultsInstantDeath: boolean | null;
+    baseDamage?: number | null;
+    fullDamageWithoutBleeding?: number | null;
+    fullDamage?: number | null;
   }>(null);
   const [attackRes, setAttackRes] = useState<null | { result: string; row: string[]; total: number }>(null);
   const [attackDto, setAttackDto] = useState<null | {
@@ -74,6 +77,7 @@ export default function AdventureFightRound() {
   }>(null);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentRoundCount, setCurrentRoundCount] = useState<number | null>(null);
 
   // Ranged/Magic modifiers state
   const [rm, setRm] = useState({
@@ -135,6 +139,20 @@ export default function AdventureFightRound() {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchRoundCount() {
+      try {
+        const res = await fetch('http://localhost:8081/api/fight/round-count');
+        if (!res.ok) return;
+        const val = await res.json();
+        if (mounted && typeof val === 'number') setCurrentRoundCount(val);
+      } catch {}
+    }
+    fetchRoundCount();
+    return () => { mounted = false; };
   }, []);
 
   function resetRollState() {
@@ -301,8 +319,8 @@ export default function AdventureFightRound() {
 
   function computeLocalModifiedTotal(): number | undefined {
     if (openTotal == null) return undefined;
-    const activity = attackerRef?.playerActivity as string | undefined;
-    const attackType = attackerRef?.attackType as string | undefined;
+    const activity = effAttacker?.playerActivity as string | undefined;
+    const attackType = effAttacker?.attackType as string | undefined;
     const usingMelee = activity === '_3PhisicalAttackOrMovement';
     const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
     const isPerformMagic = activity === '_1PerformMagic';
@@ -331,7 +349,7 @@ export default function AdventureFightRound() {
         if (r === 0) modSum -= 20; else if (r === 1) modSum -= 10; else if (r === 2) modSum += 0; else if (r === 3) modSum += 10; else if (r === 4) modSum += 20;
       }
       modSum += Math.floor(Number(rm.coverPenalty) || 0);
-      const defenderHasShield = !!defender?.shield;
+      const defenderHasShield = !!effDefender?.shield;
       if (!rm.shieldInLoS && defenderHasShield) modSum += 25;
       if (attackType === 'magicBall') {
         if (rm.inMiddleOfMagicBall) modSum += 20;
@@ -356,7 +374,8 @@ export default function AdventureFightRound() {
     const cDefenderPenalty = Math.abs(Number(effDefender?.penaltyOfActions) || 0);
 
     const open = openTotal;
-    const total = open + cAttackerTB + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + modSum;
+    const modifiersTotal = cAttackerTB + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + modSum;
+    const total = open + modifiersTotal;
     return total;
   }
 
@@ -425,12 +444,85 @@ export default function AdventureFightRound() {
       setAttackRes(null);
       setBeRoll(null);
       if (openTotal == null) return;
-      const r1 = await fetch(`http://localhost:8081/api/fight/compute-modified-roll?open=${openTotal}`);
+      // Build override payload using the exact same logic as computeLocalModifiedTotal()
+      const activity = attackerRef?.playerActivity as string | undefined;
+      const attackType = attackerRef?.attackType as string | undefined;
+      const usingMelee = activity === '_3PhisicalAttackOrMovement';
+      const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
+      const isPerformMagic = activity === '_1PerformMagic';
+
+      let modSum = 0;
+      if (usingMelee) {
+        if (mod.attackFromWeakSide) modSum += 15;
+        if (mod.attackFromBehind) modSum += 20;
+        if (mod.defenderSurprised) modSum += 20;
+        if (autoDefenderStunned) modSum += 20;
+        if (mod.attackerWeaponChange) modSum -= 30;
+        if (autoAttackerHPBelow50) modSum -= 20;
+        if (mod.attackerMoreThan3MetersMovement) modSum -= 10;
+        modSum += Number(mod.modifierByGameMaster) || 0;
+      } else if (usingRanged) {
+        switch (rm.distanceOfAttack) {
+          case '_0_3m': modSum += 35; break;
+          case '_3_15m': modSum += 0; break;
+          case '_15_30m': modSum -= 20; break;
+          case '_30_60m': modSum -= 40; break;
+          case '_60_90m': modSum -= 55; break;
+          case '_90m_plus': modSum -= 75; break;
+        }
+        if (isPerformMagic) {
+          const r = Math.max(0, Math.min(4, Math.floor(Number(rm.prepareRounds) || 0)));
+          if (r === 0) modSum -= 20; else if (r === 1) modSum -= 10; else if (r === 2) modSum += 0; else if (r === 3) modSum += 10; else if (r === 4) modSum += 20;
+        }
+        modSum += Math.floor(Number(rm.coverPenalty) || 0);
+        const defenderHasShield = !!defender?.shield;
+        if (!rm.shieldInLoS && defenderHasShield) modSum += 25;
+        if (attackType === 'magicBall') {
+          if (rm.inMiddleOfMagicBall) modSum += 20;
+          if (rm.targetAware) modSum -= 10;
+        }
+        if (rm.targetNotMoving) modSum += 10;
+        if (attackType === 'baseMagic') {
+          if (rm.baseMageType === 'kapcsolat') modSum -= 10;
+          if (rm.mdBonus) modSum += 50;
+          if (rm.agreeingTarget) modSum -= 50;
+        }
+        modSum += Number(rm.gmModifier) || 0;
+      }
+
+      const attackerTb = effAttacker ? (computeTb(effAttacker) || 0) : 0;
+      const cAttackerTBForDefense = -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
+      const cAttackerPenalty = -Math.abs(Number(effAttacker?.penaltyOfActions) || 0);
+      const cDefenderVB = -Math.abs(Number(effDefender?.vb) || 0);
+      const cDefenderTBForDefense = -Math.abs(Number(effDefender?.tbUsedForDefense) || 0);
+      const cDefenderShield = effDefender?.shield ? -25 : 0;
+      const cDefenderPenalty = Math.abs(Number(effDefender?.penaltyOfActions) || 0);
+
+      const open = openTotal;
+      const localTotal = computeLocalModifiedTotal();
+      const usedTotalLocal = typeof localTotal === 'number' ? localTotal : undefined;
+      const modifiersOut = (usedTotalLocal != null)
+        ? usedTotalLocal - (open! + attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty)
+        : modSum;
+
+      const r1 = await fetch(
+        `http://localhost:8081/api/fight/compute-modified-roll?open=${openTotal}` +
+        (usedTotalLocal != null ?
+          `&attackerTb=${attackerTb}` +
+          `&attackerTbForDefense=${cAttackerTBForDefense}` +
+          `&attackerPenalty=${cAttackerPenalty}` +
+          `&defenderVb=${cDefenderVB}` +
+          `&defenderTbForDefense=${cDefenderTBForDefense}` +
+          `&defenderShield=${cDefenderShield}` +
+          `&defenderPenalty=${cDefenderPenalty}` +
+          `&modifiers=${modifiersOut}` +
+          `&total=${usedTotalLocal}`
+        : '')
+      );
       if (!r1.ok) throw new Error('compute-modified-roll failed');
       const be = await r1.json();
       setBeRoll(be);
-      const localTotal = computeLocalModifiedTotal();
-      const usedTotal = typeof localTotal === 'number' ? localTotal : be.total;
+      const usedTotal = usedTotalLocal != null ? usedTotalLocal : be.total;
       const r2 = await fetch(`http://localhost:8081/api/fight/resolve-attack?total=${usedTotal}`);
       if (!r2.ok) throw new Error('resolve-attack failed');
       const ar = await r2.json();
@@ -500,7 +592,6 @@ export default function AdventureFightRound() {
       if (!resp.ok) throw new Error('apply-attack-with-crit failed');
       const dto = await resp.json();
       setCritDto(dto);
-      setCritEnabled(false);
       await refreshPairFromBackend();
     } catch (e: any) {
       setError(e?.message || 'Crit roll failed');
@@ -511,10 +602,30 @@ export default function AdventureFightRound() {
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Fight Round</h1>
-      <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <Link to="/adventure/fight">&larr; Back to Fight</Link>
+    <div style={{ padding: 8 }}>
+      <h1 style={{ marginTop: 0, textAlign: 'center' }}>
+        {(() => {
+          const rc = currentRoundCount != null ? currentRoundCount : (round as any)?.roundCount;
+          return rc != null ? `Round ${rc}` : 'Round';
+        })()}
+      </h1>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <Link to="/adventure/fight">
+          <button
+            type="button"
+            style={{
+              background: '#2f5597',
+              color: '#ffffff',
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            Back to Fight
+          </button>
+        </Link>
         <button
           type="button"
           onClick={async () => {
@@ -534,17 +645,19 @@ export default function AdventureFightRound() {
             }
           }}
           style={{
-            marginLeft: 'auto',
             background: '#2f5597',
             color: '#ffffff',
-            padding: '6px 10px',
-            borderRadius: 6,
+            padding: '12px 20px',
+            borderRadius: 10,
             border: 'none',
             cursor: 'pointer',
-            fontWeight: 600,
+            fontWeight: 800,
+            fontSize: 18,
+            minWidth: 200,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
           }}
         >
-          NEXT
+          Next Attacker
         </button>
       </div>
 
@@ -575,6 +688,9 @@ export default function AdventureFightRound() {
           .result-label { display: block; width: 120px; text-align: center; font-size: 14px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .4px; line-height: 1; align-self: center; white-space: nowrap; }
           .result-value { font-size: 48px; font-weight: 900; color: #111; line-height: 1; }
           .result-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 120px; }
+
+          /* Compact styling for modifiers tables */
+          .mods-table th, .mods-table td { padding: 4px 6px !important; font-size: 12px; }
         `}
       </style>
       {pair.length < 2 ? (
@@ -735,14 +851,19 @@ export default function AdventureFightRound() {
         </table>
       )}
 
+      <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto' }}>
       {(() => {
         const activity = attacker?.playerActivity as string | undefined;
         const meleeActive = activity === '_3PhisicalAttackOrMovement';
         const meleeDisabled = !meleeActive;
         return (
-      <div style={{ display: 'inline-block', verticalAlign: 'top', width: '49%', marginTop: 16, marginBottom: 8, marginRight: 8, opacity: meleeDisabled ? 0.6 : 1 }} title={meleeDisabled ? 'Inactive: only for Attack or Movement' : undefined}>
-        <h2 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Melee Modifiers</h2>
-        <table className="table" style={{ maxWidth: 760 }}>
+      <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginTop: 8, marginBottom: 4, opacity: meleeDisabled ? 0.6 : 1, overflow: 'hidden' }} title={meleeDisabled ? 'Inactive: only for Attack or Movement' : undefined}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Melee Modifiers</h2>
+        <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '75%' }} />
+            <col style={{ width: '25%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Melee Modifier</th>
@@ -814,9 +935,13 @@ export default function AdventureFightRound() {
         const isBaseMagic = attackType === 'baseMagic';
         const defenderHasShield = !!defender?.shield;
         return (
-      <div style={{ display: 'inline-block', verticalAlign: 'top', width: '49%', marginTop: 16, marginBottom: 8, opacity: rangedDisabled ? 0.6 : 1 }} title={rangedDisabled ? 'Inactive: only for Ranged or Perform Magic' : undefined}>
-        <h2 style={{ margin: '0 0 8px 0', fontSize: 18 }}>Ranged/Magic modifiers</h2>
-        <table className="table" style={{ maxWidth: 860 }}>
+      <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginTop: 8, marginBottom: 4, opacity: rangedDisabled ? 0.6 : 1, overflow: 'hidden' }} title={rangedDisabled ? 'Inactive: only for Ranged or Perform Magic' : undefined}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Ranged/Magic modifiers</h2>
+        <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '75%' }} />
+            <col style={{ width: '25%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Ranged/Magic Modifier</th>
@@ -935,7 +1060,23 @@ export default function AdventureFightRound() {
         );
       })()}
 
-      <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 500px', width: 500, minWidth: 500, maxWidth: 500, marginTop: 30, marginBottom: 4 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            minWidth: '100%',
+            maxWidth: '100%',
+            padding: 8,
+            border: '1px solid #ddd',
+            borderRadius: 8,
+            gap: 8,
+            margin: '0 auto'
+          }}
+        >
         {(() => {
           const openStarted = openTotal != null && openSign !== 0;
           const firstOpenAwaitingReroll = openStarted && (lastRoll == null || lastRoll === openTotal);
@@ -1006,7 +1147,7 @@ export default function AdventureFightRound() {
           <div className={`die tens${rolling ? ' rolling' : ''}`} aria-label="tens-die">{tensFace}</div>
           <div className={`die ones${rolling ? ' rolling' : ''}`} aria-label="ones-die">{onesFace}</div>
         </div>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginTop: 8 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'center', marginTop: 8 }}>
           <div className="result-col">
             <span className="result-label">Open roll</span>
             <div className="result-box">
@@ -1119,6 +1260,10 @@ export default function AdventureFightRound() {
           </div>
           
         </div>
+        </div>
+      </div>
+    </div>
+    <div>
 
         {error ? (
           <div style={{ marginTop: 8, color: '#b91c1c', fontWeight: 600 }}>Error: {error}</div>
@@ -1127,45 +1272,37 @@ export default function AdventureFightRound() {
         {attackRes ? (
           <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-              <div className="result-col">
-                <span className="result-label">Attack result</span>
-                <div className="result-box">
-                  <span className="result-value">{attackRes.result}</span>
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+                <div className="result-col">
+                  <span className="result-label">Modified roll</span>
+                  <div className="result-box orange">
+                    <span className="result-value">{attackRes.total}</span>
+                  </div>
                 </div>
+                <div className="result-col">
+                  <span className="result-label">Attack result</span>
+                  <div className="result-box">
+                    <span className="result-value">{(() => { const s = (attackRes.result || '').toString(); return s.endsWith('X') ? s.slice(0, -1) : s; })()}</span>
+                  </div>
+                </div>
+                
               </div>
-              <div className="result-col">
-                <span className="result-label">Used total</span>
-                <div className="result-box">
-                  <span className="result-value">{attackRes.total}</span>
-                </div>
-              </div>
-              <div className="result-col">
-                <span className="result-label">Critical roll</span>
-                <div className="result-box" title={critEnabled ? 'Critical roll available' : 'No critical required'}>
-                  <span className="result-value">{critLastRoll != null ? `${critLastRoll}` : ''}</span>
-                </div>
-                <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div className={`die tens${critRolling ? ' rolling' : ''}`} aria-label="crit-tens">{critTensFace}</div>
-                  <div className={`die ones${critRolling ? ' rolling' : ''}`} aria-label="crit-ones">{critOnesFace}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCritRoll}
-                  disabled={!critEnabled || critRolling}
-                  style={{ marginTop: 6, background: critEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!critEnabled || critRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
-                >
-                  {critRolling ? 'Rolling…' : 'Roll Critical'}
-                </button>
-              </div>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>GS row by armor</div>
-              <table className="table" style={{ maxWidth: 560 }}>
+               <div style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}></div>
+              <table className="table" style={{ maxWidth: 560, tableLayout: 'fixed', width: 560 }}>
+                <colgroup>
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '20%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Plate</th>
                     <th>Chainmail</th>
-                    <th>Heavy Leather</th>
+                    <th>Heavy<br/>Leather</th>
                     <th>Leather</th>
                     <th>None</th>
                   </tr>
@@ -1184,22 +1321,125 @@ export default function AdventureFightRound() {
                 </tbody>
               </table>
             </div>
-            {critDto && (
-              <div style={{ marginTop: 12, borderTop: '1px dashed #ddd', paddingTop: 12 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Critical effect</div>
-                <div style={{ marginBottom: 4 }}>Crit: <strong>{critDto.crit}</strong></div>
-                <div style={{ marginBottom: 4 }}>Text: <strong>{critDto.critResultText}</strong></div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(120px, 1fr))', gap: 8 }}>
-                  <div>Extra dmg: <strong>{critDto.critResultAdditionalDamage}</strong></div>
-                  <div>HP loss/round: <strong>{critDto.critResultHPLossPerRound}</strong></div>
-                  <div>Stunned rounds: <strong>{critDto.critResultStunnedForRounds}</strong></div>
-                  <div>Penalty of actions: <strong>{critDto.critResultPenaltyOfActions}</strong></div>
-                  <div>Instant death: <strong>{String(critDto.critResultsInstantDeath)}</strong></div>
+              </div>
+              {critEnabled && (
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+              <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                <button
+                  type="button"
+                  onClick={handleCritRoll}
+                  disabled={!critEnabled || critRolling}
+                  style={{ marginTop: 6, background: critEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!critEnabled || critRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                >
+                  {critRolling ? 'Rolling…' : 'Roll Critical'}
+                </button>
+                <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div className={`die tens${critRolling ? ' rolling' : ''}`} aria-label="crit-tens">{critTensFace}</div>
+                  <div className={`die ones${critRolling ? ' rolling' : ''}`} aria-label="crit-ones">{critOnesFace}</div>
                 </div>
+                <span className="result-label" style={{ textAlign: 'center' }}>Critical roll</span>
+                <div className="result-box" title={critEnabled ? 'Critical roll available' : 'No critical required'}>
+                  <span className="result-value">{critLastRoll != null ? `${critLastRoll}` : ''}</span>
+                </div>
+                
+                
+              </div>
+              </div>
+              )}
+              {critDto && String(critDto.crit).toUpperCase() === 'X' && (
+                <div style={{ marginTop: 12, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: '#FFF5EB', color: '#7a2e0c' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>Base damage</div>
+                  <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Damage</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{critDto.baseDamage ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{critDto.critResultHPLossPerRound ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Total</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{critDto.fullDamage ?? 0}</strong></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {critDto && String(critDto.crit).toUpperCase() !== 'X' && (
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+                <div style={{
+                  fontWeight: 800,
+                  marginBottom: 8,
+                  textAlign: 'center',
+                  fontSize: 18,
+                  background: (() => {
+                    const s = (critDto.crit || '').toString().toUpperCase();
+                    const letter = (s.match(/[A-ET]/) || [null])[0];
+                    switch (letter) {
+                      case 'T': return '#FFF5EB'; // very light orange
+                      case 'A': return '#FFE8D5'; // light orange
+                      case 'B': return '#FFD8B0'; // medium-light orange
+                      case 'C': return '#FFC285'; // medium orange
+                      case 'D': return '#FFAA5E'; // strong orange
+                      case 'E': return '#FF8A3D'; // almost red-orange
+                      default: return '#e8eef9';
+                    }
+                  })(),
+                  color: '#2f5597',
+                  padding: '6px 10px',
+                  borderRadius: 6
+                }}>
+                  {critDto.crit} {labelCrit(effAttacker?.critType as any)} Critical
+                </div>
+                <div style={{ marginBottom: 4, border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px' }}>
+                  <strong>{critDto.critResultText}</strong>
+                </div>
+                <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Extra dmg</td>
+                      <td><strong>{critDto.critResultAdditionalDamage}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>HP loss/round</td>
+                      <td><strong>{critDto.critResultHPLossPerRound}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Stunned rounds</td>
+                      <td><strong>{critDto.critResultStunnedForRounds}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Penalty of actions</td>
+                      <td><strong>{critDto.critResultPenaltyOfActions}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Instant death</td>
+                      <td>
+                        {critDto.critResultsInstantDeath ? (
+                          <span title="Instant death" aria-label="Instant death">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>
+                              <circle cx="9" cy="11" r="1.5" fill="#fff" />
+                              <circle cx="15" cy="11" r="1.5" fill="#fff" />
+                              <path d="M9 15c1 .7 2 .7 3 .7s2 0 3-.7" fill="none" stroke="#fff" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
-          </div>
-        ) : null}
+            </div>
+           
+            
+              </div>
+            ) : null}
       </div>
     </div>
   );

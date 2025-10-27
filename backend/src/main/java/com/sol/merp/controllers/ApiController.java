@@ -123,25 +123,73 @@ public class ApiController {
 
     // Compute Modified Roll
     @GetMapping("/fight/compute-modified-roll")
-    public ResponseEntity<FightServiceImpl.ModifiedRollResult> computeModifiedRoll(@RequestParam(name = "open") Integer openTotal) {
+    public ResponseEntity<FightServiceImpl.ModifiedRollResult> computeModifiedRoll(
+            @RequestParam(name = "open") Integer openTotal,
+            @RequestParam(name = "attackerTb", required = false) Integer attackerTb,
+            @RequestParam(name = "attackerTbForDefense", required = false) Integer attackerTbForDefense,
+            @RequestParam(name = "attackerPenalty", required = false) Integer attackerPenalty,
+            @RequestParam(name = "defenderVb", required = false) Integer defenderVb,
+            @RequestParam(name = "defenderTbForDefense", required = false) Integer defenderTbForDefense,
+            @RequestParam(name = "defenderShield", required = false) Integer defenderShield,
+            @RequestParam(name = "defenderPenalty", required = false) Integer defenderPenalty,
+            @RequestParam(name = "modifiers", required = false) Integer modifiers,
+            @RequestParam(name = "total", required = false) Integer totalOverride
+    ) {
         if (openTotal == null) {
             return ResponseEntity.badRequest().build();
         }
+
+        // If FE provided a full override breakdown, echo that back for parity
+        boolean haveOverrides = attackerTb != null && attackerTbForDefense != null && attackerPenalty != null
+                && defenderVb != null && defenderTbForDefense != null && defenderShield != null
+                && defenderPenalty != null && modifiers != null && totalOverride != null;
+        if (haveOverrides) {
+            FightServiceImpl.ModifiedRollResult res = new FightServiceImpl.ModifiedRollResult();
+            res.open = openTotal;
+            res.attackerTb = attackerTb;
+            res.attackerTbForDefense = attackerTbForDefense;
+            res.attackerPenalty = attackerPenalty;
+            res.defenderVb = defenderVb;
+            res.defenderTbForDefense = defenderTbForDefense;
+            res.defenderShield = defenderShield;
+            res.defenderPenalty = defenderPenalty;
+            res.modifiers = modifiers;
+            res.total = totalOverride;
+            return ResponseEntity.ok(res);
+        }
+
         FightServiceImpl.ModifiedRollResult res = fightServiceImpl.computeModifiedRoll(openTotal);
         return ResponseEntity.ok(res);
     }
 
     @GetMapping("/fight/resolve-attack")
-    public ResponseEntity<AttackResultResponse> resolveAttack(@RequestParam(name = "total") Integer total) {
+    public ResponseEntity<AttackResultResponse> resolveAttack(@RequestParam(name = "total") Integer total,
+                                                              @RequestParam(name = "attackType", required = false) com.sol.merp.attributes.AttackType attackTypeOverride,
+                                                              @RequestParam(name = "defenderArmor", required = false) com.sol.merp.attributes.ArmorType defenderArmorOverride) {
         if (total == null) {
             return ResponseEntity.badRequest().build();
         }
+
+        Player attacker;
+        Player defender;
         List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-        if (pair == null || pair.size() < 2) {
-            return ResponseEntity.badRequest().build();
+        if (pair != null && pair.size() >= 2) {
+            attacker = pair.get(0);
+            defender = pair.get(1);
+        } else if (attackTypeOverride != null && defenderArmorOverride != null) {
+            // Fallback: construct minimal players from overrides
+            attacker = new Player();
+            attacker.setAttackType(attackTypeOverride);
+            defender = new Player();
+            defender.setArmorType(defenderArmorOverride);
+        } else {
+            // No active pair and no overrides
+            AttackResultResponse resp = new AttackResultResponse();
+            resp.setResult("Fail");
+            resp.setRow(java.util.Arrays.asList("Fail", "Fail", "Fail", "Fail", "Fail"));
+            resp.setTotal(total);
+            return ResponseEntity.ok(resp);
         }
-        Player attacker = pair.get(0);
-        Player defender = pair.get(1);
 
         log.info("RESOLVE: attacker.id={} attacker.attackType={} defender.id={} defender.armorType={} inputTotal={}",
                 attacker != null ? attacker.getId() : null,
@@ -150,16 +198,26 @@ public class ApiController {
                 defender != null ? defender.getArmorType() : null,
                 total);
 
-        List<String> row = fightServiceImpl.getAttackResultRowByAttackType(attacker, total);
-        if (row == null) {
-            log.warn("RESOLVE: GS row is null for attackType={} total={} (after internal clamping)",
-                    attacker != null ? attacker.getAttackType() : null, total);
-            return ResponseEntity.badRequest().build();
+        List<String> row;
+        try {
+            row = fightServiceImpl.getAttackResultRowByAttackType(attacker, total);
+        } catch (Exception ex) {
+            log.warn("RESOLVE: exception while getting GS row for attackType={} total={} -> {}",
+                    attacker != null ? attacker.getAttackType() : null, total, ex.toString());
+            AttackResultResponse resp = new AttackResultResponse();
+            resp.setResult("Fail");
+            resp.setRow(java.util.Arrays.asList("Fail", "Fail", "Fail", "Fail", "Fail"));
+            resp.setTotal(total);
+            return ResponseEntity.ok(resp);
         }
-        if (row.size() < 5) {
-            log.warn("RESOLVE: GS row has insufficient columns size={} for attackType={} total={}", row.size(),
+        if (row == null || row.size() < 5) {
+            log.warn("RESOLVE: invalid GS row for attackType={} total={} (row is null or size<5)",
                     attacker != null ? attacker.getAttackType() : null, total);
-            return ResponseEntity.badRequest().build();
+            AttackResultResponse resp = new AttackResultResponse();
+            resp.setResult("Fail");
+            resp.setRow(java.util.Arrays.asList("Fail", "Fail", "Fail", "Fail", "Fail"));
+            resp.setTotal(total);
+            return ResponseEntity.ok(resp);
         }
 
         String result = fightServiceImpl.getAttackResultFromRowByDefenderArmor(row, defender);

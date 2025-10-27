@@ -237,9 +237,9 @@ export default function AdventureFight() {
   })();
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Fight</h1>
-      <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+    <div style={{ padding: 8 }}>
+      <h1 style={{ marginTop: 0, textAlign: 'center' }}>Fight</h1>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 24, alignItems: 'flex-end', justifyContent: 'center' }}>
         <button
           type="button"
           onClick={async () => {
@@ -282,7 +282,7 @@ export default function AdventureFight() {
         >
           END FIGHT
         </button>
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, width: 180 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 180 }}>
           <div
             style={{
               marginTop: 4,

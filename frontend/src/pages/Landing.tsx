@@ -126,8 +126,8 @@ export default function Landing() {
   if (error) return <p>{error}</p>;
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Home</h1>
+    <div style={{ padding: 0 }}>
+      <h1 style={{ marginTop: 0 }}>The Lazy Dragon Inn</h1>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button onClick={playAll} disabled={!players.some((p) => p.isPlaying)}>PLAY</button>
         <Link to="/create-character">

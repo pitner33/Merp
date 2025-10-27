@@ -193,8 +193,8 @@ export default function AdventureMain() {
   })();
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Adventure</h1>
+    <div style={{ padding: 8 }}>
+      <h1 style={{ marginTop: 0 }}>Adventure</h1>
       <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
         <button
           type="button"
