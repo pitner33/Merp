@@ -53,6 +53,15 @@ export default function AdventureFightRound() {
     modifiers: number;
     total: number;
   }>(null);
+  // Fail roll state (open-ended like attack roll)
+  const [failEnabled, setFailEnabled] = useState(false);
+  const [failRolling, setFailRolling] = useState(false);
+  const [failTensFace, setFailTensFace] = useState<number>(0);
+  const [failOnesFace, setFailOnesFace] = useState<number>(0);
+  const [failLastRoll, setFailLastRoll] = useState<number | null>(null);
+  const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
+  const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
+  const [failDto, setFailDto] = useState<null | { failResultText: string | null; fullDamage?: number | null }>(null);
   // Critical roll state
   const [critEnabled, setCritEnabled] = useState(false);
   const [critRolling, setCritRolling] = useState(false);
@@ -175,6 +184,14 @@ export default function AdventureFightRound() {
     setCritOnesFace(0);
     setCritLastRoll(null);
     setCritDto(null);
+    setFailEnabled(false);
+    setFailRolling(false);
+    setFailTensFace(0);
+    setFailOnesFace(0);
+    setFailLastRoll(null);
+    setFailOpenSign(0);
+    setFailOpenTotal(null);
+    setFailDto(null);
     setAttackerRef(undefined);
     setDefenderRef(undefined);
     setResolveAttempted(false);
@@ -259,6 +276,74 @@ export default function AdventureFightRound() {
         return p.tbTargetMagic;
       default:
         return p.tb;
+    }
+  }
+
+  async function handleFailRoll() {
+    if (!failEnabled || failRolling) return;
+    setFailRolling(true);
+    const localInterval = window.setInterval(() => {
+      setFailTensFace((p) => (p + 1) % 10);
+      setFailOnesFace((p) => (p + 1) % 10);
+    }, 50);
+
+    try {
+      // Perform one open-ended step
+      const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
+        if (!r.ok) throw new Error('Fail dice roll failed');
+        return r.json();
+      }) as Promise<number>;
+      const waitPromise = new Promise<void>((res) => setTimeout(res, 1200));
+      const [rolled] = await Promise.all([fetchPromise, waitPromise]);
+      const value = typeof rolled === 'number' ? rolled : 1;
+      const tens = value === 100 ? 0 : Math.floor(value / 10);
+      const ones = value === 100 ? 0 : value % 10;
+      setFailTensFace(tens);
+      setFailOnesFace(ones);
+      setFailLastRoll(value);
+
+      // Compute next open-ended state locally to decide whether to close and resolve
+      let nextSign = failOpenSign;
+      let nextTotal = failOpenTotal == null ? null : failOpenTotal;
+
+      if (nextSign === 0 || nextTotal == null) {
+        if (value >= 96) {
+          nextSign = 1;
+          nextTotal = value;
+        } else if (value <= 4) {
+          nextSign = -1;
+          nextTotal = value;
+        } else {
+          nextSign = 0;
+          nextTotal = value;
+        }
+      } else {
+        const base = nextTotal == null ? 0 : nextTotal;
+        if (nextSign === 1) nextTotal = base + value;
+        if (nextSign === -1) nextTotal = base - value;
+        if (nextSign === 1 && value < 96) nextSign = 0;
+        if (nextSign === -1 && value > 4) nextSign = 0;
+      }
+
+      // Push computed state to React
+      setFailOpenTotal(nextTotal);
+      setFailOpenSign(nextSign);
+
+      // If the sequence is now closed, apply fail to backend
+      const sequenceClosed = nextTotal != null && nextSign === 0;
+      if (sequenceClosed) {
+        const resp = await fetch(`http://localhost:8081/api/fight/apply-attack-with-fail?failRoll=${nextTotal}`, { method: 'POST' });
+        if (!resp.ok) throw new Error('apply-attack-with-fail failed');
+        const dto = await resp.json();
+        setFailDto(dto);
+        setFailEnabled(false);
+        await refreshPairFromBackend();
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Fail roll failed');
+    } finally {
+      window.clearInterval(localInterval);
+      setFailRolling(false);
     }
   }
 
@@ -541,7 +626,7 @@ export default function AdventureFightRound() {
       // Scenario handling
       // - No crit (ends with X): apply immediately
       // - Crit (A–E): wait for crit roll; apply after roll
-      // - Fail: will be handled later
+      // - Fail: enable Fail roll (open-ended) and handle after roll
       if (resStr && resStr !== 'Fail') {
         const letter = resStr.slice(-1);
         if (letter === 'X') {
@@ -552,6 +637,16 @@ export default function AdventureFightRound() {
           setCritEnabled(false);
           await refreshPairFromBackend();
         }
+      } else if (resStr === 'Fail') {
+        // Reset fail state and enable fail roll box
+        setFailEnabled(true);
+        setFailRolling(false);
+        setFailTensFace(0);
+        setFailOnesFace(0);
+        setFailLastRoll(null);
+        setFailOpenSign(0);
+        setFailOpenTotal(null);
+        setFailDto(null);
       }
     } catch (e: any) {
       setError(e?.message || 'Resolve failed');
@@ -1346,6 +1441,28 @@ export default function AdventureFightRound() {
               </div>
               </div>
               )}
+              {attackRes?.result === 'Fail' && (
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+                <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={handleFailRoll}
+                    disabled={!failEnabled || failRolling}
+                    style={{ marginTop: 6, background: failEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!failEnabled || failRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                  >
+                    {failRolling ? 'Rolling…' : 'Roll Fail'}
+                  </button>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
+                    <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
+                  </div>
+                  <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
+                  <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail roll required'}>
+                    <span className="result-value">{failLastRoll != null ? `${failLastRoll}` : ''}</span>
+                  </div>
+                </div>
+              </div>
+              )}
               {critDto && String(critDto.crit).toUpperCase() === 'X' && (
                 <div style={{ marginTop: 12, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: '#FFF5EB', color: '#7a2e0c' }}>
                   <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>Base damage</div>
@@ -1362,6 +1479,51 @@ export default function AdventureFightRound() {
                       <tr>
                         <td style={{ textAlign: 'left' }}>Total</td>
                         <td><strong style={{ color: '#7a2e0c' }}>{critDto.fullDamage ?? 0}</strong></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {failDto && (
+                <div style={{ marginTop: 12, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: '#FFF5EB', color: '#7a2e0c' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>FAIL</div>
+                  <div style={{ marginBottom: 4, border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', background: '#fff', color: '#111' }}>
+                    <strong>{failDto.failResultText}</strong>
+                  </div>
+                  <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Extra dmg</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultAdditionalDamage ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultHPLossPerRound ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Stunned rounds</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultStunnedForRounds ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Penalty of actions</td>
+                        <td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultPenaltyOfActions ?? 0}</strong></td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'left' }}>Instant death</td>
+                        <td>
+                          {(failDto as any).failResultsInstantDeath ? (
+                            <span title="Instant death" aria-label="Instant death">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>
+                                <circle cx="9" cy="11" r="1.5" fill="#fff" />
+                                <circle cx="15" cy="11" r="1.5" fill="#fff" />
+                                <path d="M9 15c1 .7 2 .7 3 .7s2 0 3-.7" fill="none" stroke="#fff" />
+                              </svg>
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -1403,7 +1565,7 @@ export default function AdventureFightRound() {
                       <td><strong>{critDto.critResultAdditionalDamage}</strong></td>
                     </tr>
                     <tr>
-                      <td style={{ textAlign: 'left' }}>HP loss/round</td>
+                      <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
                       <td><strong>{critDto.critResultHPLossPerRound}</strong></td>
                     </tr>
                     <tr>

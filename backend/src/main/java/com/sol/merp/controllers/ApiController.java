@@ -263,6 +263,22 @@ public class ApiController {
         return ResponseEntity.ok(dto);
     }
 
+    @PostMapping("/fight/apply-attack-with-fail")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttackWithFail(@RequestParam(name = "failRoll") Integer failRoll) {
+        if (failRoll == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
+
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithFailRoll(attacker, defender, failRoll);
+        return ResponseEntity.ok(dto);
+    }
+
     // Compute crit effects for a given crit letter and a provided roll (client-side dice)
     @GetMapping("/fight/crit-roll-with")
     public ResponseEntity<AttackResultsDTO> critRollWith(@RequestParam(name = "crit") String crit,

@@ -410,17 +410,35 @@ TODO      */
 
     @Override
     public void failRoll(Player attacker, AttackResultsDTO attackResultsDTO) {
-        List<String> failRollResultRow = getFailRollResultRow();
+        List<String> row = getFailRollResultRow();
 
+        // Choose text by attack type
         if (attacker.getAttackType().equals(AttackType.baseMagic) ||
                 attacker.getAttackType().equals(AttackType.magicBall) ||
                 attacker.getAttackType().equals(AttackType.magicProjectile)) {
-            attackResultsDTO.setFailResultText(failRollResultRow.get(2));
+            attackResultsDTO.setFailResultText(row.get(2));
         } else if (attacker.getAttackType().equals(AttackType.ranged)) {
-            attackResultsDTO.setFailResultText(failRollResultRow.get(1));
-        } else attackResultsDTO.setFailResultText(failRollResultRow.get(0));
+            attackResultsDTO.setFailResultText(row.get(1));
+        } else {
+            attackResultsDTO.setFailResultText(row.get(0));
+        }
 
-        logger.info("Fail effect: {}", attackResultsDTO.getFailResultText());
+        // Optional extra columns: [3]=extra dmg, [4]=hp loss/round, [5]=stunned rounds, [6]=penalty, [7]=instant death ("1")
+        try {
+            if (row.size() > 3) attackResultsDTO.setFailResultAdditionalDamage(parseIntSafe(row.get(3)));
+            if (row.size() > 4) attackResultsDTO.setFailResultHPLossPerRound(parseIntSafe(row.get(4)));
+            if (row.size() > 5) attackResultsDTO.setFailResultStunnedForRounds(parseIntSafe(row.get(5)));
+            if (row.size() > 6) attackResultsDTO.setFailResultPenaltyOfActions(parseIntSafe(row.get(6)));
+            if (row.size() > 7) attackResultsDTO.setFailResultsInstantDeath("1".equals(row.get(7)));
+        } catch (Exception ignore) {}
+
+        logger.info("Fail effect: {} (extraDmg={}, hpLoss/round={}, stunnedRounds={}, penalty={}, instDeath={})",
+                attackResultsDTO.getFailResultText(),
+                attackResultsDTO.getFailResultAdditionalDamage(),
+                attackResultsDTO.getFailResultHPLossPerRound(),
+                attackResultsDTO.getFailResultStunnedForRounds(),
+                attackResultsDTO.getFailResultPenaltyOfActions(),
+                attackResultsDTO.getFailResultsInstantDeath());
     }
 
     @Override
@@ -435,6 +453,20 @@ TODO      */
         }
 
         return mapsFromTabs.getMapFail().get(failRoll);
+    }
+
+    // Helper for FE-provided fail roll (open-ended result already computed client-side)
+    public List<String> getFailResultRowByProvidedRoll(Integer providedRoll) {
+        int r = (providedRoll == null ? 5 : providedRoll);
+        if (r < 5) r = 5;
+        if (r > 120) r = 120;
+        return mapsFromTabs.getMapFail().get(r);
+    }
+
+    // Interface compatibility: expose by exact signature
+    @Override
+    public List<String> getFailResultRow(Integer failRoll) {
+        return getFailResultRowByProvidedRoll(failRoll);
     }
 
 
@@ -582,6 +614,49 @@ TODO      */
         playerRepository.save(defender);
 
         return attackResultsDTO;
+    }
+
+    @Override
+    public AttackResultsDTO applyResolvedAttackWithFailRoll(Player attacker, Player defender, Integer failRoll) {
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult("Fail");
+
+        // Apply bleeding damage on Fail
+        attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
+        defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+        logger.info("ATTACK FAIL: Defender actual HP after bleeding: {}", defender.getHpActual());
+
+        // Determine fail text from provided roll and attack type
+        List<String> row = getFailResultRowByProvidedRoll(failRoll);
+        if (attacker.getAttackType().equals(AttackType.baseMagic) ||
+                attacker.getAttackType().equals(AttackType.magicBall) ||
+                attacker.getAttackType().equals(AttackType.magicProjectile)) {
+            attackResultsDTO.setFailResultText(row.get(2));
+        } else if (attacker.getAttackType().equals(AttackType.ranged)) {
+            attackResultsDTO.setFailResultText(row.get(1));
+        } else {
+            attackResultsDTO.setFailResultText(row.get(0));
+        }
+
+        // Optional extra columns for effects
+        try {
+            if (row.size() > 3) attackResultsDTO.setFailResultAdditionalDamage(parseIntSafe(row.get(3)));
+            if (row.size() > 4) attackResultsDTO.setFailResultHPLossPerRound(parseIntSafe(row.get(4)));
+            if (row.size() > 5) attackResultsDTO.setFailResultStunnedForRounds(parseIntSafe(row.get(5)));
+            if (row.size() > 6) attackResultsDTO.setFailResultPenaltyOfActions(parseIntSafe(row.get(6)));
+            if (row.size() > 7) attackResultsDTO.setFailResultsInstantDeath("1".equals(row.get(7)));
+        } catch (Exception ignore) {}
+
+        // Persist and refresh state
+        playerService.refreshAdventurerOrderedListObject(defender);
+        playerRepository.save(defender);
+
+        return attackResultsDTO;
+    }
+
+    // Safe integer parser for optional sheet values
+    private int parseIntSafe(String s) {
+        try { return Integer.parseInt(s); } catch (Exception e) { return 0; }
     }
 
     @Override

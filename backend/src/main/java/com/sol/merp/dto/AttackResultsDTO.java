@@ -22,6 +22,11 @@ public class AttackResultsDTO {
     private Integer fullDamageWithoutBleeding;
     private Integer fullDamage;
     private String failResultText;
+    private Integer failResultAdditionalDamage;
+    private Integer failResultHPLossPerRound;
+    private Integer failResultStunnedForRounds;
+    private Integer failResultPenaltyOfActions;
+    private Boolean failResultsInstantDeath;
 
     public AttackResultsDTO() {
         this.critResultText = "none";
@@ -31,5 +36,10 @@ public class AttackResultsDTO {
         this.critResultPenaltyOfActions = 0;
         this.critResultsInstantDeath = false;
         this.failResultText = "none";
+        this.failResultAdditionalDamage = 0;
+        this.failResultHPLossPerRound = 0;
+        this.failResultStunnedForRounds = 0;
+        this.failResultPenaltyOfActions = 0;
+        this.failResultsInstantDeath = false;
     }
 }

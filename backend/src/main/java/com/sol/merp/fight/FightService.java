@@ -32,6 +32,7 @@ public interface FightService {
     void failRoll(Player attacker, AttackResultsDTO attackResultsDTO);
 
     List<String> getFailRollResultRow();
+    List<String> getFailResultRow(Integer failRoll);
 
     void critRoll(Player attacker, String crit, AttackResultsDTO attackResultsDTO);
 
@@ -70,4 +71,5 @@ public interface FightService {
     AttackResultsDTO applyResolvedAttack(Player attacker, Player defender, String attackResult);
 
     AttackResultsDTO applyResolvedAttackWithCritRoll(Player attacker, Player defender, String attackResult, Integer critRoll);
+    AttackResultsDTO applyResolvedAttackWithFailRoll(Player attacker, Player defender, Integer failRoll);
 }
