@@ -158,6 +158,49 @@ export default function AdventureFightRound() {
     setReadyToRoll(false);
   }, [attacker?.id, defender?.id]);
 
+  // Auto-skip attackers that cannot act (dead or stunned);
+  // if no valid attacker is found, fall back to the Fight page (end-of-round handling)
+  useEffect(() => {
+    let cancelled = false;
+    async function maybeSkipInvalidAttacker() {
+      const a = attackerRef ?? attacker;
+      if (!a) return;
+      const stunned = !!a.isStunned || (Number(a.stunnedForRounds) || 0) > 0;
+      const dead = a.isAlive === false;
+      if (!(stunned || dead)) return;
+      let attempts = 0;
+      const maxAttempts = 24; // safety to avoid infinite cycling
+      while (!cancelled && attempts < maxAttempts) {
+        attempts++;
+        try {
+          const res = await fetch('http://localhost:8081/api/fight/next-round', { method: 'POST' });
+          if (!res.ok) break;
+          const data = await res.json();
+          const nextPair: Player[] = data?.nextTwoPlayersToFight || [];
+          if (nextPair.length < 2) {
+            navigate('/adventure/fight', { replace: true });
+            break;
+          }
+          const nextA = nextPair[0];
+          const nextStunned = !!nextA?.isStunned || (Number(nextA?.stunnedForRounds) || 0) > 0;
+          const nextDead = nextA?.isAlive === false;
+          // Navigate to the next pair; if still invalid, the effect will run again and continue skipping
+          navigate('/adventure/fight/round', { replace: true, state: { round: data } });
+          if (!(nextStunned || nextDead)) break;
+        } catch {
+          break;
+        }
+      }
+      if (!cancelled && attempts >= maxAttempts) {
+        // Could not find any valid attacker; go back to fight page and let the normal flow continue
+        navigate('/adventure/fight', { replace: true });
+      }
+    }
+    maybeSkipInvalidAttacker();
+    return () => { cancelled = true; };
+    // Re-check when the effective attacker changes
+  }, [attacker?.id, attackerRef?.id]);
+
   useEffect(() => {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
@@ -701,6 +744,7 @@ export default function AdventureFightRound() {
       if (!resp.ok) throw new Error('apply-attack-with-crit failed');
       const dto = await resp.json();
       setCritDto(dto);
+      setCritEnabled(false);
       await refreshPairFromBackend();
     } catch (e: any) {
       setError(e?.message || 'Crit roll failed');
@@ -1444,7 +1488,12 @@ export default function AdventureFightRound() {
               </table>
             </div>
               </div>
-              {critEnabled && (
+              {(() => {
+                const resStr = (attackRes?.result || '').toString().trim();
+                const upper = resStr.toUpperCase();
+                const letter = upper && upper !== 'FAIL' ? upper.slice(-1) : '';
+                const show = !!letter && letter !== 'X';
+                return show ? (
               <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
                 <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
                   <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
@@ -1504,7 +1553,8 @@ export default function AdventureFightRound() {
                   })()}
                 </div>
               </div>
-              )}
+                ) : null;
+              })()}
               {attackRes?.result === 'Fail' && (
               <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
                 <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>

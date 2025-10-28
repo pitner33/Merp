@@ -28,8 +28,19 @@ export function getLevelCap(level: number): number {
   return LEVEL_CAPS[idx] ?? 0;
 }
 
+function getNextLevelCap(level: number): number {
+  if (!Number.isFinite(level) || level < 1) return LEVEL_CAPS[1] ?? 0;
+  const nextIdx = Math.min(Math.floor(level) + 1, LEVEL_CAPS.length - 1);
+  // If already at or above the last defined level, treat next cap as Infinity so we don't mark.
+  if (nextIdx <= 1) return LEVEL_CAPS[1] ?? 0;
+  if (nextIdx === LEVEL_CAPS.length - 1 && Math.floor(level) + 1 >= LEVEL_CAPS.length) return Number.POSITIVE_INFINITY;
+  return LEVEL_CAPS[nextIdx] ?? Number.POSITIVE_INFINITY;
+}
+
 export function isXpOverCap(level: number, xp: number): boolean {
-  return Number.isFinite(xp) && xp > getLevelCap(level);
+  if (!Number.isFinite(xp)) return false;
+  const nextCap = getNextLevelCap(level);
+  return xp >= nextCap;
 }
 
 export function formatXp(xp: number): number {

@@ -594,7 +594,7 @@ export default function AdventureFight() {
                   <td>
                     <select
                       className="sel-target"
-                      style={{ width: `${targetWidthCh + 4}ch` }}
+                      style={{ width: `${targetWidthCh + 6}ch` }}
                       value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -624,11 +624,18 @@ export default function AdventureFight() {
                       <option value="self">self</option>
                       {rows
                         .filter((o) => o.id !== p.id)
-                        .map((o) => (
-                          <option key={o.id} value={o.characterId}>
-                            {o.characterId}
-                          </option>
-                        ))}
+                        .slice()
+                        .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
+                        .map((o) => {
+                          const dead = o.isAlive === false;
+                          const stunned = (o.stunnedForRounds ?? 0) > 0;
+                          const mark = `${dead ? ' ☠' : ''}${stunned ? ' ⚡' : ''}`;
+                          return (
+                            <option key={o.id} value={o.characterId} style={dead ? { color: '#d32f2f' } : undefined}>
+                              {o.characterId}{mark}
+                            </option>
+                          );
+                        })}
                     </select>
                   </td>
                   <td>

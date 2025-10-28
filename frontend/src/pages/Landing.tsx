@@ -22,6 +22,7 @@ export default function Landing() {
   const [closingReviveAll, setClosingReviveAll] = useState(false);
   const [revivingAll, setRevivingAll] = useState(false);
   const [reviveAllError, setReviveAllError] = useState<string | null>(null);
+  const [reviveAllHover, setReviveAllHover] = useState(false);
 
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
@@ -211,23 +212,29 @@ export default function Landing() {
         >
           MM
         </button>
-        <button
-          aria-label="Revive All"
-          title="Revive All"
-          onClick={() => {
-            if (!canReviveAll) return;
-            setReviveAllError(null);
-            setRevivingAll(false);
-            setClosingReviveAll(false);
-            setConfirmReviveAll(true);
-          }}
-          disabled={!canReviveAll}
-          style={{ background: 'none', border: 'none', cursor: canReviveAll ? 'pointer' : 'not-allowed', padding: 4, display: 'inline-flex', alignItems: 'center', color: '#b00020' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill={canReviveAll ? 'currentColor' : 'none'} stroke="#b00020" strokeWidth={canReviveAll ? 0 : 2} aria-hidden="true">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-        </button>
+        <span style={{ position: 'relative', display: 'inline-flex' }} onMouseEnter={() => setReviveAllHover(true)} onMouseLeave={() => setReviveAllHover(false)}>
+          <button
+            aria-label="Revive All"
+            onClick={() => {
+              if (!canReviveAll) return;
+              setReviveAllError(null);
+              setRevivingAll(false);
+              setClosingReviveAll(false);
+              setConfirmReviveAll(true);
+            }}
+            disabled={!canReviveAll}
+            style={{ background: 'none', border: 'none', cursor: canReviveAll ? 'pointer' : 'not-allowed', padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 6, color: '#b00020' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill={canReviveAll ? 'currentColor' : 'none'} stroke="#b00020" strokeWidth={canReviveAll ? 0 : 2} aria-hidden="true">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+          </button>
+          {reviveAllHover && (
+            <div role="tooltip" style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translate(-50%, 8px)', background: '#111', color: '#fff', padding: '6px 8px', borderRadius: 6, fontSize: 12, whiteSpace: 'nowrap', boxShadow: '0 4px 10px rgba(0,0,0,0.25)', zIndex: 100 }}>
+              Revive All
+            </div>
+          )}
+        </span>
       </div>
       <style>
         {`
