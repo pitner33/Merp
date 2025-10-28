@@ -1419,26 +1419,63 @@ export default function AdventureFightRound() {
               </div>
               {critEnabled && (
               <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-              <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
-                <button
-                  type="button"
-                  onClick={handleCritRoll}
-                  disabled={!critEnabled || critRolling}
-                  style={{ marginTop: 6, background: critEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!critEnabled || critRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
-                >
-                  {critRolling ? 'Rolling…' : 'Roll Critical'}
-                </button>
-                <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div className={`die tens${critRolling ? ' rolling' : ''}`} aria-label="crit-tens">{critTensFace}</div>
-                  <div className={`die ones${critRolling ? ' rolling' : ''}`} aria-label="crit-ones">{critOnesFace}</div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={handleCritRoll}
+                      disabled={!critEnabled || critRolling}
+                      style={{ marginTop: 6, background: critEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!critEnabled || critRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                    >
+                      {critRolling ? 'Rolling…' : 'Roll Critical'}
+                    </button>
+                    <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {(() => {
+                        const tensFixed = (critLastRoll != null) ? (critLastRoll === 100 ? 0 : Math.floor(critLastRoll / 10)) : null;
+                        const onesFixed = (critLastRoll != null) ? (critLastRoll === 100 ? 0 : (critLastRoll % 10)) : null;
+                        const tensShow = critRolling ? critTensFace : (tensFixed != null ? tensFixed : critTensFace);
+                        const onesShow = critRolling ? critOnesFace : (onesFixed != null ? onesFixed : critOnesFace);
+                        return (
+                          <>
+                            <div className={`die tens${critRolling ? ' rolling' : ''}`} aria-label="crit-tens">{tensShow}</div>
+                            <div className={`die ones${critRolling ? ' rolling' : ''}`} aria-label="crit-ones">{onesShow}</div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <span className="result-label" style={{ textAlign: 'center' }}>Critical roll</span>
+                    <div className="result-box" title={critEnabled ? 'Critical roll available' : 'No critical required'}>
+                      <span className="result-value">{critLastRoll != null ? `${critLastRoll}` : ''}</span>
+                    </div>
+                  </div>
+                  {(() => {
+                    // Show the modified crit result used to index the crit table
+                    const resStr = (attackRes?.result || '').toString().trim();
+                    const upper = resStr.toUpperCase();
+                    const letter = upper && upper !== 'FAIL' ? upper.slice(-1) : '';
+                    let modVal: number | null = null;
+                    if (critLastRoll != null && letter) {
+                      const base = critLastRoll;
+                      switch (letter) {
+                        case 'T': modVal = base - 50; break;
+                        case 'A': modVal = base - 20; break;
+                        case 'B': modVal = base - 10; break;
+                        case 'C': modVal = base; break;
+                        case 'D': modVal = base + 10; break;
+                        case 'E': modVal = base + 20; break;
+                        default: modVal = null;
+                      }
+                    }
+                    return (
+                      <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                        <span className="result-label" style={{ textAlign: 'center' }}>Crit result</span>
+                        <div className="result-box orange" title="Modified value used for crit table">
+                          <span className="result-value">{modVal != null ? `${modVal}` : ''}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-                <span className="result-label" style={{ textAlign: 'center' }}>Critical roll</span>
-                <div className="result-box" title={critEnabled ? 'Critical roll available' : 'No critical required'}>
-                  <span className="result-value">{critLastRoll != null ? `${critLastRoll}` : ''}</span>
-                </div>
-                
-                
-              </div>
               </div>
               )}
               {attackRes?.result === 'Fail' && (
@@ -1453,8 +1490,18 @@ export default function AdventureFightRound() {
                     {failRolling ? 'Rolling…' : 'Roll Fail'}
                   </button>
                   <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
-                    <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
+                    {(() => {
+                      const tensFixed = (failLastRoll != null) ? (failLastRoll === 100 ? 0 : Math.floor(failLastRoll / 10)) : null;
+                      const onesFixed = (failLastRoll != null) ? (failLastRoll === 100 ? 0 : (failLastRoll % 10)) : null;
+                      const tensShow = failRolling ? failTensFace : (tensFixed != null ? tensFixed : failTensFace);
+                      const onesShow = failRolling ? failOnesFace : (onesFixed != null ? onesFixed : failOnesFace);
+                      return (
+                        <>
+                          <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{tensShow}</div>
+                          <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{onesShow}</div>
+                        </>
+                      );
+                    })()}
                   </div>
                   <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
                   <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail roll required'}>

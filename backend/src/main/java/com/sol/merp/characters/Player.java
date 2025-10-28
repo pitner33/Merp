@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -63,6 +65,9 @@ public class Player {
     private Integer runes; //runaolvasas
     private Integer influence; //befolyasolas
     private Integer stealth; //lopakodas/rejtozkodes
+    @ElementCollection
+    @CollectionTable(name = "player_active_penalty_effects", joinColumns = @JoinColumn(name = "player_id"))
+    private List<PenaltyEffect> activePenaltyEffects = new ArrayList<>();
 
 
 
@@ -116,6 +121,7 @@ public class Player {
         this.runes = runes;
         this.influence = influence;
         this.stealth = stealth;
+        this.activePenaltyEffects = new ArrayList<>();
     }
 
     //TODO delete / ideiglenes a playertarget beallitashoz
@@ -214,6 +220,39 @@ public class Player {
 
     //TODO this way won't work - service method needed with same logic, check all Object when POST
 
+    public void addPenaltyEffect(int value, int rounds) {
+        if (value <= 0 || rounds <= 0) return;
+        if (this.activePenaltyEffects == null) this.activePenaltyEffects = new ArrayList<>();
+        this.activePenaltyEffects.add(new PenaltyEffect(value, rounds));
+        recomputePenaltyOfActions();
+    }
 
+    public void recomputePenaltyOfActions() {
+        int sum = 0;
+        if (this.activePenaltyEffects != null) {
+            for (PenaltyEffect e : this.activePenaltyEffects) {
+                if (e != null && e.getValue() != null && e.getRemainingRounds() != null && e.getRemainingRounds() > 0) {
+                    sum += e.getValue();
+                }
+            }
+        }
+        // Display penalties as negative values in UI
+        this.penaltyOfActions = -sum;
+    }
+
+    public void decrementPenaltyEffectsForNewRound() {
+        if (this.activePenaltyEffects == null) return;
+        List<PenaltyEffect> keep = new ArrayList<>();
+        for (PenaltyEffect e : this.activePenaltyEffects) {
+            if (e == null) continue;
+            Integer r = e.getRemainingRounds();
+            if (r == null) continue;
+            int nr = r - 1;
+            e.setRemainingRounds(nr);
+            if (nr > 0) keep.add(e);
+        }
+        this.activePenaltyEffects = keep;
+        recomputePenaltyOfActions();
+    }
 
 }

@@ -18,6 +18,7 @@ public class AttackResultsDTO {
     private Integer critResultHPLossPerRound;
     private Integer critResultStunnedForRounds;
     private Integer critResultPenaltyOfActions;
+    private Integer critResultPenaltyDurationRounds;
     private Boolean critResultsInstantDeath;
     private Integer fullDamageWithoutBleeding;
     private Integer fullDamage;
@@ -26,6 +27,7 @@ public class AttackResultsDTO {
     private Integer failResultHPLossPerRound;
     private Integer failResultStunnedForRounds;
     private Integer failResultPenaltyOfActions;
+    private Integer failResultPenaltyDurationRounds;
     private Boolean failResultsInstantDeath;
 
     public AttackResultsDTO() {
@@ -34,12 +36,14 @@ public class AttackResultsDTO {
         this.critResultHPLossPerRound = 0;
         this.critResultStunnedForRounds = 0;
         this.critResultPenaltyOfActions = 0;
+        this.critResultPenaltyDurationRounds = 0;
         this.critResultsInstantDeath = false;
         this.failResultText = "none";
         this.failResultAdditionalDamage = 0;
         this.failResultHPLossPerRound = 0;
         this.failResultStunnedForRounds = 0;
         this.failResultPenaltyOfActions = 0;
+        this.failResultPenaltyDurationRounds = 0;
         this.failResultsInstantDeath = false;
     }
 }

@@ -10,6 +10,7 @@ import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
+import com.sol.merp.characters.PenaltyEffect;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
@@ -175,26 +176,16 @@ public class FightServiceImpl implements FightService {
 
         //check if the attackresult is "Fail"
         if (attackResultsDTO.getAttackResult().equals("Fail")) {
-            failRoll(attacker, attackResultsDTO);
-            return;
-        }
-    }
-
-    @Override
-    public AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
-        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
-        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
-
-        //check if the attackresult is "Fail"
-        if (attackResultsDTO.getAttackResult().equals("Fail")) {
-            //even in case of Fail, the defender suffers damage from bleeding in the given round
+            // Defender still takes bleeding damage this round
             attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
-            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+            logger.info("ATTACK: Defender actual HP (bleeding tick): {}", defender.getHpActual());
             playerRepository.save(defender);
 
+            // Compute fail and apply to ATTACKER (self-inflicted fail effects)
             failRoll(attacker, attackResultsDTO);
-            return attackResultsDTO;
+            applyFailEffectsToAttacker(attacker, attackResultsDTO);
+            return;
         } else {
             //get the Damage as Integer and crit as String from attackResult String
             attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResultsDTO.getAttackResult()));
@@ -217,7 +208,10 @@ public class FightServiceImpl implements FightService {
             attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
             logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
 
-            defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+            if (attackResultsDTO.getCritResultPenaltyOfActions() != null && attackResultsDTO.getCritResultPenaltyOfActions() != 0) {
+                int dur = attackResultsDTO.getCritResultPenaltyDurationRounds() != null ? attackResultsDTO.getCritResultPenaltyDurationRounds() : 0;
+                defender.addPenaltyEffect(Math.abs(attackResultsDTO.getCritResultPenaltyOfActions()), Math.max(1, dur));
+            }
             logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
 
             if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
@@ -241,9 +235,83 @@ public class FightServiceImpl implements FightService {
             playerService.experienceCounterCrit(attackResultsDTO.getCrit());
             playerService.experienceCounterKill();
 
-            return attackResultsDTO;
+            // persist defender state after applying effects
+            playerRepository.save(defender);
+            return;
         }
 
+    }
+
+    @Override
+    public AttackResultsDTO attackOtherThanBaseMagicOrMagicBall(Player attacker, Player defender) {
+        AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
+        attackResultsDTO.setAttackResult(getAttackResultString(attacker, defender, attackResultsDTO));
+
+        //check if the attackresult is "Fail"
+        if (attackResultsDTO.getAttackResult().equals("Fail")) {
+            // Defender still takes bleeding damage this round
+            attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+            logger.info("ATTACK: Defender actual HP (bleeding tick): {}", defender.getHpActual());
+            playerRepository.save(defender);
+
+            // Compute fail and apply to ATTACKER (self-inflicted fail effects)
+            failRoll(attacker, attackResultsDTO);
+            applyFailEffectsToAttacker(attacker, attackResultsDTO);
+            return attackResultsDTO;
+        } else {
+            //get the Damage as Integer and crit as String from attackResult String
+            attackResultsDTO.setBaseDamage(getBaseDamageFromAttackResult(attackResultsDTO.getAttackResult()));
+            attackResultsDTO.setCrit(getCritFromAttackResult(attackResultsDTO.getAttackResult()));
+            logger.info("BaseDamage : {}", attackResultsDTO.getBaseDamage());
+            logger.info("Crit : {}", attackResultsDTO.getCrit());
+
+            if (!attackResultsDTO.getCrit().equals("X")) {
+                critRoll(attacker, attackResultsDTO.getCrit(), attackResultsDTO);
+            }
+
+            attackResultsDTO.setFullDamageWithoutBleeding(attackResultsDTO.getBaseDamage() + attackResultsDTO.getCritResultAdditionalDamage());
+            logger.info("CRIT: additional damage from crit: {}", attackResultsDTO.getCritResultAdditionalDamage());
+            logger.info("ATTACK: Full damage without bleeding: {}", attackResultsDTO.getFullDamageWithoutBleeding());
+
+            logger.info("CRIT: effect: {}", attackResultsDTO.getCritResultText());
+            logger.info("CRIT: Hp loss per round: {}", attackResultsDTO.getCritResultHPLossPerRound());
+
+            defender.setHpLossPerRound(defender.getHpLossPerRound() + attackResultsDTO.getCritResultHPLossPerRound());
+            attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
+            logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
+
+            if (attackResultsDTO.getCritResultPenaltyOfActions() != null && attackResultsDTO.getCritResultPenaltyOfActions() > 0) {
+                int dur = attackResultsDTO.getCritResultPenaltyDurationRounds() != null ? attackResultsDTO.getCritResultPenaltyDurationRounds() : 0;
+                defender.addPenaltyEffect(attackResultsDTO.getCritResultPenaltyOfActions(), Math.max(1, dur));
+            }
+            logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
+
+            if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
+                defender.setStunnedForRounds(defender.getStunnedForRounds() + attackResultsDTO.getCritResultStunnedForRounds());
+                defender.setIsStunned(true);
+                defender.setPlayerActivity(PlayerActivity._5DoNothing);
+                logger.info("CRIT: Defender is stunned for {} rounds.", defender.getStunnedForRounds());
+            }
+
+            defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
+            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+
+            if (attackResultsDTO.getCritResultsInstantDeath()) {
+                defender.setIsAlive(false);
+            }
+
+            // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
+            playerService.refreshAdventurerOrderedListObject(defender);
+
+            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
+            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
+            playerService.experienceCounterKill();
+
+            // persist defender state after applying effects
+            playerRepository.save(defender);
+            return attackResultsDTO;
+        }
     }
 
     @Override
@@ -423,14 +491,12 @@ TODO      */
             attackResultsDTO.setFailResultText(row.get(0));
         }
 
-        // Optional extra columns: [3]=extra dmg, [4]=hp loss/round, [5]=stunned rounds, [6]=penalty, [7]=instant death ("1")
-        try {
-            if (row.size() > 3) attackResultsDTO.setFailResultAdditionalDamage(parseIntSafe(row.get(3)));
-            if (row.size() > 4) attackResultsDTO.setFailResultHPLossPerRound(parseIntSafe(row.get(4)));
-            if (row.size() > 5) attackResultsDTO.setFailResultStunnedForRounds(parseIntSafe(row.get(5)));
-            if (row.size() > 6) attackResultsDTO.setFailResultPenaltyOfActions(parseIntSafe(row.get(6)));
-            if (row.size() > 7) attackResultsDTO.setFailResultsInstantDeath("1".equals(row.get(7)));
-        } catch (Exception ignore) {}
+        // Effects are grouped in blocks per attack type:
+        // weapon:  cols 5-9   -> idx 4..8
+        // ranged:  cols 10-14 -> idx 9..13
+        // magic:   cols 15-19 -> idx 14..18
+        // MM:      cols 20-24 -> idx 19..23
+        parseFailEffectsByAttackType(attacker, row, attackResultsDTO);
 
         logger.info("Fail effect: {} (extraDmg={}, hpLoss/round={}, stunnedRounds={}, penalty={}, instDeath={})",
                 attackResultsDTO.getFailResultText(),
@@ -439,6 +505,70 @@ TODO      */
                 attackResultsDTO.getFailResultStunnedForRounds(),
                 attackResultsDTO.getFailResultPenaltyOfActions(),
                 attackResultsDTO.getFailResultsInstantDeath());
+    }
+
+    private void parseFailEffectsByAttackType(Player attacker, List<String> row, AttackResultsDTO dto) {
+        int startIdx;
+        // Determine block by attack type or activity
+        if (attacker.getAttackType() == AttackType.ranged) {
+            startIdx = 9; // ranged block
+        } else if (attacker.getAttackType() == AttackType.baseMagic
+                || attacker.getAttackType() == AttackType.magicBall
+                || attacker.getAttackType() == AttackType.magicProjectile) {
+            startIdx = 14; // magic block
+        } else if (attacker.getPlayerActivity() == PlayerActivity._3PhisicalAttackOrMovement
+                || attacker.getAttackType() == AttackType.slashing
+                || attacker.getAttackType() == AttackType.blunt
+                || attacker.getAttackType() == AttackType.twoHanded
+                || attacker.getAttackType() == AttackType.clawsAndFangs
+                || attacker.getAttackType() == AttackType.grabOrBalance) {
+            startIdx = 4; // weapon block
+        } else {
+            // Fallback to MM block if not matching above
+            startIdx = 19;
+        }
+
+        try {
+            // [start] extra dmg, [start+1] hp loss/round, [start+2] stunned rounds, [start+3] penalty, [start+4] instant death
+            if (row.size() > startIdx) dto.setFailResultAdditionalDamage(parseIntSafe(row.get(startIdx)));
+            if (row.size() > startIdx + 1) dto.setFailResultHPLossPerRound(parseIntSafe(row.get(startIdx + 1)));
+            if (row.size() > startIdx + 2) dto.setFailResultStunnedForRounds(parseIntSafe(row.get(startIdx + 2)));
+            if (row.size() > startIdx + 3) parsePenaltyAndDuration(row.get(startIdx + 3), false, dto);
+            if (row.size() > startIdx + 4) dto.setFailResultsInstantDeath("1".equals(row.get(startIdx + 4)));
+        } catch (Exception ignore) {}
+    }
+
+    private void applyFailEffectsToAttacker(Player attacker, AttackResultsDTO attackResultsDTO) {
+        Integer extra = attackResultsDTO.getFailResultAdditionalDamage();
+        if (extra != null && extra > 0) {
+            attacker.setHpActual(attacker.getHpActual() - extra);
+        }
+        Integer bleed = attackResultsDTO.getFailResultHPLossPerRound();
+        if (bleed != null && bleed > 0) {
+            attacker.setHpLossPerRound(attacker.getHpLossPerRound() + bleed);
+        }
+        Integer stun = attackResultsDTO.getFailResultStunnedForRounds();
+        if (stun != null && stun > 0) {
+            attacker.setStunnedForRounds(attacker.getStunnedForRounds() + stun);
+            attacker.setIsStunned(true);
+            attacker.setPlayerActivity(PlayerActivity._5DoNothing);
+            attacker.setIsActive(false);
+        }
+        Integer pen = attackResultsDTO.getFailResultPenaltyOfActions();
+        Integer penDur = attackResultsDTO.getFailResultPenaltyDurationRounds();
+        if (pen != null && pen != 0) {
+            int dur = penDur != null ? penDur : 0;
+            attacker.addPenaltyEffect(Math.abs(pen), Math.max(1, dur));
+        }
+        if (Boolean.TRUE.equals(attackResultsDTO.getFailResultsInstantDeath())) {
+            attacker.setIsAlive(false);
+            attacker.setIsActive(false);
+            attacker.setIsStunned(false);
+            attacker.setStunnedForRounds(0);
+            attacker.setPlayerActivity(PlayerActivity._5DoNothing);
+        }
+        playerService.refreshAdventurerOrderedListObject(attacker);
+        playerRepository.save(attacker);
     }
 
     @Override
@@ -488,7 +618,8 @@ TODO      */
         attackResultsDTO.setCritResultAdditionalDamage(Integer.parseInt(critResultRow.get(1)));
         attackResultsDTO.setCritResultHPLossPerRound(Integer.parseInt(critResultRow.get(2)));
         attackResultsDTO.setCritResultStunnedForRounds(Integer.parseInt(critResultRow.get(3)));
-        attackResultsDTO.setCritResultPenaltyOfActions(Integer.parseInt(critResultRow.get(4)));
+        // Penalty can be plain number or value/duration (e.g., 20/2)
+        parsePenaltyAndDuration(critResultRow.get(4), true, attackResultsDTO);
         if (critResultRow.get(5).equals("1")) {
             attackResultsDTO.setCritResultsInstantDeath(true);
         }
@@ -561,11 +692,14 @@ TODO      */
         attackResultsDTO.setAttackResult(attackResult);
 
         if ("Fail".equals(attackResult)) {
+            // Defender still takes bleeding damage this round
             attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
             defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
-            logger.info("ATTACK: Defender actual HP: {}", defender.getHpActual());
+            logger.info("ATTACK: Defender actual HP (bleeding tick): {}", defender.getHpActual());
             playerRepository.save(defender);
+            // Apply fail to attacker
             failRoll(attacker, attackResultsDTO);
+            applyFailEffectsToAttacker(attacker, attackResultsDTO);
             return attackResultsDTO;
         }
 
@@ -589,7 +723,19 @@ TODO      */
         attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
         logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
 
-        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+        logger.info("APPLY-RESOLVED: attacker={} defender={} critPenalty={} duration={}",
+                attacker != null ? attacker.getId() : null,
+                defender != null ? defender.getId() : null,
+                attackResultsDTO.getCritResultPenaltyOfActions(),
+                attackResultsDTO.getCritResultPenaltyDurationRounds());
+        if (attackResultsDTO.getCritResultPenaltyOfActions() != null && attackResultsDTO.getCritResultPenaltyOfActions() != 0) {
+            int dur = attackResultsDTO.getCritResultPenaltyDurationRounds() != null ? attackResultsDTO.getCritResultPenaltyDurationRounds() : 0;
+            defender.addPenaltyEffect(Math.abs(attackResultsDTO.getCritResultPenaltyOfActions()), Math.max(1, dur));
+            logger.info("APPLY-RESOLVED: defender={} effects={} penaltyOfActions={}",
+                    defender.getId(),
+                    defender.getActivePenaltyEffects() != null ? defender.getActivePenaltyEffects().size() : 0,
+                    defender.getPenaltyOfActions());
+        }
         logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
 
         if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
@@ -638,16 +784,17 @@ TODO      */
             attackResultsDTO.setFailResultText(row.get(0));
         }
 
-        // Optional extra columns for effects
-        try {
-            if (row.size() > 3) attackResultsDTO.setFailResultAdditionalDamage(parseIntSafe(row.get(3)));
-            if (row.size() > 4) attackResultsDTO.setFailResultHPLossPerRound(parseIntSafe(row.get(4)));
-            if (row.size() > 5) attackResultsDTO.setFailResultStunnedForRounds(parseIntSafe(row.get(5)));
-            if (row.size() > 6) attackResultsDTO.setFailResultPenaltyOfActions(parseIntSafe(row.get(6)));
-            if (row.size() > 7) attackResultsDTO.setFailResultsInstantDeath("1".equals(row.get(7)));
-        } catch (Exception ignore) {}
+        // Parse effects from the correct block for this attack type
+        parseFailEffectsByAttackType(attacker, row, attackResultsDTO);
 
-        // Persist and refresh state
+        // Apply FAIL effects to ATTACKER (self-inflicted), defender only gets bleeding tick above
+        logger.info("APPLY-FAIL: attacker={} (apply to attacker) failPenalty={} duration={}",
+                attacker != null ? attacker.getId() : null,
+                attackResultsDTO.getFailResultPenaltyOfActions(),
+                attackResultsDTO.getFailResultPenaltyDurationRounds());
+        applyFailEffectsToAttacker(attacker, attackResultsDTO);
+
+        // Persist and refresh defender after bleeding; attacker was saved in helper
         playerService.refreshAdventurerOrderedListObject(defender);
         playerRepository.save(defender);
 
@@ -657,6 +804,31 @@ TODO      */
     // Safe integer parser for optional sheet values
     private int parseIntSafe(String s) {
         try { return Integer.parseInt(s); } catch (Exception e) { return 0; }
+    }
+
+    // Parse penalty string like "20" or "20/2" and set DTO fields
+    private void parsePenaltyAndDuration(String s, boolean isCrit, AttackResultsDTO dto) {
+        int value = 0;
+        int duration = 0;
+        if (s != null) {
+            String t = s.trim();
+            if (!t.isEmpty()) {
+                if (t.contains("/")) {
+                    String[] parts = t.split("/", 2);
+                    try { value = Integer.parseInt(parts[0].trim()); } catch (Exception ignore) {}
+                    try { duration = Integer.parseInt(parts.length > 1 ? parts[1].trim() : "0"); } catch (Exception ignore) {}
+                } else {
+                    try { value = Integer.parseInt(t); } catch (Exception ignore) {}
+                }
+            }
+        }
+        if (isCrit) {
+            dto.setCritResultPenaltyOfActions(value);
+            dto.setCritResultPenaltyDurationRounds(duration);
+        } else {
+            dto.setFailResultPenaltyOfActions(value);
+            dto.setFailResultPenaltyDurationRounds(duration);
+        }
     }
 
     @Override
@@ -686,7 +858,7 @@ TODO      */
             attackResultsDTO.setCritResultAdditionalDamage(Integer.parseInt(row.get(1)));
             attackResultsDTO.setCritResultHPLossPerRound(Integer.parseInt(row.get(2)));
             attackResultsDTO.setCritResultStunnedForRounds(Integer.parseInt(row.get(3)));
-            attackResultsDTO.setCritResultPenaltyOfActions(Integer.parseInt(row.get(4)));
+            parsePenaltyAndDuration(row.get(4), true, attackResultsDTO);
             if (row.get(5).equals("1")) {
                 attackResultsDTO.setCritResultsInstantDeath(true);
             }
@@ -703,7 +875,10 @@ TODO      */
         attackResultsDTO.setFullDamage(attackResultsDTO.getFullDamageWithoutBleeding() + defender.getHpLossPerRound());
         logger.info("ATTACK: Full damage: {}", attackResultsDTO.getFullDamage());
 
-        defender.setPenaltyOfActions(defender.getPenaltyOfActions() + attackResultsDTO.getCritResultPenaltyOfActions());
+        if (attackResultsDTO.getCritResultPenaltyOfActions() != null && attackResultsDTO.getCritResultPenaltyOfActions() != 0) {
+            int dur = attackResultsDTO.getCritResultPenaltyDurationRounds() != null ? attackResultsDTO.getCritResultPenaltyDurationRounds() : 0;
+            defender.addPenaltyEffect(Math.abs(attackResultsDTO.getCritResultPenaltyOfActions()), Math.max(1, dur));
+        }
         logger.info("CRIT: Penalty of actions: {}", attackResultsDTO.getCritResultPenaltyOfActions());
 
         if (attackResultsDTO.getCritResultStunnedForRounds() != 0) {
@@ -732,17 +907,48 @@ TODO      */
 
     @Override
     public void decreaseStunnedForRoundCounter() {
-        adventurerOrderedListObject.getPlayerList()
-                .stream()
-                .filter(Player::getIsStunned)
-                .forEach(player -> {
-                    player.setStunnedForRounds(player.getStunnedForRounds() - 1);
-                    playerRepository.save(player);
-                });
-
-
+        // Backward-compat: delegate to end-of-round stun tick
+        decreaseStunnedAtEndOfRound();
     }
 
+    // Start-of-round: tick penalties and apply HP loss per round
+    public void tickStartOfRoundEffects() {
+        java.util.List<Player> players = playerRepository.findAllByIsPlayingIsTrue();
+        players.forEach(p -> {
+            // duration-based penalties tick at start of round
+            p.decrementPenaltyEffectsForNewRound();
+            // HP loss per round ticks at start of round
+            Integer perRound = p.getHpLossPerRound();
+            if (perRound != null && perRound > 0 && Boolean.TRUE.equals(p.getIsAlive())) {
+                p.setHpActual(Math.max(0D, (p.getHpActual() != null ? p.getHpActual() : 0D) - perRound));
+                if (p.getHpActual() <= 0D) {
+                    p.setIsAlive(false);
+                    p.setIsActive(false);
+                    p.setIsStunned(false);
+                    p.setStunnedForRounds(0);
+                    p.setPlayerActivity(com.sol.merp.attributes.PlayerActivity._5DoNothing);
+                }
+            }
+            playerRepository.save(p);
+        });
+    }
+
+    // End-of-round: decrement stunned counters only
+    public void decreaseStunnedAtEndOfRound() {
+        java.util.List<Player> players = playerRepository.findAll();
+        players.stream()
+                .filter(Player::getIsStunned)
+                .forEach(player -> {
+                    int newVal = (player.getStunnedForRounds() != null ? player.getStunnedForRounds() : 0) - 1;
+                    if (newVal <= 0) {
+                        player.setStunnedForRounds(0);
+                        player.setIsStunned(false);
+                    } else {
+                        player.setStunnedForRounds(newVal);
+                    }
+                    playerRepository.save(player);
+                });
+    }
 
     @Override
     public AttackType attackerWhichTBToUse(Player attacker) {
@@ -788,6 +994,4 @@ TODO      */
     public Boolean critDefenderStunned(Integer critRoll) {
         return null;
     }
-
-
 }

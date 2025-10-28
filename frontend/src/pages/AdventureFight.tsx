@@ -308,12 +308,35 @@ export default function AdventureFight() {
             try {
               setLoading(true);
               // 1) Persist the current table to backend so it's aware of targets/activities/etc
+              const payload = rows.map((r) => {
+                const candidate = r.target ?? 'none';
+                const targetToken = candidate ?? 'none';
+                let act = r.playerActivity;
+                if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
+                let atk = r.attackType;
+                let crit = r.critType;
+                if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+                let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+                if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
+                const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
+                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+              });
               const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(rows),
+                body: JSON.stringify(payload),
               });
               if (!upd.ok) throw new Error(`Bulk update failed (${upd.status})`);
+              // Ensure server-side derivations are applied before starting the round
+              try {
+                const resOrdered = await fetch('http://localhost:8081/api/players/ordered');
+                if (resOrdered.ok) {
+                  const refreshed = (await resOrdered.json()) as Player[];
+                  setRows(Array.isArray(refreshed) ? refreshed.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
+                }
+              } catch {}
 
               // 2) Start a fresh round
               const res = await fetch('http://localhost:8081/api/fight/start-round', { method: 'POST' });

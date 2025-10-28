@@ -1,14 +1,46 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 
 export default function AdventureMain() {
   const location = useLocation();
   const navigate = useNavigate();
-  const players = (location.state as { players?: Player[] } | undefined)?.players || [];
+  const statePlayers = (location.state as { players?: Player[] } | undefined)?.players || [];
+  const storageKey = 'merp:selectedPlayers';
+  const storagePlayers: Player[] = (() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as Player[]) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const players: Player[] = statePlayers.length > 0 ? statePlayers : storagePlayers;
   const [rows, setRows] = useState<Player[]>(players);
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
+
+  useEffect(() => {
+    function loadFromStorage(): Player[] {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        return raw ? (JSON.parse(raw) as Player[]) : [];
+      } catch {
+        return [];
+      }
+    }
+    function onStorage(e: StorageEvent) {
+      if (!e.key) return;
+      if (e.key === storageKey || e.key === 'merp:adventureRefresh') {
+        const next = loadFromStorage();
+        if (Array.isArray(next) && next.length > 0) {
+          setRows(next);
+        }
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   function showToast(message: string, x?: number, y?: number) {
     let nx = x;
@@ -230,14 +262,23 @@ export default function AdventureMain() {
                 showToast(`Saved ${savedCount}/${payload.length}. ${missing} failed.`);
                 return;
               }
+              const homeUrl = new URL('/home', window.location.origin).toString();
+              if (window.opener && !window.opener.closed) {
+                try {
+                  window.opener.location.href = homeUrl;
+                  window.opener.focus();
+                  window.close();
+                  return;
+                } catch {}
+              }
               navigate('/home');
             } catch (e) {
               showToast('Failed to save to server.');
             }
           }}
-          style={{ padding: '6px 12px', background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          style={{ padding: '6px 12px', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}
         >
-          Back to Home
+          Back to the Inn
         </button>
         <button
           type="button"

@@ -81,7 +81,13 @@ public class PlayerServiceImpl implements PlayerService {
         player.setStunnedForRounds(0);
         player.setHpActual(player.getHpMax());
         player.setTbUsedForDefense(0);
-        player.setPenaltyOfActions(0);
+        // Clear penalties and ongoing effects fully (ElementCollection must be cleared on managed list)
+        if (player.getActivePenaltyEffects() != null) {
+            player.getActivePenaltyEffects().clear();
+        } else {
+            player.setActivePenaltyEffects(new java.util.ArrayList<>());
+        }
+        player.recomputePenaltyOfActions();
         player.setHpLossPerRound(0);
 
         playerRepository.save(player);
@@ -113,6 +119,14 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public List<Player> adventurersOrderedList() {
         List<Player> allWhoPlays = playerRepository.findAllByIsPlayingIsTrue();
+
+        // Ensure displayed penalty matches active effects (e.g., after revive/reset)
+        for (Player p : allWhoPlays) {
+            if (p != null) {
+                p.recomputePenaltyOfActions();
+                playerRepository.save(p);
+            }
+        }
 
         Comparator<Player> orderByStatusActivityMm =
                 Comparator

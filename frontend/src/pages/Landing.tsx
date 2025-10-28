@@ -1,13 +1,12 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { get, patch, del, put } from '../api/client';
+import { get, patch, del } from '../api/client';
 import type { Player } from '../types';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Landing() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<keyof Player | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [confirmReviveFor, setConfirmReviveFor] = useState<Player | null>(null);
@@ -18,6 +17,10 @@ export default function Landing() {
   const [closingDelete, setClosingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmReviveAll, setConfirmReviveAll] = useState(false);
+  const [closingReviveAll, setClosingReviveAll] = useState(false);
+  const [revivingAll, setRevivingAll] = useState(false);
+  const [reviveAllError, setReviveAllError] = useState<string | null>(null);
 
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
@@ -75,22 +78,32 @@ export default function Landing() {
   }
 
   async function revive(p: Player) {
-    const body: Player = {
-      ...p,
-      hpActual: p.hpMax,
-      isAlive: true,
-      stunnedForRounds: 0,
-      penaltyOfActions: 0,
-      hpLossPerRound: 0,
-    };
-    await put<Player>(`/players/${p.id}`, body);
+    await fetch(`http://localhost:8081/api/players/${p.id}/revive`, { method: 'POST' });
+    await load();
+  }
+
+  async function reviveAll() {
+    const targets = players.filter((p) => !isRevived(p));
+    if (targets.length === 0) return;
+    await Promise.allSettled(
+      targets.map((p) => fetch(`http://localhost:8081/api/players/${p.id}/revive`, { method: 'POST' }))
+    );
     await load();
   }
 
   function playAll() {
     const selected = players.filter((p) => p.isPlaying);
     if (selected.length === 0) return;
-    navigate('/adventure/main', { state: { players: selected } });
+    try {
+      const key = 'merp:selectedPlayers';
+      const refreshKey = 'merp:adventureRefresh';
+      localStorage.setItem(key, JSON.stringify(selected));
+      const url = new URL('/adventure/main', window.location.origin).toString();
+      // Signal other windows to refresh selection
+      localStorage.setItem(refreshKey, String(Date.now()));
+      // Reuse an existing named window if already open; this refreshes that window
+      window.open(url, 'AdventureMainWindow');
+    } catch {}
   }
 
   function toggleSort(key: keyof Player) {
@@ -122,17 +135,50 @@ export default function Landing() {
     return arr;
   })();
 
+  const canReviveAll = players.some((p) => !isRevived(p));
+
   if (loading) return <p>Loading...</p>;
   if (error) return <p>{error}</p>;
 
   return (
     <div style={{ padding: 0 }}>
       <h1 style={{ marginTop: 0 }}>The Lazy Dragon Inn</h1>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={playAll} disabled={!players.some((p) => p.isPlaying)}>PLAY</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+        <button
+          onClick={playAll}
+          disabled={!players.some((p) => p.isPlaying)}
+          style={{
+            background: players.some((p) => p.isPlaying) ? '#2fa84f' : '#a8e6a1',
+            color: players.some((p) => p.isPlaying) ? '#ffffff' : '#2b2b2b',
+            border: '1px solid #228b3a',
+            borderRadius: 4,
+            padding: '6px 10px',
+            fontWeight: 700,
+            cursor: players.some((p) => p.isPlaying) ? 'pointer' : 'not-allowed'
+          }}
+        >
+          START AN ADVENTURE
+        </button>
         <Link to="/create-character">
           <button>CHARACTER CREATION</button>
         </Link>
+        <button
+          aria-label="Revive All"
+          title="Revive All"
+          onClick={() => {
+            if (!canReviveAll) return;
+            setReviveAllError(null);
+            setRevivingAll(false);
+            setClosingReviveAll(false);
+            setConfirmReviveAll(true);
+          }}
+          disabled={!canReviveAll}
+          style={{ background: 'none', border: 'none', cursor: canReviveAll ? 'pointer' : 'not-allowed', padding: 4, display: 'inline-flex', alignItems: 'center', color: '#b00020' }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill={canReviveAll ? 'currentColor' : 'none'} stroke="#b00020" strokeWidth={canReviveAll ? 0 : 2} aria-hidden="true">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
       </div>
       <style>
         {`
@@ -443,6 +489,78 @@ export default function Landing() {
                 style={{ padding: '8px 12px', background: '#1f3b6e', color: '#fff', border: '1px solid #1a305a', borderRadius: 4, fontWeight: 700, opacity: reviving ? 0.8 : 1 }}
               >
                 {reviving ? 'Reviving…' : 'Revive'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmReviveAll && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 50,
+            animation: (closingReviveAll ? 'overlayFadeOut 140ms ease-in forwards' : 'overlayFadeIn 160ms ease-out'),
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 8,
+              width: 'min(460px, 92vw)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: (closingReviveAll ? 'dialogPopOut 140ms ease-in forwards' : 'dialogPopIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1)'),
+            }}
+          >
+            <div style={{ padding: '16px 16px 8px 16px', borderBottom: '1px solid #e6e6e6', background: '#1f3b6e', color: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Revive all players</h3>
+            </div>
+            <div style={{ padding: 16, color: '#111' }}>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>
+                Revive all non-revived characters? This will set HP to max and clear stunned rounds, penalty, and HP loss per round for each.
+              </p>
+              <p style={{ margin: '8px 0 0 0', lineHeight: 1.6 }}>
+                Targets: <strong>{players.filter((p) => !isRevived(p)).length}</strong>
+              </p>
+              {reviveAllError && (
+                <p style={{ margin: '12px 0 0 0', color: '#b00020' }}>{reviveAllError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 16, background: '#f5f5f5', borderTop: '1px solid #e6e6e6' }}>
+              <button
+                onClick={() => {
+                  setClosingReviveAll(true);
+                  setTimeout(() => { setConfirmReviveAll(false); setClosingReviveAll(false); }, 160);
+                }}
+                disabled={revivingAll}
+                style={{ padding: '8px 12px', background: '#ffffff', color: '#111', border: '1px solid #444', borderRadius: 4, fontWeight: 600, opacity: revivingAll ? 0.7 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    setReviveAllError(null);
+                    setRevivingAll(true);
+                    await reviveAll();
+                    setClosingReviveAll(true);
+                    setTimeout(() => { setConfirmReviveAll(false); setClosingReviveAll(false); setRevivingAll(false); }, 180);
+                  } catch (e) {
+                    setReviveAllError('Failed to revive all players. Please try again.');
+                    setRevivingAll(false);
+                  }
+                }}
+                disabled={revivingAll || players.every((p) => isRevived(p))}
+                style={{ padding: '8px 12px', background: '#1f3b6e', color: '#fff', border: '1px solid #1a305a', borderRadius: 4, fontWeight: 700, opacity: revivingAll ? 0.8 : 1 }}
+              >
+                {revivingAll ? 'Reviving…' : 'Revive All'}
               </button>
             </div>
           </div>

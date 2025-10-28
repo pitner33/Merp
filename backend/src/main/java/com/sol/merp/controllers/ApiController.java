@@ -388,11 +388,9 @@ public class ApiController {
                 incoming.setPlayerActivity(PlayerActivity._5DoNothing);
             }
 
-            // 3) Non-negative counters
+            // 3) Non-negative counters (penaltyOfActions is derived server-side; do not override it here)
             if (incoming.getStunnedForRounds() == null || incoming.getStunnedForRounds() < 0)
                 incoming.setStunnedForRounds(0);
-            if (incoming.getPenaltyOfActions() == null || incoming.getPenaltyOfActions() < 0)
-                incoming.setPenaltyOfActions(0);
             if (incoming.getHpLossPerRound() == null || incoming.getHpLossPerRound() < 0)
                 incoming.setHpLossPerRound(0);
 
@@ -490,6 +488,21 @@ public class ApiController {
     @PostMapping("/fight/reset-round-count")
     public ResponseEntity<Integer> resetRoundCount() {
         round.setRoundCount(0);
+        // Start of a new combat session: clear per-round penalty effects
+        try {
+            java.util.List<Player> all = playerRepository.findAll();
+            for (Player p : all) {
+                if (p.getActivePenaltyEffects() != null) {
+                    p.getActivePenaltyEffects().clear();
+                } else {
+                    p.setActivePenaltyEffects(new java.util.ArrayList<>());
+                }
+                p.setHpLossPerRound(0);
+                // derive displayed penalty from active effects (now none)
+                p.setPenaltyOfActions(0);
+                playerRepository.save(p);
+            }
+        } catch (Exception ignore) {}
         return ResponseEntity.ok(round.getRoundCount());
     }
 
@@ -499,6 +512,21 @@ public class ApiController {
         // Ensure backend state reflects latest statuses before selecting next players
         playerService.playerActivitySwitch();
         playerService.doNothingWhenStunned();
+        // If this is the first round of a new session, ensure penalties/effects are clean
+        if (round.getRoundCount() == 0) {
+            try {
+                java.util.List<Player> all = playerRepository.findAll();
+                for (Player p : all) {
+                    if (p.getActivePenaltyEffects() != null) p.getActivePenaltyEffects().clear();
+                    else p.setActivePenaltyEffects(new java.util.ArrayList<>());
+                    p.setHpLossPerRound(0);
+                    p.setPenaltyOfActions(0);
+                    playerRepository.save(p);
+                }
+            } catch (Exception ignore) {}
+        }
+        // Start-of-round ticking: penalties and HP loss per round
+        fightServiceImpl.tickStartOfRoundEffects();
         playerService.adventurersOrderedList();
         // increment round counter on new round start
         round.setRoundCount(round.getRoundCount() + 1);
@@ -509,6 +537,11 @@ public class ApiController {
     @PostMapping("/fight/next-round")
     public ResponseEntity<NextTwoPlayersToFigthObject> startNextRound() throws Exception {
         NextTwoPlayersToFigthObject result = playerService.nextPlayersToFight();
+        // If no more attackers this round -> end-of-round hook (stun tick)
+        if (result == null || result.getNextTwoPlayersToFight() == null || result.getNextTwoPlayersToFight().size() < 2) {
+            fightServiceImpl.decreaseStunnedAtEndOfRound();
+            playerService.adventurersOrderedList();
+        }
         return ResponseEntity.ok(result);
     }
 
