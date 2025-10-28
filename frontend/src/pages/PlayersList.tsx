@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { get, patch, post, del } from '../api/client';
 import type { Player } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
+import { isXpOverCap, formatXp } from '../utils/xp';
 
 export default function PlayersList() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -135,7 +136,24 @@ export default function PlayersList() {
               <td>{p.race}</td>
               <td>{p.playerClass}</td>
               <td>{p.lvl}</td>
-              <td>{p.xp}</td>
+              <td
+                className="right"
+                style={
+                  isXpOverCap(Number(p.lvl), Number(p.xp))
+                    ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800 }
+                    : { position: 'relative' }
+                }
+                title={isXpOverCap(Number(p.lvl), Number(p.xp)) ? 'Level up available' : undefined}
+              >
+                {formatXp(Number(p.xp))}
+                {isXpOverCap(Number(p.lvl), Number(p.xp)) && (
+                  <span aria-hidden="true" style={{ position: 'absolute', top: 2, right: 2, lineHeight: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M12 3l7 7h-4v11H9V10H5l7-7z" />
+                    </svg>
+                  </span>
+                )}
+              </td>
               <td>{String(p.isPlaying)}</td>
               <td>{String(p.isActive)}</td>
               <td>{/* @ts-ignore backend has isAlive */ String((p as any).isAlive)}</td>

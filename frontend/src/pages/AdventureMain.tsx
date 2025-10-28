@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
+import { isXpOverCap, formatXp } from '../utils/xp';
 
 export default function AdventureMain() {
   const location = useLocation();
@@ -467,7 +468,24 @@ export default function AdventureMain() {
                   <td>{p.race}</td>
                   <td>{p.playerClass}</td>
                   <td className="right">{p.lvl}</td>
-                  <td className="right">{p.xp}</td>
+                  <td
+                    className="right"
+                    style={
+                      isXpOverCap(Number(p.lvl), Number(p.xp))
+                        ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800 }
+                        : { position: 'relative' }
+                    }
+                    title={isXpOverCap(Number(p.lvl), Number(p.xp)) ? 'Level up available' : undefined}
+                  >
+                    {formatXp(Number(p.xp))}
+                    {isXpOverCap(Number(p.lvl), Number(p.xp)) && (
+                      <span aria-hidden="true" style={{ position: 'absolute', top: 2, right: 2, lineHeight: 0 }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M12 3l7 7h-4v11H9V10H5l7-7z" />
+                        </svg>
+                      </span>
+                    )}
+                  </td>
                   <td className="right">{p.hpMax}</td>
                   <td style={hpStyle(p)} title={hpTitle(p)}>
                     <div>{p.hpActual}</div>

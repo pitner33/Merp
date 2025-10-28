@@ -71,6 +71,37 @@ public class Player {
 
 
 
+    // XP level caps (index = level). Level 1..20 supported.
+    private static final int[] LEVEL_CAPS = new int[] {
+            0,      // 0 (unused)
+            0,      // 1
+            300,    // 2
+            900,    // 3
+            2700,   // 4
+            6500,   // 5
+            14000,  // 6
+            23000,  // 7
+            34000,  // 8
+            48000,  // 9
+            64000,  // 10
+            85000,  // 11
+            100000, // 12
+            120000, // 13
+            140000, // 14
+            165000, // 15
+            195000, // 16
+            225000, // 17
+            265000, // 18
+            305000, // 19
+            355000  // 20
+    };
+
+    private static double getLevelCap(Integer level) {
+        if (level == null || level < 1) return 0d;
+        int idx = Math.min(Math.max(level, 1), 20);
+        return (double) LEVEL_CAPS[idx];
+    }
+
     //this one is used for charactercreation when starting the app
     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
                   PlayerTarget target, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer secondaryTB, Integer vb,
@@ -85,7 +116,7 @@ public class Player {
         this.isActive = true;
         this.isAlive = true;
         this.lvl = lvl;
-        this.xp = Double.valueOf(lvl * 10000);
+        this.xp = getLevelCap(lvl);
         this.playerActivity = playerActivity;
         this.attackType = attackType;
         this.critType = critType;
@@ -137,7 +168,7 @@ public class Player {
         this.isPlaying = false;
         this.isActive = true;
         this.lvl = lvl;
-        this.xp = Double.valueOf(lvl * 1000);
+        this.xp = getLevelCap(lvl);
         this.playerActivity = PlayerActivity._5DoNothing;
         this.attackType = attackType;
         this.critType = critType;
