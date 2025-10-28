@@ -88,6 +88,19 @@ export default function AdventureFightRound() {
   const [error, setError] = useState<string | null>(null);
   const [currentRoundCount, setCurrentRoundCount] = useState<number | null>(null);
 
+  // Set initial document title based on navigation state
+  useEffect(() => {
+    const rc = (round as any)?.roundCount;
+    document.title = rc != null ? `Round ${rc}` : 'Round';
+  }, []);
+
+  // Update title when the fetched round count changes
+  useEffect(() => {
+    if (currentRoundCount != null) {
+      document.title = `Round ${currentRoundCount}`;
+    }
+  }, [currentRoundCount]);
+
   // Ranged/Magic modifiers state
   const [rm, setRm] = useState({
     distanceOfAttack: '_3_15m' as '_0_3m' | '_3_15m' | '_15_30m' | '_30_60m' | '_60_90m' | '_90m_plus',
@@ -797,12 +810,17 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>Role</th>
               <th rowSpan={2}>ID</th>
               <th rowSpan={2}>Name</th>
-              <th rowSpan={2}>Target</th>
+              <th rowSpan={2}>Gender</th>
+              <th rowSpan={2}>Race</th>
+              <th rowSpan={2}>Class</th>
+              <th rowSpan={2}>lvl</th>
+              <th rowSpan={2}>XP</th>
               <th rowSpan={2}>max HP</th>
               <th rowSpan={2}>HP</th>
               <th rowSpan={2}>Alive</th>
               <th rowSpan={2}>Active</th>
               <th rowSpan={2}>Stunned</th>
+              <th rowSpan={2}>Target</th>
               <th rowSpan={2}>Activity</th>
               <th rowSpan={2}>Attack</th>
               <th rowSpan={2}>Crit</th>
@@ -825,11 +843,6 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>Runes</th>
               <th rowSpan={2}>Influence</th>
               <th rowSpan={2}>Stealth</th>
-              <th rowSpan={2}>Gender</th>
-              <th rowSpan={2}>Race</th>
-              <th rowSpan={2}>Class</th>
-              <th rowSpan={2}>lvl</th>
-              <th rowSpan={2}>XP</th>
             </tr>
             <tr>
               <th>Lenyeg</th>
@@ -842,7 +855,11 @@ export default function AdventureFightRound() {
                 <td>{role}</td>
                 <td>{p?.characterId}</td>
                 <td>{p?.name}</td>
-                <td>{p?.target}</td>
+                <td>{p?.gender}</td>
+                <td>{p?.race}</td>
+                <td>{p?.playerClass}</td>
+                <td className="right">{p?.lvl}</td>
+                <td className="right">{p?.xp}</td>
                 <td className="right">{p?.hpMax}</td>
                 <td style={p ? hpStyle(p) : undefined} title={p ? hpTitle(p) : undefined}>
                   <div>{p?.hpActual}</div>
@@ -896,6 +913,7 @@ export default function AdventureFightRound() {
                     </span>
                   )}
                 </td>
+                <td>{p?.target}</td>
                 <td>{labelActivity(p?.playerActivity as any)}</td>
                 <td>{labelAttack(p?.attackType as any)}</td>
                 <td>{labelCrit(p?.critType as any)}</td>
@@ -935,11 +953,6 @@ export default function AdventureFightRound() {
                 <td className="right">{p?.runes}</td>
                 <td className="right">{p?.influence}</td>
                 <td className="right">{p?.stealth}</td>
-                <td>{p?.gender}</td>
-                <td>{p?.race}</td>
-                <td>{p?.playerClass}</td>
-                <td className="right">{p?.lvl}</td>
-                <td className="right">{p?.xp}</td>
               </tr>
             ))}
           </tbody>

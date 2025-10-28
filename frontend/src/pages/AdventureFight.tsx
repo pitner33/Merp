@@ -13,6 +13,10 @@ export default function AdventureFight() {
   const [roundCount, setRoundCount] = useState<number>(0);
 
   useEffect(() => {
+    document.title = 'Fight';
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
     async function initRoundCounter() {
       try {
@@ -236,6 +240,46 @@ export default function AdventureFight() {
     return maxLen(base.concat(ids));
   })();
 
+  function normalizeRows(payloadRows: Player[]): Player[] {
+    return payloadRows.map((r) => {
+      const candidate = r.target ?? 'none';
+      const targetToken = candidate ?? 'none';
+      let act = r.playerActivity;
+      if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
+      let atk = r.attackType;
+      let crit = r.critType;
+      if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+      let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+      if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
+      const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+      const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
+      const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+      return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+    });
+  }
+
+  useEffect(() => {
+    function persistOnUnload() {
+      try {
+        const payload = normalizeRows(rows);
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        // Best-effort save during navigation/unload
+        if ((navigator as any).sendBeacon) {
+          (navigator as any).sendBeacon('http://localhost:8081/api/players/bulk-update', blob);
+        } else {
+          fetch('http://localhost:8081/api/players/bulk-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true }).catch(() => {});
+        }
+      } catch {}
+    }
+    window.addEventListener('beforeunload', persistOnUnload);
+    window.addEventListener('pagehide', persistOnUnload);
+    return () => {
+      persistOnUnload();
+      window.removeEventListener('beforeunload', persistOnUnload);
+      window.removeEventListener('pagehide', persistOnUnload);
+    };
+  }, [rows]);
+
   return (
     <div style={{ padding: 8 }}>
       <h1 style={{ marginTop: 0, textAlign: 'center' }}>Fight</h1>
@@ -270,9 +314,17 @@ export default function AdventureFight() {
               const res = await fetch('http://localhost:8081/api/players/ordered');
               const fetched = res.ok ? await res.json() : rows;
               const sorted = [...fetched].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
+              try {
+                localStorage.setItem('merp:selectedPlayers', JSON.stringify(sorted));
+                localStorage.setItem('merp:adventureRefresh', String(Date.now()));
+              } catch {}
               navigate('/adventure/main', { state: { players: sorted } });
             } catch (e) {
               const sortedFallback = [...rows].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
+              try {
+                localStorage.setItem('merp:selectedPlayers', JSON.stringify(sortedFallback));
+                localStorage.setItem('merp:adventureRefresh', String(Date.now()));
+              } catch {}
               navigate('/adventure/main', { state: { players: sortedFallback } });
             } finally {
               setLoading(false);
@@ -409,12 +461,17 @@ export default function AdventureFight() {
                 <th rowSpan={2} className="center">Play</th>
                 <th rowSpan={2}>ID</th>
                 <th rowSpan={2}>Name</th>
-                <th rowSpan={2}>Target</th>
+                <th rowSpan={2}>Gender</th>
+                <th rowSpan={2}>Race</th>
+                <th rowSpan={2}>Class</th>
+                <th rowSpan={2}>lvl</th>
+                <th rowSpan={2}>XP</th>
                 <th rowSpan={2}>max HP</th>
                 <th rowSpan={2}>HP</th>
                 <th rowSpan={2}>Alive</th>
                 <th rowSpan={2}>Active</th>
                 <th rowSpan={2}>Stunned</th>
+                <th rowSpan={2}>Target</th>
                 <th rowSpan={2}>Activity</th>
                 <th rowSpan={2}>Attack</th>
                 <th rowSpan={2}>Crit</th>
@@ -438,11 +495,6 @@ export default function AdventureFight() {
                 <th rowSpan={2}>Runes</th>
                 <th rowSpan={2}>Influence</th>
                 <th rowSpan={2}>Stealth</th>
-                <th rowSpan={2}>Gender</th>
-                <th rowSpan={2}>Race</th>
-                <th rowSpan={2}>Class</th>
-                <th rowSpan={2}>lvl</th>
-                <th rowSpan={2}>XP</th>
               </tr>
               <tr>
                 <th>1H</th>
@@ -463,48 +515,11 @@ export default function AdventureFight() {
                   </td>
                   <td>{p.characterId}</td>
                   <td>{p.name}</td>
-                  <td>
-                    <select
-                      className="sel-target"
-                      style={{ width: `${targetWidthCh + 4}ch` }}
-                      value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) => {
-                            if (r.id !== p.id) return r;
-                            let nextTarget: string | undefined;
-                            if (value === 'none') nextTarget = undefined;
-                            else if (value === 'self') nextTarget = r.characterId;
-                            else nextTarget = value;
-
-                            // Enforce allowed activities based on target
-                            const allowedActs = allowedActivitiesByTarget(nextTarget);
-                            const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                            const allowedAttacks = attacksByActivity(enforcedAct);
-                            const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                            const allowedCrits = critByAttack[nextAttack] ?? ['none'];
-                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                            const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-
-                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
-                          })
-                        );
-                      }}
-                    >
-                      <option value="none">none</option>
-                      <option value="self">self</option>
-                      {rows
-                        .filter((o) => o.id !== p.id)
-                        .map((o) => (
-                          <option key={o.id} value={o.characterId}>
-                            {o.characterId}
-                          </option>
-                        ))}
-                    </select>
-                  </td>
+                  <td>{p.gender}</td>
+                  <td>{p.race}</td>
+                  <td>{p.playerClass}</td>
+                  <td className="right">{p.lvl}</td>
+                  <td className="right">{p.xp}</td>
                   <td className="right">{p.hpMax}</td>
                   <td style={hpStyle(p)} title={hpTitle(p)}>
                     <div>{p.hpActual}</div>
@@ -557,6 +572,46 @@ export default function AdventureFight() {
                         </svg>
                       </span>
                     )}
+                  </td>
+                  <td>
+                    <select
+                      className="sel-target"
+                      style={{ width: `${targetWidthCh + 4}ch` }}
+                      value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRows((prev) =>
+                          prev.map((r) => {
+                            if (r.id !== p.id) return r;
+                            let nextTarget: string | undefined;
+                            if (value === 'none') nextTarget = undefined;
+                            else if (value === 'self') nextTarget = r.characterId;
+                            else nextTarget = value;
+
+                            const allowedActs = allowedActivitiesByTarget(nextTarget);
+                            const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
+                            const allowedAttacks = attacksByActivity(enforcedAct);
+                            const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                            const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                            const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
+                          })
+                        );
+                      }}
+                    >
+                      <option value="none">none</option>
+                      <option value="self">self</option>
+                      {rows
+                        .filter((o) => o.id !== p.id)
+                        .map((o) => (
+                          <option key={o.id} value={o.characterId}>
+                            {o.characterId}
+                          </option>
+                        ))}
+                    </select>
                   </td>
                   <td>
                     {(() => {
@@ -744,7 +799,7 @@ export default function AdventureFight() {
                       )}
                     </button>
                   </td>
-                  <td className="right">{p.stunnedForRounds ?? 0}</td>
+                  <td className="right">{p.stunnedForRounds}</td>
                   <td className="right">{p.penaltyOfActions}</td>
                   <td className="right">{p.hpLossPerRound}</td>
                   <td className="right">{p.mm}</td>
@@ -759,17 +814,12 @@ export default function AdventureFight() {
                   <td className="right">{p.runes}</td>
                   <td className="right">{p.influence}</td>
                   <td className="right">{p.stealth}</td>
-                  <td>{p.gender}</td>
-                  <td>{p.race}</td>
-                  <td>{p.playerClass}</td>
-                  <td className="right">{p.lvl}</td>
-                  <td className="right">{p.xp}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </>
-      )}
-    </div>
-  );
+            </table>
+          </>
+        )}
+      </div>
+    );
 }

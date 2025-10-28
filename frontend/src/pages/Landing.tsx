@@ -67,6 +67,10 @@ export default function Landing() {
     load();
   }, []);
 
+  useEffect(() => {
+    document.title = 'The Lazy Dragon Inn';
+  }, []);
+
   async function togglePlay(id: number) {
     await patch<Player>(`/players/${id}/isplay`);
     await load();
@@ -162,6 +166,50 @@ export default function Landing() {
         <Link to="/create-character">
           <button>CHARACTER CREATION</button>
         </Link>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/adventure/d100', window.location.origin).toString();
+              window.open(url, 'D100Window');
+            } catch {}
+          }}
+        >
+          D100
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/adventure/crit', window.location.origin).toString();
+              window.open(url, 'CritWindow');
+            } catch {}
+          }}
+        >
+          CRIT
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/adventure/attack', window.location.origin).toString();
+              window.open(url, 'AttackWindow');
+            } catch {}
+          }}
+        >
+          ATTACK
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/adventure/mm', window.location.origin).toString();
+              window.open(url, 'MMWindow');
+            } catch {}
+          }}
+        >
+          MM
+        </button>
         <button
           aria-label="Revive All"
           title="Revive All"

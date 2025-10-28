@@ -21,6 +21,46 @@ export default function AdventureMain() {
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
 
   useEffect(() => {
+    document.title = 'Adventure';
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        const saved = raw ? (JSON.parse(raw) as Player[]) : [];
+        if (!Array.isArray(saved) || saved.length === 0) return;
+        const ids = saved.map((p) => p.characterId);
+        const res = await fetch('http://localhost:8081/api/players/ordered');
+        if (!res.ok) { setRows(saved); return; }
+        const data = (await res.json()) as Player[];
+        const byId = new Map(data.map((p) => [p.characterId, p] as const));
+        const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
+        if (selected.length > 0) setRows(selected);
+      } catch {}
+    })();
+  }, [location.key]);
+
+  useEffect(() => {
+    async function onFocus() {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        const saved = raw ? (JSON.parse(raw) as Player[]) : [];
+        if (!Array.isArray(saved) || saved.length === 0) return;
+        const ids = saved.map((p) => p.characterId);
+        const res = await fetch('http://localhost:8081/api/players/ordered');
+        if (!res.ok) { setRows(saved); return; }
+        const data = (await res.json()) as Player[];
+        const byId = new Map(data.map((p) => [p.characterId, p] as const));
+        const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
+        if (selected.length > 0) setRows(selected);
+      } catch {}
+    }
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
+  useEffect(() => {
     function loadFromStorage(): Player[] {
       try {
         const raw = localStorage.getItem(storageKey);
@@ -29,13 +69,20 @@ export default function AdventureMain() {
         return [];
       }
     }
-    function onStorage(e: StorageEvent) {
+    async function onStorage(e: StorageEvent) {
       if (!e.key) return;
       if (e.key === storageKey || e.key === 'merp:adventureRefresh') {
-        const next = loadFromStorage();
-        if (Array.isArray(next) && next.length > 0) {
-          setRows(next);
-        }
+        try {
+          const saved = loadFromStorage();
+          if (!Array.isArray(saved) || saved.length === 0) return;
+          const ids = saved.map((p) => p.characterId);
+          const res = await fetch('http://localhost:8081/api/players/ordered');
+          if (!res.ok) { setRows(saved); return; }
+          const data = (await res.json()) as Player[];
+          const byId = new Map(data.map((p) => [p.characterId, p] as const));
+          const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
+          if (selected.length > 0) setRows(selected);
+        } catch {}
       }
     }
     window.addEventListener('storage', onStorage);
@@ -226,8 +273,8 @@ export default function AdventureMain() {
 
   return (
     <div style={{ padding: 8 }}>
-      <h1 style={{ marginTop: 0 }}>Adventure</h1>
-      <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+      <h1 style={{ marginTop: 0, textAlign: 'center' }}>Adventure</h1>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
         <button
           type="button"
           onClick={async () => {
@@ -362,16 +409,23 @@ export default function AdventureMain() {
                 <th rowSpan={2} className="center">Play</th>
                 <th rowSpan={2}>ID</th>
                 <th rowSpan={2}>Name</th>
-                <th rowSpan={2}>Target</th>
+                <th rowSpan={2}>Gender</th>
+                <th rowSpan={2}>Race</th>
+                <th rowSpan={2}>Class</th>
+                <th rowSpan={2}>lvl</th>
+                <th rowSpan={2}>XP</th>
                 <th rowSpan={2}>max HP</th>
                 <th rowSpan={2}>HP</th>
                 <th rowSpan={2}>Alive</th>
                 <th rowSpan={2}>Active</th>
+                <th rowSpan={2}>Stunned</th>
+                <th rowSpan={2}>Target</th>
                 <th rowSpan={2}>Activity</th>
                 <th rowSpan={2}>Attack</th>
                 <th rowSpan={2}>Crit</th>
                 <th rowSpan={2}>Armor</th>
                 <th rowSpan={2}>TB</th>
+                <th rowSpan={2}>TB for Defense</th>
                 <th colSpan={6} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
@@ -389,11 +443,6 @@ export default function AdventureMain() {
                 <th rowSpan={2}>Runes</th>
                 <th rowSpan={2}>Influence</th>
                 <th rowSpan={2}>Stealth</th>
-                <th rowSpan={2}>Gender</th>
-                <th rowSpan={2}>Race</th>
-                <th rowSpan={2}>Class</th>
-                <th rowSpan={2}>lvl</th>
-                <th rowSpan={2}>XP</th>
               </tr>
               <tr>
                 <th>1H</th>
@@ -414,6 +463,64 @@ export default function AdventureMain() {
                   </td>
                   <td>{p.characterId}</td>
                   <td>{p.name}</td>
+                  <td>{p.gender}</td>
+                  <td>{p.race}</td>
+                  <td>{p.playerClass}</td>
+                  <td className="right">{p.lvl}</td>
+                  <td className="right">{p.xp}</td>
+                  <td className="right">{p.hpMax}</td>
+                  <td style={hpStyle(p)} title={hpTitle(p)}>
+                    <div>{p.hpActual}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+                  </td>
+                  <td>
+                    {p.isAlive ? (
+                      <span title="Alive" aria-label="Alive">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Dead" aria-label="Dead">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <line x1="8" y1="8" x2="16" y2="16" />
+                          <line x1="16" y1="8" x2="8" y2="16" />
+                        </svg>
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {p.isActive ? (
+                      <span title="Active" aria-label="Active">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="6" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Inactive" aria-label="Inactive">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="6" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {p.isStunned ? (
+                      <span title="Stunned" aria-label="Stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Not stunned" aria-label="Not stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="8" />
+                        </svg>
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <select
                       style={{ width: `${targetWidthCh + 4}ch` }}
@@ -453,44 +560,6 @@ export default function AdventureMain() {
                           </option>
                         ))}
                     </select>
-                  </td>
-                  <td className="right">{p.hpMax}</td>
-                  <td style={hpStyle(p)} title={hpTitle(p)}>
-                    <div>{p.hpActual}</div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
-                  </td>
-                  <td>
-                    {p.isAlive ? (
-                      <span title="Alive" aria-label="Alive">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span title="Dead" aria-label="Dead">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="9" />
-                          <line x1="8" y1="8" x2="16" y2="16" />
-                          <line x1="16" y1="8" x2="8" y2="16" />
-                        </svg>
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {p.isActive ? (
-                      <span title="Active" aria-label="Active">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="6" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span title="Inactive" aria-label="Inactive">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="6" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </span>
-                    )}
                   </td>
                   <td>
                     {(() => {
@@ -608,6 +677,7 @@ export default function AdventureMain() {
                     </select>
                   </td>
                   <td className="right">{computeTb(p)}</td>
+                  <td className="right">{p.tbUsedForDefense}</td>
                   <td className="right">{p.tbOneHanded}</td>
                   <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>
@@ -666,17 +736,12 @@ export default function AdventureMain() {
                   <td className="right">{p.runes}</td>
                   <td className="right">{p.influence}</td>
                   <td className="right">{p.stealth}</td>
-                  <td>{p.gender}</td>
-                  <td>{p.race}</td>
-                  <td>{p.playerClass}</td>
-                  <td className="right">{p.lvl}</td>
-                  <td className="right">{p.xp}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </>
-      )}
-    </div>
+        </table>
+      </>
+    )}
+  </div>
   );
 }
