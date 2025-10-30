@@ -12,6 +12,8 @@ export default function AdventureFight() {
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [roundCount, setRoundCount] = useState<number>(0);
+  const [hoveredRowId, setHoveredRowId] = useState<string | number | null>(null);
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = 'Fight';
@@ -509,8 +511,10 @@ export default function AdventureFight() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => (
-                <tr key={p.id}>
+              {rows.map((p) => {
+                const isHovered = hoveredRowId === p.id || (hoverTargetId != null && p.characterId === hoverTargetId);
+                return (
+                <tr key={p.id} style={isHovered ? { background: '#fff9c4' } : undefined}>
                   <td className="center">
                     <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
                   </td>
@@ -596,6 +600,20 @@ export default function AdventureFight() {
                       className="sel-target"
                       style={{ width: `${targetWidthCh + 6}ch` }}
                       value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
+                      onMouseEnter={() => setHoveredRowId(p.id)}
+                      onMouseLeave={() => { setHoveredRowId(null); setHoverTargetId(null); }}
+                      onBlur={() => { setHoveredRowId(null); setHoverTargetId(null); }}
+                      onMouseMove={(e) => {
+                        const t = e.target as HTMLElement;
+                        if (!t) return;
+                        if (t.tagName === 'OPTION') {
+                          const opt = t as HTMLOptionElement;
+                          const val = opt.value;
+                          if (val === 'none') setHoverTargetId(null);
+                          else if (val === 'self') setHoverTargetId(p.characterId || null);
+                          else setHoverTargetId(val);
+                        }
+                      }}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRows((prev) =>
@@ -647,6 +665,8 @@ export default function AdventureFight() {
                           className="sel-activity"
                           style={{ width: `${activityWidthCh + 2}ch` }}
                           value={curAct}
+                          onMouseEnter={() => setHoveredRowId(p.id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
                           onChange={(e) => {
                             const value = e.target.value;
                             setRows((prev) =>
@@ -681,6 +701,8 @@ export default function AdventureFight() {
                       className="sel-attack"
                       style={{ width: `${attackWidthCh + 2}ch` }}
                       value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
+                      onMouseEnter={() => setHoveredRowId(p.id)}
+                      onMouseLeave={() => setHoveredRowId(null)}
                       onChange={(e) => {
                         const newAttack = e.target.value;
                         setRows((prev) =>
@@ -712,6 +734,8 @@ export default function AdventureFight() {
                           className="sel-crit"
                           style={{ width: `${critWidthCh + 2}ch` }}
                           value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                          onMouseEnter={() => setHoveredRowId(p.id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
                           onChange={(e) => {
                             const value = e.target.value;
                             setRows((prev) =>
@@ -840,7 +864,8 @@ export default function AdventureFight() {
                   <td className="right">{p.influence}</td>
                   <td className="right">{p.stealth}</td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
             </table>
           </>

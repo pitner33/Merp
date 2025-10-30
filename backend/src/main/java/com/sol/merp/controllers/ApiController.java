@@ -263,6 +263,46 @@ public class ApiController {
         return ResponseEntity.ok(dto);
     }
 
+    @PostMapping("/fight/apply-crit-to-target")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyCritToTarget(@RequestParam(name = "defenderId") Long defenderId,
+                                                                               @RequestParam(name = "result") String result,
+                                                                               @RequestParam(name = "critResult") Integer critResult,
+                                                                               @RequestParam(name = "critType") CritType critType) {
+        if (defenderId == null || result == null || critResult == null || critType == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Optional<Player> defenderOpt = playerRepository.findById(defenderId);
+        if (defenderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Player defender = defenderOpt.get();
+
+        Player attacker = null;
+        try {
+            java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+            if (pair != null && pair.size() >= 1) attacker = pair.get(0);
+        } catch (Exception ignore) {}
+        if (attacker == null) {
+            attacker = new Player();
+            attacker.setAttackType(AttackType.none);
+        }
+        attacker.setCritType(critType);
+
+        String letter = fightServiceImpl.getCritFromAttackResult(result);
+        int delta = 0;
+        if ("T".equals(letter)) delta = -50;
+        else if ("A".equals(letter)) delta = -20;
+        else if ("B".equals(letter)) delta = -10;
+        else if ("C".equals(letter)) delta = 0;
+        else if ("D".equals(letter)) delta = 10;
+        else if ("E".equals(letter)) delta = 20;
+        int rawRoll = critResult - delta;
+
+        try { playerService.adventurersOrderedList(); } catch (Exception ignore) {}
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithCritRoll(attacker, defender, result, rawRoll);
+        return ResponseEntity.ok(dto);
+    }
+
     @PostMapping("/fight/apply-attack-with-fail")
     public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttackWithFail(@RequestParam(name = "failRoll") Integer failRoll) {
         if (failRoll == null) {

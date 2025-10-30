@@ -753,9 +753,9 @@ TODO      */
         }
 
         playerService.refreshAdventurerOrderedListObject(defender);
-        playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
-        playerService.experienceCounterCrit(attackResultsDTO.getCrit());
-        playerService.experienceCounterKill();
+        try { playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage()); } catch (Exception ignore) {}
+        try { playerService.experienceCounterCrit(attackResultsDTO.getCrit()); } catch (Exception ignore) {}
+        try { playerService.experienceCounterKill(); } catch (Exception ignore) {}
 
         playerRepository.save(defender);
 

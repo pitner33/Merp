@@ -70,6 +70,46 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
+    let last = 0;
+    const debouncedLoad = () => {
+      const now = Date.now();
+      if (now - last < 250) return;
+      last = now;
+      load();
+    };
+
+    const onFocus = () => debouncedLoad();
+    const onVis = () => { if (document.visibilityState === 'visible') debouncedLoad(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVis);
+
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'merp:player-updated' && e.newValue) {
+        debouncedLoad();
+      }
+    }
+    window.addEventListener('storage', onStorage);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('merp-sync');
+      bc.onmessage = (ev: MessageEvent) => {
+        const m: any = ev.data;
+        if (m && (m.type === 'player-updated' || m.type === 'global-refresh')) {
+          debouncedLoad();
+        }
+      };
+    } catch {}
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('storage', onStorage);
+      try { if (bc) { bc.onmessage = null as any; bc.close(); } } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
     document.title = 'The Lazy Dragon Inn';
   }, []);
 

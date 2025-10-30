@@ -435,7 +435,9 @@ public class PlayerServiceImpl implements PlayerService {
     //experience from getting wounded
     @Override
     public void experienceCounterHPLoss(Integer hpLoss) {
-        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) return;
+        Player defender = pair.get(1);
         defender.setXp(defender.getXp() + hpLoss);
         refreshAdventurerOrderedListObject(defender);
     }
@@ -443,8 +445,10 @@ public class PlayerServiceImpl implements PlayerService {
     //experience from giving or getting crit blow
     @Override
     public void experienceCounterCrit(String crit) {
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
-        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) return;
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
         Double defenderLvl = Double.valueOf(defender.getLvl());
 
 
@@ -485,8 +489,10 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     public void experienceCounterKill() {
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
-        Player defender = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(1);
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) return;
+        Player attacker = pair.get(0);
+        Player defender = pair.get(1);
         Double experienceKill = 0D;
 
         if ((!defender.getIsAlive()) && (experienceModifiers.getIsTargetAlive())) {
@@ -516,7 +522,9 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     public void experienceCounterMagic() {
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.isEmpty()) return;
+        Player attacker = pair.get(0);
         int magicLvl = 1; //TODO ivenni a magiclevlelt valahonnan, és a methodot magát betenni a helyére, hogy számolja az XP-t
         Double experienceMagic = 0D;
 
@@ -537,9 +545,13 @@ public class PlayerServiceImpl implements PlayerService {
 
     @Override
     public Boolean isPlayerFightAlone() {
-        Player attacker = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight().get(0);
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.isEmpty()) return true;
+        Player attacker = pair.get(0);
         int count = 0;
-        for (Player player: adventurerOrderedListObject.getPlayerList()) {
+        java.util.List<Player> ord = adventurerOrderedListObject.getPlayerList();
+        if (ord == null) return true;
+        for (Player player: ord) {
             if (player.getTarget() == attacker.getTarget()) {
                 count += 1;
             }

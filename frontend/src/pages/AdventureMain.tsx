@@ -9,6 +9,8 @@ export default function AdventureMain() {
   const navigate = useNavigate();
   const statePlayers = (location.state as { players?: Player[] } | undefined)?.players || [];
   const storageKey = 'merp:selectedPlayers';
+  const [hoveredRowId, setHoveredRowId] = useState<string | number | null>(null);
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const storagePlayers: Player[] = (() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -457,8 +459,10 @@ export default function AdventureMain() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((p) => (
-                <tr key={p.id}>
+              {rows.map((p) => {
+                const isHovered = hoveredRowId === p.id || (hoverTargetId != null && p.characterId === hoverTargetId);
+                return (
+                <tr key={p.id} style={isHovered ? { background: '#fff9c4' } : undefined}>
                   <td className="center">
                     <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
                   </td>
@@ -544,6 +548,20 @@ export default function AdventureMain() {
                       style={{ width: `${targetWidthCh + 6}ch` }}
                       className="sel-target"
                       value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
+                      onMouseEnter={() => setHoveredRowId(p.id)}
+                      onMouseLeave={() => { setHoveredRowId(null); setHoverTargetId(null); }}
+                      onBlur={() => { setHoveredRowId(null); setHoverTargetId(null); }}
+                      onMouseMove={(e) => {
+                        const t = e.target as HTMLElement;
+                        if (!t) return;
+                        if (t.tagName === 'OPTION') {
+                          const opt = t as HTMLOptionElement;
+                          const val = opt.value;
+                          if (val === 'none') setHoverTargetId(null);
+                          else if (val === 'self') setHoverTargetId(p.characterId || null);
+                          else setHoverTargetId(val);
+                        }
+                      }}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRows((prev) =>
@@ -595,6 +613,8 @@ export default function AdventureMain() {
                           style={{ width: `${activityWidthCh + 2}ch` }}
                           className="sel-activity"
                           value={curAct}
+                          onMouseEnter={() => setHoveredRowId(p.id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
                           onChange={(e) => {
                             const value = e.target.value;
                             setRows((prev) =>
@@ -629,6 +649,8 @@ export default function AdventureMain() {
                       style={{ width: `${attackWidthCh + 2}ch` }}
                       className="sel-attack"
                       value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
+                      onMouseEnter={() => setHoveredRowId(p.id)}
+                      onMouseLeave={() => setHoveredRowId(null)}
                       onChange={(e) => {
                         const newAttack = e.target.value;
                         setRows((prev) =>
@@ -660,6 +682,8 @@ export default function AdventureMain() {
                           style={{ width: `${critWidthCh + 2}ch` }}
                           className="sel-crit"
                           value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                          onMouseEnter={() => setHoveredRowId(p.id)}
+                          onMouseLeave={() => setHoveredRowId(null)}
                           onChange={(e) => {
                             const value = e.target.value;
                             setRows((prev) =>
@@ -685,6 +709,8 @@ export default function AdventureMain() {
                       style={{ width: `${armorWidthCh + 2}ch` }}
                       className="sel-armor"
                       value={p.armorType ?? 'none'}
+                      onMouseEnter={() => setHoveredRowId(p.id)}
+                      onMouseLeave={() => setHoveredRowId(null)}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRows((prev) =>
@@ -762,11 +788,12 @@ export default function AdventureMain() {
                   <td className="right">{p.influence}</td>
                   <td className="right">{p.stealth}</td>
                 </tr>
-              ))}
-            </tbody>
+              );
+            })}
+          </tbody>
         </table>
       </>
     )}
   </div>
-  );
+);
 }
