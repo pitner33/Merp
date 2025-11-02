@@ -571,6 +571,24 @@ TODO      */
         playerRepository.save(attacker);
     }
 
+    // Public helper to apply fail effects to a specific attacker by a provided roll
+    public AttackResultsDTO applyFailToAttackerByProvidedRoll(Player attacker, Integer providedRoll) {
+        AttackResultsDTO dto = new AttackResultsDTO();
+        List<String> row = getFailResultRowByProvidedRoll(providedRoll);
+        if (attacker.getAttackType() == AttackType.baseMagic ||
+                attacker.getAttackType() == AttackType.magicBall ||
+                attacker.getAttackType() == AttackType.magicProjectile) {
+            dto.setFailResultText(row.get(2));
+        } else if (attacker.getAttackType() == AttackType.ranged) {
+            dto.setFailResultText(row.get(1));
+        } else {
+            dto.setFailResultText(row.get(0));
+        }
+        parseFailEffectsByAttackType(attacker, row, dto);
+        applyFailEffectsToAttacker(attacker, dto);
+        return dto;
+    }
+
     @Override
     public List<String> getFailRollResultRow() {
         //fail roll open D100

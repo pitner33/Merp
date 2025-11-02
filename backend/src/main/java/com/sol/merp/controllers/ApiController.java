@@ -246,6 +246,23 @@ public class ApiController {
         return ResponseEntity.ok(dto);
     }
 
+    // Apply fail effects directly to a specific attacker by ID, independent from the global pair
+    @PostMapping("/fight/apply-fail-to-attacker")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyFailToAttacker(
+            @RequestParam(name = "attackerId") Long attackerId,
+            @RequestParam(name = "failRoll") Integer failRoll) {
+        if (attackerId == null || failRoll == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Optional<Player> attackerOpt = playerRepository.findById(attackerId);
+        if (attackerOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Player attacker = attackerOpt.get();
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyFailToAttackerByProvidedRoll(attacker, failRoll);
+        return ResponseEntity.ok(dto);
+    }
+
     @PostMapping("/fight/apply-attack-with-crit")
     public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttackWithCrit(@RequestParam(name = "result") String result,
                                                                                   @RequestParam(name = "critRoll") Integer critRoll) {

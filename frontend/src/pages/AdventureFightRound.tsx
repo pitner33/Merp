@@ -89,6 +89,46 @@ export default function AdventureFightRound() {
   const [error, setError] = useState<string | null>(null);
   const [currentRoundCount, setCurrentRoundCount] = useState<number | null>(null);
 
+  // Helpers to refresh attacker/defender rows from server
+  async function fetchPlayerById(id?: number | string | null): Promise<Player | undefined> {
+    try {
+      if (id == null) return undefined;
+      const r = await fetch(`http://localhost:8081/api/players/${id}`);
+      if (!r.ok) return undefined;
+      return (await r.json()) as Player;
+    } catch { return undefined; }
+  }
+  async function refreshPairFromServer() {
+    const aId = attacker?.id;
+    const dId = defender?.id;
+    const [a, d] = await Promise.all([fetchPlayerById(aId), fetchPlayerById(dId)]);
+    if (a) setAttackerRef(a);
+    if (d) setDefenderRef(d);
+  }
+
+  // Refresh on window focus, click (debounced), and storage broadcast from SingleAttack
+  useEffect(() => {
+    let clickTimer: number | null = null;
+    function onFocus() { refreshPairFromServer(); }
+    function onClick() {
+      if (clickTimer) window.clearTimeout(clickTimer);
+      clickTimer = window.setTimeout(() => refreshPairFromServer(), 150);
+    }
+    function onStorage(e: StorageEvent) {
+      if (!e.key) return;
+      if (e.key === 'merp:adventureRefresh') refreshPairFromServer();
+    }
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('click', onClick);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('click', onClick);
+      window.removeEventListener('storage', onStorage);
+      if (clickTimer) window.clearTimeout(clickTimer);
+    };
+  }, [attacker?.id, defender?.id]);
+
   // Set initial document title based on navigation state
   useEffect(() => {
     const rc = (round as any)?.roundCount;

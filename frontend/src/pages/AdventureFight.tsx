@@ -19,6 +19,37 @@ export default function AdventureFight() {
     document.title = 'Fight';
   }, []);
 
+  // Refresh helpers to reflect updates coming from other pages (e.g., SingleAttack)
+  useEffect(() => {
+    let clickTimer: number | null = null;
+    async function refreshOrdered() {
+      try {
+        const res = await fetch('http://localhost:8081/api/players/ordered');
+        if (!res.ok) return;
+        const data = (await res.json()) as Player[];
+        setRows(Array.isArray(data) ? data.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
+      } catch {}
+    }
+    function onFocus() { refreshOrdered(); }
+    function onClick() {
+      if (clickTimer) window.clearTimeout(clickTimer);
+      clickTimer = window.setTimeout(() => refreshOrdered(), 150);
+    }
+    async function onStorage(e: StorageEvent) {
+      if (!e.key) return;
+      if (e.key === 'merp:adventureRefresh') refreshOrdered();
+    }
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('click', onClick);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('click', onClick);
+      window.removeEventListener('storage', onStorage);
+      if (clickTimer) window.clearTimeout(clickTimer);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     async function initRoundCounter() {
