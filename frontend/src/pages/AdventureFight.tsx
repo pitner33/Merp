@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
@@ -12,7 +12,8 @@ export default function AdventureFight() {
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [roundCount, setRoundCount] = useState<number>(0);
-  
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
+  const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
 
   useEffect(() => {
     document.title = 'Fight';
@@ -238,9 +239,158 @@ export default function AdventureFight() {
   const armorWidthCh = maxLen(armorOptions.map((o) => o.label));
   const targetWidthCh = (() => {
     const base = ['none', 'self'];
-    const ids = rows.map((r) => r.characterId || '');
+    const ids = rows.map((r) => {
+      const dead = r.isAlive === false;
+      const stunned = (r.stunnedForRounds ?? 0) > 0;
+      const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
+      return `${r.characterId || ''}${mark}`;
+    });
     return maxLen(base.concat(ids));
   })();
+
+  function TargetDropdown({
+    valueToken,
+    selfId,
+    widthCh,
+    options,
+    isOpen,
+    onToggle,
+    onOption,
+  }: {
+    valueToken: string;
+    selfId?: string;
+    widthCh: number;
+    options: { value: string; label: string; dead?: boolean; stunned?: boolean }[];
+    isOpen: boolean;
+    onToggle: () => void;
+    onOption: (val: string) => void;
+  }) {
+    const btnRef = useRef<HTMLButtonElement | null>(null);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+    const [pos, setPos] = useState<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: 0 });
+
+    function currentLabel() {
+      const o = options.find((x) => x.value === valueToken);
+      if (!o) return 'none';
+      const mark = `${o.dead ? ' \u2620' : ''}${o.stunned ? ' \u26A1' : ''}`;
+      return `${o.label}${mark}`;
+    }
+
+    useEffect(() => {
+      // Place the menu once on open
+      if (isOpen && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setPos({ left: r.left, top: r.bottom + 2, width: r.width });
+      }
+      function onDocClick(e: MouseEvent) {
+        const t = e.target as Node | null;
+        if (!t) return;
+        if (btnRef.current?.contains(t)) return;
+        if (menuRef.current?.contains(t)) return;
+        if (isOpen) onToggle();
+      }
+      if (isOpen) document.addEventListener('click', onDocClick);
+      return () => {
+        if (isOpen) document.removeEventListener('click', onDocClick);
+      };
+    }, [isOpen, onToggle]);
+
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const b = btnRef.current;
+            if (b) {
+              const r = b.getBoundingClientRect();
+              setPos({ left: r.left, top: r.bottom + 2, width: r.width });
+            }
+            onToggle();
+          }}
+          style={{
+            width: `${widthCh}ch`,
+            textAlign: 'left',
+            padding: '2px 6px',
+            border: '1px solid #555',
+            background: '#2b2b2b',
+            color: '#fff',
+            borderRadius: 4,
+            lineHeight: 1.6,
+            fontFamily: 'inherit',
+            fontSize: '14px',
+            fontWeight: 400,
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+        >
+          <span>{currentLabel()}</span>
+          <span aria-hidden="true" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#ccc" aria-hidden="true">
+              <path d="M7 10l5 5 5-5z" />
+            </svg>
+          </span>
+        </button>
+        {isOpen && (
+          <div
+            ref={menuRef}
+            role="listbox"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: pos.left,
+              top: pos.top,
+              width: pos.width,
+              zIndex: 10000,
+              maxHeight: 220,
+              overflowY: 'auto',
+              background: '#2b2b2b',
+              color: '#fff',
+              border: '1px solid #555',
+              borderRadius: 4,
+              boxShadow: '0 6px 16px rgba(0,0,0,0.3)'
+            }}
+          >
+            {options.map((opt) => (
+              <div
+                key={opt.value}
+                role="option"
+                aria-selected={valueToken === opt.value}
+                onMouseEnter={() => {
+                  if (opt.value === 'none') setHoverTargetId(null);
+                  else if (opt.value === 'self') setHoverTargetId(selfId || null);
+                  else setHoverTargetId(opt.value);
+                }}
+                onClick={() => {
+                  onOption(opt.value);
+                  setHoverTargetId(null);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                  background: valueToken === opt.value ? '#3a4a6a' : 'transparent',
+                  color: opt.dead ? '#ef5350' : '#fff',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  cursor: 'pointer',
+                }}
+              >
+                <span>{opt.label}{opt.dead ? ' \u2620' : ''}{opt.stunned ? ' \u26A1' : ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   function normalizeRows(payloadRows: Player[]): Player[] {
     return payloadRows.map((r) => {
@@ -511,278 +661,278 @@ export default function AdventureFight() {
             </thead>
             <tbody>
               {rows.map((p) => {
+                const isHovered = hoverTargetId != null && p.characterId === hoverTargetId;
                 return (
-                <tr key={p.id}>
-                  <td className="center">
-                    <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
-                  </td>
-                  <td>{p.characterId}</td>
-                  <td>{p.name}</td>
-                  <td>{p.gender}</td>
-                  <td>{p.race}</td>
-                  <td>{p.playerClass}</td>
-                  <td className="right">{p.lvl}</td>
-                  <td
-                    className="right"
-                    style={
-                      isXpOverCap(Number(p.lvl), Number(p.xp))
-                        ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800 }
-                        : { position: 'relative' }
-                    }
-                    title={isXpOverCap(Number(p.lvl), Number(p.xp)) ? 'Level up available' : undefined}
-                  >
-                    {formatXp(Number(p.xp))}
-                    {isXpOverCap(Number(p.lvl), Number(p.xp)) && (
-                      <span aria-hidden="true" style={{ position: 'absolute', top: 2, right: 2, lineHeight: 0 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                          <path d="M12 3l7 7h-4v11H9V10H5l7-7z" />
-                        </svg>
-                      </span>
-                    )}
-                  </td>
-                  <td className="right">{p.hpMax}</td>
-                  <td style={hpStyle(p)} title={hpTitle(p)}>
-                    <div>{p.hpActual}</div>
-                    <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
-                  </td>
-                  <td>
-                    {p.isAlive ? (
-                      <span title="Alive" aria-label="Alive">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span title="Dead" aria-label="Dead">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="9" />
-                          <line x1="8" y1="8" x2="16" y2="16" />
-                          <line x1="16" y1="8" x2="8" y2="16" />
-                        </svg>
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {p.isActive ? (
-                      <span title="Active" aria-label="Active">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="6" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span title="Inactive" aria-label="Inactive">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="6" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {p.isStunned ? (
-                      <span title="Stunned" aria-label="Stunned">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <span title="Not stunned" aria-label="Not stunned">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <circle cx="12" cy="12" r="8" />
-                        </svg>
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <select
-                      className="sel-target"
-                      style={{ width: `${targetWidthCh + 6}ch` }}
-                      value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) => {
-                            if (r.id !== p.id) return r;
-                            let nextTarget: string | undefined;
-                            if (value === 'none') nextTarget = undefined;
-                            else if (value === 'self') nextTarget = r.characterId;
-                            else nextTarget = value;
+                  <tr key={p.id} style={isHovered ? { background: 'rgba(47,85,151,0.35)' } : undefined}>
+                    <td className="center">
+                      <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
+                    </td>
+                    <td>{p.characterId}</td>
+                    <td>{p.name}</td>
+                    <td>{p.gender}</td>
+                    <td>{p.race}</td>
+                    <td>{p.playerClass}</td>
+                    <td className="right">{p.lvl}</td>
+                    <td
+                      className="right"
+                      style={
+                        isXpOverCap(Number(p.lvl), Number(p.xp))
+                          ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800 }
+                          : { position: 'relative' }
+                      }
+                      title={isXpOverCap(Number(p.lvl), Number(p.xp)) ? 'Level up available' : undefined}
+                    >
+                      {formatXp(Number(p.xp))}
+                      {isXpOverCap(Number(p.lvl), Number(p.xp)) && (
+                        <span aria-hidden="true" style={{ position: 'absolute', top: 2, right: 2, lineHeight: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 3l7 7h-4v11H9V10H5l7-7z" />
+                          </svg>
+                        </span>
+                      )}
+                    </td>
+                    <td className="right">{p.hpMax}</td>
+                    <td style={hpStyle(p)} title={hpTitle(p)}>
+                      <div>{p.hpActual}</div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+                    </td>
+                    <td>
+                      {p.isAlive ? (
+                        <span title="Alive" aria-label="Alive">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span title="Dead" aria-label="Dead">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" />
+                            <line x1="8" y1="8" x2="16" y2="16" />
+                            <line x1="16" y1="8" x2="8" y2="16" />
+                          </svg>
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {p.isActive ? (
+                        <span title="Active" aria-label="Active">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="6" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span title="Inactive" aria-label="Inactive">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="6" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {p.isStunned ? (
+                        <span title="Stunned" aria-label="Stunned">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span title="Not stunned" aria-label="Not stunned">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="8" />
+                          </svg>
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {(() => {
+                        const opts = [
+                          { value: 'none', label: 'none' },
+                          { value: 'self', label: 'self' },
+                          ...rows
+                            .filter((o) => o.id !== p.id)
+                            .slice()
+                            .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
+                            .map((o) => ({ value: o.characterId || '', label: o.characterId || '', dead: o.isAlive === false, stunned: (o.stunnedForRounds ?? 0) > 0 })),
+                        ];
+                        return (
+                          <TargetDropdown
+                            valueToken={p.target == null ? 'none' : p.target === p.characterId ? 'self' : (p.target as string)}
+                            selfId={p.characterId}
+                            widthCh={targetWidthCh + 6}
+                            options={opts}
+                            isOpen={openTargetRowId === p.id}
+                            onToggle={() => setOpenTargetRowId(openTargetRowId === p.id ? null : p.id)}
+                            onOption={(value) => {
+                              setRows((prev) =>
+                                prev.map((r) => {
+                                  if (r.id !== p.id) return r;
+                                  let nextTarget: string | undefined;
+                                  if (value === 'none') nextTarget = undefined;
+                                  else if (value === 'self') nextTarget = r.characterId;
+                                  else nextTarget = value;
 
-                            const allowedActs = allowedActivitiesByTarget(nextTarget);
-                            const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                            const allowedAttacks = attacksByActivity(enforcedAct);
-                            const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                            const allowedCrits = critByAttack[nextAttack] ?? ['none'];
-                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                            const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
-                          })
+                                  const allowedActs = allowedActivitiesByTarget(nextTarget);
+                                  const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
+                                  const allowedAttacks = attacksByActivity(enforcedAct);
+                                  const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                                  const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                                  const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                                  const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                                  const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                                  const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                                  return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
+                                })
+                              );
+                              setOpenTargetRowId(null);
+                            }}
+                          />
                         );
-                      }}
-                    >
-                      <option value="none">none</option>
-                      <option value="self">self</option>
-                      {rows
-                        .filter((o) => o.id !== p.id)
-                        .slice()
-                        .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
-                        .map((o) => {
-                          const dead = o.isAlive === false;
-                          const stunned = (o.stunnedForRounds ?? 0) > 0;
-                          const mark = `${dead ? ' ☠' : ''}${stunned ? ' ⚡' : ''}`;
-                          return (
-                            <option key={o.id} value={o.characterId} style={dead ? { color: '#d32f2f' } : undefined}>
-                              {o.characterId}{mark}
-                            </option>
+                      })()}
+                    </td>
+                    <td>
+                      {(() => {
+                        const allowedActs = allowedActivitiesByTarget(p.target);
+                        const curAct = (p.playerActivity && allowedActs.includes(p.playerActivity)) ? p.playerActivity : allowedActs[0];
+                        return (
+                          <select
+                            className="sel-activity"
+                            style={{ width: `${activityWidthCh + 2}ch` }}
+                            value={curAct}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setRows((prev) =>
+                                prev.map((r) => {
+                                  if (r.id !== p.id) return r;
+                                  const enforcedAct = allowedActivitiesByTarget(r.target).includes(value) ? value : allowedActivitiesByTarget(r.target)[0];
+                                  const allowedAttacks = attacksByActivity(enforcedAct);
+                                  const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                                  const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                                  const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                                  const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                                  const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                                  const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                                  return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
+                                })
+                              );
+                            }}
+                          >
+                            {activityOptions
+                              .filter((opt) => allowedActs.includes(opt.value))
+                              .map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                          </select>
+                        );
+                      })()}
+                    </td>
+                    <td>
+                      <select
+                        className="sel-attack"
+                        style={{ width: `${attackWidthCh + 2}ch` }}
+                        value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
+                        onChange={(e) => {
+                          const newAttack = e.target.value;
+                          setRows((prev) =>
+                            prev.map((r) => {
+                              if (r.id !== p.id) return r;
+                              const allowedCrits = critByAttack[newAttack] ?? ['none'];
+                              const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                              const nextShield = canUseShield(newAttack) ? r.shield : false;
+                              return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                            })
                           );
-                        })}
-                    </select>
-                  </td>
-                  <td>
-                    {(() => {
-                      const allowedActs = allowedActivitiesByTarget(p.target);
-                      const curAct = (p.playerActivity && allowedActs.includes(p.playerActivity)) ? p.playerActivity : allowedActs[0];
-                      return (
-                        <select
-                          className="sel-activity"
-                          style={{ width: `${activityWidthCh + 2}ch` }}
-                          value={curAct}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setRows((prev) =>
-                              prev.map((r) => {
-                                if (r.id !== p.id) return r;
-                                const enforcedAct = allowedActivitiesByTarget(r.target).includes(value) ? value : allowedActivitiesByTarget(r.target)[0];
-                                const allowedAttacks = attacksByActivity(enforcedAct);
-                                const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                                const allowedCrits = critByAttack[nextAttack] ?? ['none'];
-                                const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                                const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                                const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
-                              })
-                            );
-                          }}
-                        >
-                          {activityOptions
-                            .filter((opt) => allowedActs.includes(opt.value))
-                            .map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                        </select>
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <select
-                      className="sel-attack"
-                      style={{ width: `${attackWidthCh + 2}ch` }}
-                      value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
-                      onChange={(e) => {
-                        const newAttack = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) => {
-                            if (r.id !== p.id) return r;
-                            const allowedCrits = critByAttack[newAttack] ?? ['none'];
-                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                            const nextShield = canUseShield(newAttack) ? r.shield : false;
-                            return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
-                          })
+                        }}
+                      >
+                        {attackOptions
+                          .filter((opt) => attacksByActivity(p.playerActivity).includes(opt.value))
+                          .map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                      </select>
+                    </td>
+                    <td>
+                      {(() => {
+                        const curAttack = (attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none';
+                        const allowed = critByAttack[curAttack ?? 'none'] ?? ['none'];
+                        return (
+                          <select
+                            className="sel-crit"
+                            style={{ width: `${critWidthCh + 2}ch` }}
+                            value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.id === p.id ? { ...r, critType: value } : r
+                                )
+                              );
+                            }}
+                          >
+                            {critOptions
+                              .filter((opt) => allowed.includes(opt.value))
+                              .map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                          </select>
                         );
-                      }}
-                    >
-                      {attackOptions
-                        .filter((opt) => attacksByActivity(p.playerActivity).includes(opt.value))
-                        .map((opt) => (
+                      })()}
+                    </td>
+                    <td>
+                      <select
+                        className="sel-armor"
+                        style={{ width: `${armorWidthCh + 2}ch` }}
+                        value={p.armorType ?? 'none'}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === p.id ? { ...r, armorType: value } : r
+                            )
+                          );
+                        }}
+                      >
+                        {armorOptions.map((opt) => (
                           <option key={opt.value} value={opt.value}>
                             {opt.label}
                           </option>
                         ))}
-                    </select>
-                  </td>
-                  <td>
-                    {(() => {
-                      const curAttack = (attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none';
-                      const allowed = critByAttack[curAttack ?? 'none'] ?? ['none'];
-                      return (
-                        <select
-                          className="sel-crit"
-                          style={{ width: `${critWidthCh + 2}ch` }}
-                          value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setRows((prev) =>
-                              prev.map((r) =>
-                                r.id === p.id ? { ...r, critType: value } : r
-                              )
-                            );
-                          }}
-                        >
-                          {critOptions
-                            .filter((opt) => allowed.includes(opt.value))
-                            .map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                        </select>
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <select
-                      className="sel-armor"
-                      style={{ width: `${armorWidthCh + 2}ch` }}
-                      value={p.armorType ?? 'none'}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) =>
-                            r.id === p.id ? { ...r, armorType: value } : r
-                          )
+                      </select>
+                    </td>
+                    <td className="right">{computeTb(p)}</td>
+                    <td>
+                      {(() => {
+                        const tb = computeTb(p) ?? 0;
+                        const neg = tb < 0;
+                        const max = Math.floor(Math.max(0, tb) * 0.5);
+                        const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
+                        return (
+                          <input
+                            type="number"
+                            min={0}
+                            max={max}
+                            step={1}
+                            disabled={neg}
+                            value={value}
+                            onChange={(e) => {
+                              if (neg) return;
+                              const raw = Number(e.target.value);
+                              const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
+                              setRows((prev) => prev.map((r) => (r.id === p.id ? { ...r, tbUsedForDefense: val } : r)));
+                            }}
+                            style={{ width: 70, textAlign: 'right' }}
+                            aria-label="TB used for defense"
+                            title={neg ? 'TB < 0 ➜ Defense TB fixed at 0' : `Max ${max} (50% of TB)`}
+                          />
                         );
-                      }}
-                    >
-                      {armorOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="right">{computeTb(p)}</td>
-                  <td>
-                    {(() => {
-                      const tb = computeTb(p) ?? 0;
-                      const neg = tb < 0;
-                      const max = Math.floor(Math.max(0, tb) * 0.5);
-                      const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
-                      return (
-                        <input
-                          type="number"
-                          min={0}
-                          max={max}
-                          step={1}
-                          disabled={neg}
-                          value={value}
-                          onChange={(e) => {
-                            if (neg) return;
-                            const raw = Number(e.target.value);
-                            const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
-                            setRows((prev) => prev.map((r) => (r.id === p.id ? { ...r, tbUsedForDefense: val } : r)));
-                          }}
-                          style={{ width: 70, textAlign: 'right' }}
-                          aria-label="TB used for defense"
-                          title={neg ? 'TB < 0 ➜ Defense TB fixed at 0' : `Max ${max} (50% of TB)`}
-                        />
-                      );
-                    })()}
-                  </td>
+                      })()}
+                    </td>
                   <td className="right">{p.tbOneHanded}</td>
                   <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>

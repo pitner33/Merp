@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
@@ -19,6 +19,8 @@ export default function AdventureMain() {
   })();
   const players: Player[] = statePlayers.length > 0 ? statePlayers : storagePlayers;
   const [rows, setRows] = useState<Player[]>(players);
+  const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
+  const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
 
   useEffect(() => {
@@ -268,9 +270,159 @@ export default function AdventureMain() {
   const armorWidthCh = maxLen(armorOptions.map((o) => o.label));
   const targetWidthCh = (() => {
     const base = ['none', 'self'];
-    const ids = rows.map((r) => r.characterId || '');
+    const ids = rows.map((r) => {
+      const dead = r.isAlive === false;
+      const stunned = (r.stunnedForRounds ?? 0) > 0;
+      const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
+      return `${r.characterId || ''}${mark}`;
+    });
     return maxLen(base.concat(ids));
   })();
+
+  function TargetDropdown({
+    valueToken,
+    selfId,
+    widthCh,
+    options,
+    isOpen,
+    onToggle,
+    onOption,
+  }: {
+    valueToken: string;
+    selfId?: string;
+    widthCh: number;
+    options: { value: string; label: string; dead?: boolean; stunned?: boolean }[];
+    isOpen: boolean;
+    onToggle: () => void;
+    onOption: (val: string) => void;
+  }) {
+    const btnRef = useRef<HTMLButtonElement | null>(null);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+    const [pos, setPos] = useState<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: 0 });
+
+    function currentLabel() {
+      const o = options.find((x) => x.value === valueToken);
+      if (!o) return 'none';
+      const mark = `${o.dead ? ' \u2620' : ''}${o.stunned ? ' \u26A1' : ''}`;
+      return `${o.label}${mark}`;
+    }
+
+    useEffect(() => {
+      // Place the menu once on open
+      if (isOpen && btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setPos({ left: r.left, top: r.bottom + 2, width: r.width });
+      }
+      // Outside click to close (bubble phase so menu stopPropagation works)
+      function onDocClick(e: MouseEvent) {
+        const t = e.target as Node | null;
+        if (!t) return;
+        if (btnRef.current?.contains(t)) return;
+        if (menuRef.current?.contains(t)) return;
+        if (isOpen) onToggle();
+      }
+      if (isOpen) document.addEventListener('click', onDocClick);
+      return () => {
+        if (isOpen) document.removeEventListener('click', onDocClick);
+      };
+    }, [isOpen, onToggle]);
+
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const b = btnRef.current;
+            if (b) {
+              const r = b.getBoundingClientRect();
+              setPos({ left: r.left, top: r.bottom + 2, width: r.width });
+            }
+            onToggle();
+          }}
+          style={{
+            width: `${widthCh}ch`,
+            textAlign: 'left',
+            padding: '2px 6px',
+            border: '1px solid #555',
+            background: '#2b2b2b',
+            color: '#fff',
+            borderRadius: 4,
+            lineHeight: 1.6,
+            fontFamily: 'inherit',
+            fontSize: '14px',
+            fontWeight: 400,
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+        >
+          <span>{currentLabel()}</span>
+          <span aria-hidden="true" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#ccc" aria-hidden="true">
+              <path d="M7 10l5 5 5-5z" />
+            </svg>
+          </span>
+        </button>
+        {isOpen && (
+          <div
+            ref={menuRef}
+            role="listbox"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: pos.left,
+              top: pos.top,
+              width: pos.width,
+              zIndex: 10000,
+              maxHeight: 220,
+              overflowY: 'auto',
+              background: '#2b2b2b',
+              color: '#fff',
+              border: '1px solid #555',
+              borderRadius: 4,
+              boxShadow: '0 6px 16px rgba(0,0,0,0.3)'
+            }}
+          >
+            {options.map((opt) => (
+              <div
+                key={opt.value}
+                role="option"
+                aria-selected={valueToken === opt.value}
+                onMouseEnter={() => {
+                  if (opt.value === 'none') setHoverTargetId(null);
+                  else if (opt.value === 'self') setHoverTargetId(selfId || null);
+                  else setHoverTargetId(opt.value);
+                }}
+                onClick={() => {
+                  onOption(opt.value);
+                  setHoverTargetId(null);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                  background: valueToken === opt.value ? '#3a4a6a' : 'transparent',
+                  color: opt.dead ? '#ef5350' : '#fff',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  cursor: 'pointer',
+                }}
+              >
+                <span>{opt.label}{opt.dead ? ' \u2620' : ''}{opt.stunned ? ' \u26A1' : ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 8 }}>
@@ -458,8 +610,9 @@ export default function AdventureMain() {
             </thead>
             <tbody>
               {rows.map((p) => {
+                const isHovered = hoverTargetId != null && p.characterId === hoverTargetId;
                 return (
-                <tr key={p.id}>
+                <tr key={p.id} style={isHovered ? { background: 'rgba(47,85,151,0.35)' } : undefined}>
                   <td className="center">
                     <input type="checkbox" checked={!!p.isPlaying} disabled aria-label={`Is playing ${p.name}`} />
                   </td>
@@ -541,51 +694,50 @@ export default function AdventureMain() {
                     )}
                   </td>
                   <td>
-                    <select
-                      style={{ width: `${targetWidthCh + 6}ch` }}
-                      className="sel-target"
-                      value={p.target == null ? 'none' : p.target === p.characterId ? 'self' : p.target}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) => {
-                            if (r.id !== p.id) return r;
-                            let nextTarget: string | undefined;
-                            if (value === 'none') nextTarget = undefined;
-                            else if (value === 'self') nextTarget = r.characterId;
-                            else nextTarget = value;
+                    {(() => {
+                      const opts = [
+                        { value: 'none', label: 'none' },
+                        { value: 'self', label: 'self' },
+                        ...rows
+                          .filter((o) => o.id !== p.id)
+                          .slice()
+                          .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
+                          .map((o) => ({ value: o.characterId || '', label: o.characterId || '', dead: o.isAlive === false, stunned: (o.stunnedForRounds ?? 0) > 0 })),
+                      ];
+                      return (
+                        <TargetDropdown
+                          valueToken={p.target == null ? 'none' : p.target === p.characterId ? 'self' : (p.target as string)}
+                          selfId={p.characterId}
+                          widthCh={targetWidthCh + 6}
+                          options={opts}
+                          isOpen={openTargetRowId === p.id}
+                          onToggle={() => setOpenTargetRowId(openTargetRowId === p.id ? null : p.id)}
+                          onOption={(value) => {
+                            setRows((prev) =>
+                              prev.map((r) => {
+                                if (r.id !== p.id) return r;
+                                let nextTarget: string | undefined;
+                                if (value === 'none') nextTarget = undefined;
+                                else if (value === 'self') nextTarget = r.characterId;
+                                else nextTarget = value;
 
-                            const allowedActs = allowedActivitiesByTarget(nextTarget);
-                            const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                            const allowedAttacks = attacksByActivity(enforcedAct);
-                            const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                            const allowedCrits = critByAttack[nextAttack] ?? ['none'];
-                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                            const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                            const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                            return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
-                          })
-                        );
-                      }}
-                    >
-                      <option value="none">none</option>
-                      <option value="self">self</option>
-                      {rows
-                        .filter((o) => o.id !== p.id)
-                        .slice()
-                        .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
-                        .map((o) => {
-                          const dead = o.isAlive === false;
-                          const stunned = (o.stunnedForRounds ?? 0) > 0;
-                          const mark = `${dead ? ' ☠' : ''}${stunned ? ' ⚡' : ''}`;
-                          return (
-                            <option key={o.id} value={o.characterId} style={dead ? { color: '#d32f2f' } : undefined}>
-                              {o.characterId}{mark}
-                            </option>
-                          );
-                        })}
-                    </select>
+                                const allowedActs = allowedActivitiesByTarget(nextTarget);
+                                const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
+                                const allowedAttacks = attacksByActivity(enforcedAct);
+                                const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+                                const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                                const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                                const nextShield = canUseShield(nextAttack) ? r.shield : false;
+                                const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
+                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
+                                return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
+                              })
+                            );
+                            setOpenTargetRowId(null);
+                          }}
+                        />
+                      );
+                    })()}
                   </td>
                   <td>
                     {(() => {
