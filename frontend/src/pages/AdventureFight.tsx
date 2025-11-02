@@ -340,6 +340,7 @@ export default function AdventureFight() {
             role="listbox"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
+            onMouseLeave={() => setHoverTargetId(null)}
             style={{
               position: 'fixed',
               left: pos.left,
@@ -375,7 +376,17 @@ export default function AdventureFight() {
                   alignItems: 'center',
                   gap: 6,
                   whiteSpace: 'nowrap',
-                  background: valueToken === opt.value ? '#3a4a6a' : 'transparent',
+                  background:
+                    valueToken === opt.value
+                      ? '#3a4a6a'
+                      : (
+                          opt.value !== 'none' && (
+                            (opt.value === 'self' && hoverTargetId === (selfId || null)) ||
+                            (opt.value !== 'self' && hoverTargetId === opt.value)
+                          )
+                        )
+                      ? 'rgba(47,85,151,0.25)'
+                      : 'transparent',
                   color: opt.dead ? '#ef5350' : '#fff',
                   fontFamily: 'inherit',
                   fontSize: '14px',
@@ -693,8 +704,8 @@ export default function AdventureFight() {
                     </td>
                     <td className="right">{p.hpMax}</td>
                     <td style={hpStyle(p)} title={hpTitle(p)}>
-                      <div>{p.hpActual}</div>
                       <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+                      <div>{p.hpActual}</div>
                     </td>
                     <td>
                       {p.isAlive ? (

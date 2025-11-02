@@ -162,7 +162,19 @@ export default function PlayersList() {
               <td>{p.critType}</td>
               <td>{/* @ts-ignore backend has target */ (p as any).target}</td>
               <td>{p.hpMax}</td>
-              <td>{p.hpActual}</td>
+              <td>
+                {(() => {
+                  const max = Number(p.hpMax) || 0;
+                  const cur = Number(p.hpActual) || 0;
+                  const pct = Math.round(((cur) / (max || 1)) * 100);
+                  return (
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{pct}%</div>
+                      <div>{p.hpActual}</div>
+                    </div>
+                  );
+                })()}
+              </td>
               <td>{p.mm}</td>
               <td>{p.tb}</td>
               <td>{p.tbOneHanded}</td>

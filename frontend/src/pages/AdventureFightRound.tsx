@@ -920,8 +920,8 @@ export default function AdventureFightRound() {
                 </td>
                 <td className="right">{p?.hpMax}</td>
                 <td style={p ? hpStyle(p) : undefined} title={p ? hpTitle(p) : undefined}>
-                  <div>{p?.hpActual}</div>
                   <div style={{ fontSize: 12, fontWeight: 500 }}>{p ? hpTitle(p) : ''}</div>
+                  <div>{p?.hpActual}</div>
                 </td>
                 <td>
                   {p?.isAlive ? (

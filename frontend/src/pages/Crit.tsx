@@ -426,8 +426,8 @@ export default function Crit() {
             <td className="right">{p.xp}</td>
             <td className="right">{p.hpMax}</td>
             <td style={hpStyle(p)} title={hpTitle(p)}>
-              <div>{p.hpActual}</div>
               <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+              <div>{p.hpActual}</div>
             </td>
             <td>
               {p.isAlive ? (

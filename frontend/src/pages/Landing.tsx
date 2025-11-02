@@ -235,11 +235,11 @@ export default function Landing() {
           onClick={() => {
             try {
               const url = new URL('/adventure/attack', window.location.origin).toString();
-              window.open(url, 'AttackWindow');
+              window.open(url, 'SingleAttackWindow');
             } catch {}
           }}
         >
-          ATTACK
+          SINGLE ATTACK
         </button>
         <button
           type="button"
@@ -372,8 +372,8 @@ export default function Landing() {
               </td>
               <td className="right">{p.hpMax}</td>
               <td style={hpStyle(p)} title={hpTitle(p)}>
-                <div>{p.hpActual}</div>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
+                <div>{p.hpActual}</div>
               </td>
               <td>{p.attackType}</td>
               <td>{p.critType}</td>

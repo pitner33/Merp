@@ -8,7 +8,7 @@ import AdventureFight from './pages/AdventureFight';
 import AdventureFightRound from './pages/AdventureFightRound';
 import D100 from './pages/D100';
 import Crit from './pages/Crit';
-import Attack from './pages/Attack';
+import SingleAttack from './pages/SingleAttack';
 import MM from './pages/MM';
 
 export default function App() {
@@ -24,7 +24,7 @@ export default function App() {
         <Route path="/adventure/fight/round" element={<AdventureFightRound />} />
         <Route path="/adventure/d100" element={<D100 />} />
         <Route path="/adventure/crit" element={<Crit />} />
-        <Route path="/adventure/attack" element={<Attack />} />
+        <Route path="/adventure/attack" element={<SingleAttack />} />
         <Route path="/adventure/mm" element={<MM />} />
         <Route path="*" element={<p>Not Found</p>} />
       </Routes>
