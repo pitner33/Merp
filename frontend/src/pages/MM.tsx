@@ -34,6 +34,18 @@ export default function MM() {
     modifierByGameMaster: 0,
   });
 
+  // Per-maneuver minimal modifiers (non-Movement)
+  const [maneuverMods, setManeuverMods] = useState<Record<string, {
+    specialProficiencyBonus: number;
+    modifierByGameMaster: number;
+    lookingForSpecificInfo?: boolean;
+    magicTypeDifferent?: boolean;
+    knownMagicOrAbility?: boolean;
+    capableSameSpell?: boolean;
+    loyalFollower?: boolean;
+    audienceHired?: boolean;
+  }>>({});
+
   // Dice roll state (like AdventureFightRound)
   const [rolling, setRolling] = useState(false);
   const [tensFace, setTensFace] = useState<number>(0);
@@ -287,6 +299,7 @@ export default function MM() {
         specialProficiencyBonus: 0,
         modifierByGameMaster: 0,
       }));
+      setManeuverMods({});
     } catch {}
   }
 
@@ -319,21 +332,71 @@ export default function MM() {
     return `${base} (${sign}${amt})`;
   }
 
+  function getDifficultyBonus(d: string): number {
+    const s = (d || '').toLowerCase();
+    switch (s) {
+      case 'piece of cake': return 30;
+      case 'very easy': return 20;
+      case 'easy': return 10;
+      case 'average': return 0;
+      case 'hard': return -10;
+      case 'very hard': return -20;
+      case 'extremely hard': return -30;
+      case 'insane': return -50;
+      case 'absurd': return -70;
+      default: return 0;
+    }
+  }
+
   // Compute modified total (movement modifiers only)
   function computeLocalModifiedTotal(): number | undefined {
     if (openTotal == null) return undefined;
     const a = attacker as Player | null;
-    const mmBonus = Number(a?.mm) || 0;
-    const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
-    let sum = 0;
-    sum += mmBonus; // MM bonus from player attribute
-    sum += Math.floor(Number(mod.specialProficiencyBonus) || 0);
-    if (mod.playerStunned) sum += -50;
-    if (mod.playerKnockedOnGround) sum += -70;
-    if (mod.playerLimbUnusable) sum += -30;
-    sum += playerPenalty; // Player's penalty
-    sum += Math.floor(Number(mod.modifierByGameMaster) || 0); // GM modifier
-    return openTotal + sum;
+    if (mmType === 'Movement') {
+      const mmBonus = Number(a?.mm) || 0;
+      const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+      let sum = 0;
+      sum += mmBonus; // MM bonus from player attribute
+      if (maneuverType === 'Stealth') {
+        sum += Number((attacker as any)?.stealth) || 0; // Stealth bonus
+      }
+      sum += Math.floor(Number(mod.specialProficiencyBonus) || 0);
+      if (mod.playerStunned) sum += -50;
+      if (mod.playerKnockedOnGround) sum += -70;
+      if (mod.playerLimbUnusable) sum += -30;
+      sum += playerPenalty; // Player's penalty
+      sum += Math.floor(Number(mod.modifierByGameMaster) || 0); // GM modifier
+      return openTotal + sum;
+    } else {
+      const cur = maneuverMods[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 };
+      const includeDifficulty = !(maneuverType === 'Object usage' || maneuverType === 'Runes');
+      const diff = includeDifficulty ? getDifficultyBonus(difficulty) : 0;
+      let sum = diff + Math.floor(Number(cur.specialProficiencyBonus) || 0) + Math.floor(Number(cur.modifierByGameMaster) || 0);
+      if (maneuverType === 'Perception' || maneuverType === 'Tracking') {
+        const attrVal = maneuverType === 'Perception' ? Number((attacker as any)?.perception) || 0 : Number((attacker as any)?.tracking) || 0;
+        const looking = !!cur.lookingForSpecificInfo;
+        sum += attrVal + (looking ? 20 : 0);
+      } else if (maneuverType === 'Lockpicking') {
+        const attrVal = Number((attacker as any)?.lockPicking) || 0;
+        sum += attrVal;
+      } else if (maneuverType === 'Stealth') {
+        const attrVal = Number((attacker as any)?.stealth) || 0;
+        sum += attrVal;
+      } else if (maneuverType === 'Object usage' || maneuverType === 'Runes') {
+        const lvl = Number((attacker as any)?.lvl) || 0;
+        const attrVal = maneuverType === 'Object usage' ? (Number((attacker as any)?.objectUsage) || 0) : (Number((attacker as any)?.runes) || 0);
+        const magicTypeDiff = !!cur.magicTypeDifferent ? -30 : 0;
+        const known = !!cur.knownMagicOrAbility ? 20 : -10;
+        const sameSpell = !!cur.capableSameSpell ? 30 : 0;
+        sum += lvl + attrVal + magicTypeDiff + known + sameSpell;
+      } else if (maneuverType === 'Influence') {
+        const attrVal = Number((attacker as any)?.influence) || 0;
+        const loyal = !!cur.loyalFollower ? 50 : 0;
+        const hired = !!cur.audienceHired ? 20 : 0;
+        sum += attrVal + loyal + hired;
+      }
+      return openTotal + sum;
+    }
   }
 
   async function handleRoll() {
@@ -569,8 +632,8 @@ export default function MM() {
                   <td>
                     {(() => {
                       const opts = mmType === 'Movement'
-                        ? ['Movement']
-                        : ['Perception', 'Tracking', 'Lockpicking', 'Disarm traps', 'Object usage', 'Runes', 'Influence', 'Stealth', 'Other'];
+                        ? ['Movement', 'Stealth']
+                        : ['Perception', 'Tracking', 'Lockpicking', 'Disarm traps', 'Object usage', 'Runes', 'Influence', 'Other'];
                       const value = opts.includes(maneuverType) ? maneuverType : opts[0];
                       return (
                         <select value={value} onChange={(e) => setManeuverType(e.target.value)}>
@@ -619,9 +682,96 @@ export default function MM() {
       <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
         {(() => {
           const movementDisabled = false;
+          if (mmType === 'Movement') {
+            return (
+              <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginBottom: 8 }}>
+                <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>{maneuverType === 'Stealth' ? 'Stealth Modifiers' : 'Movement Modifiers'}</h2>
+                <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '75%' }} />
+                    <col style={{ width: '25%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>{maneuverType === 'Stealth' ? 'Stealth Modifier' : 'Movement Modifier'}</th>
+                      <th>Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{movementLabel('MM bonus (from player attribute)', Number(attacker?.mm) || 0)}</td>
+                      <td>
+                        <input type="number" value={Number(attacker?.mm) || 0} disabled aria-label="MM bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
+                      </td>
+                    </tr>
+                    {maneuverType === 'Stealth' && (
+                      <tr>
+                        <td>{movementLabel('Stealth bonus (from player attribute)', Number((attacker as any)?.stealth) || 0)}</td>
+                        <td>
+                          <input type="number" value={Number((attacker as any)?.stealth) || 0} disabled aria-label="Stealth bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td>{movementLabel('Special proficiency bonus', Number(mod.specialProficiencyBonus) || 0)}</td>
+                      <td>
+                        <input
+                          type="number"
+                          value={mod.specialProficiencyBonus}
+                          onChange={(e) => {
+                            const v = Math.floor(Number(e.target.value) || 0);
+                            setMod((m) => ({ ...m, specialProficiencyBonus: v }));
+                          }}
+                          style={{ width: 80, textAlign: 'right' }}
+                          disabled={movementDisabled}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>{movementLabel('Player stunned (auto)', -50)}</td>
+                      <td><input type="checkbox" checked={mod.playerStunned} disabled aria-label="Player stunned (auto)" /></td>
+                    </tr>
+                    <tr>
+                      <td>{movementLabel('Player knocked on the ground', -70)}</td>
+                      <td><input type="checkbox" checked={mod.playerKnockedOnGround} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerKnockedOnGround: e.target.checked }))} /></td>
+                    </tr>
+                    <tr>
+                      <td>{movementLabel('Any limb of the player is unusable', -30)}</td>
+                      <td><input type="checkbox" checked={mod.playerLimbUnusable} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerLimbUnusable: e.target.checked }))} /></td>
+                    </tr>
+                    <tr>
+                      <td>{movementLabel("Player's penalty (from Penalty)", -Math.abs(Number(attacker?.penaltyOfActions) || 0))}</td>
+                      <td>
+                        <input type="number" value={-Math.abs(Number(attacker?.penaltyOfActions) || 0)} disabled aria-label="Player's penalty (from Penalty)" style={{ width: 80, textAlign: 'right' }} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>GM modifier</td>
+                      <td>
+                        <input
+                          type="number"
+                          value={mod.modifierByGameMaster}
+                          onChange={(e) => {
+                            const v = Math.floor(Number(e.target.value) || 0);
+                            setMod((m) => ({ ...m, modifierByGameMaster: v }));
+                          }}
+                          style={{ width: 80, textAlign: 'right' }}
+                          disabled={movementDisabled}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          }
+
+          const cur = maneuverMods[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 };
+          const includeDifficulty = !(maneuverType === 'Object usage' || maneuverType === 'Runes');
+          const diff = includeDifficulty ? getDifficultyBonus(difficulty) : 0;
           return (
             <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginBottom: 8 }}>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Movement Modifiers</h2>
+              <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>{maneuverType} Modifiers</h2>
               <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
                 <colgroup>
                   <col style={{ width: '75%' }} />
@@ -629,48 +779,207 @@ export default function MM() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Movement Modifier</th>
+                    <th>{maneuverType} Modifier</th>
                     <th>Value</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {includeDifficulty && (
+                    <tr>
+                      <td>Difficulty</td>
+                      <td>
+                        <input type="number" value={diff} disabled aria-label="Difficulty bonus" style={{ width: 80, textAlign: 'right' }} />
+                      </td>
+                    </tr>
+                  )}
+                  {(maneuverType === 'Perception' || maneuverType === 'Tracking') && (
+                    <>
+                      <tr>
+                        <td>{maneuverType} bonus (from player attribute)</td>
+                        <td>
+                          <input type="number" value={maneuverType === 'Perception' ? (Number((attacker as any)?.perception) || 0) : (Number((attacker as any)?.tracking) || 0)} disabled aria-label={`${maneuverType} bonus (from player)`} style={{ width: 80, textAlign: 'right' }} />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Player is looking for specific information (+20)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.lookingForSpecificInfo}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), lookingForSpecificInfo: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  {(maneuverType === 'Lockpicking' || maneuverType === 'Disarm traps') && (
+                    <>
+                      <tr>
+                        <td>{maneuverType} bonus (from player attribute)</td>
+                        <td>
+                          <input
+                            type="number"
+                            value={maneuverType === 'Lockpicking' ? (Number((attacker as any)?.lockPicking) || 0) : (Number((attacker as any)?.disarmTraps) || 0)}
+                            disabled
+                            aria-label={`${maneuverType} bonus (from player)`}
+                            style={{ width: 80, textAlign: 'right' }}
+                          />
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  {maneuverType === 'Influence' && (
+                    <>
+                      <tr>
+                        <td>Influence bonus (from player attribute)</td>
+                        <td>
+                          <input
+                            type="number"
+                            value={Number((attacker as any)?.influence) || 0}
+                            disabled
+                            aria-label="Influence bonus (from player)"
+                            style={{ width: 80, textAlign: 'right' }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Audience is loyal follower / fan of player (+50)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.loyalFollower}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), loyalFollower: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Audience is hired (+20)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.audienceHired}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), audienceHired: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  {(maneuverType === 'Object usage' || maneuverType === 'Runes') && (
+                    <>
+                      <tr>
+                        <td>Level (from player)</td>
+                        <td>
+                          <input type="number" value={Number((attacker as any)?.lvl) || 0} disabled aria-label="Level (from player)" style={{ width: 80, textAlign: 'right' }} />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>{maneuverType} bonus (from player attribute)</td>
+                        <td>
+                          <input
+                            type="number"
+                            value={maneuverType === 'Object usage' ? (Number((attacker as any)?.objectUsage) || 0) : (Number((attacker as any)?.runes) || 0)}
+                            disabled
+                            aria-label={`${maneuverType} bonus (from player)`}
+                            style={{ width: 80, textAlign: 'right' }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Magic type is different from mage's magic type (-30)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.magicTypeDifferent}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), magicTypeDifferent: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Known magic or ability (+20 / -10)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.knownMagicOrAbility}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), knownMagicOrAbility: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Player is capable to perform the same spell (+30)</td>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={!!cur.capableSameSpell}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setManeuverMods((prev) => ({
+                                ...prev,
+                                [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), capableSameSpell: v },
+                              }));
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  {(maneuverType === 'Stealth') && (
+                    <>
+                      <tr>
+                        <td>Stealth bonus (from player attribute)</td>
+                        <td>
+                          <input
+                            type="number"
+                            value={Number((attacker as any)?.stealth) || 0}
+                            disabled
+                            aria-label="Stealth bonus (from player)"
+                            style={{ width: 80, textAlign: 'right' }}
+                          />
+                        </td>
+                      </tr>
+                    </>
+                  )}
                   <tr>
-                    <td>{movementLabel('MM bonus (from player attribute)', Number(attacker?.mm) || 0)}</td>
-                    <td>
-                      <input type="number" value={Number(attacker?.mm) || 0} disabled aria-label="MM bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>{movementLabel('Special proficiency bonus', Number(mod.specialProficiencyBonus) || 0)}</td>
+                    <td>Special proficiency bonus</td>
                     <td>
                       <input
                         type="number"
-                        value={mod.specialProficiencyBonus}
+                        value={cur.specialProficiencyBonus}
                         onChange={(e) => {
                           const v = Math.floor(Number(e.target.value) || 0);
-                          setMod((m) => ({ ...m, specialProficiencyBonus: v }));
+                          setManeuverMods((prev) => ({ ...prev, [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), specialProficiencyBonus: v } }));
                         }}
                         style={{ width: 80, textAlign: 'right' }}
-                        disabled={movementDisabled}
                       />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>{movementLabel('Player stunned (auto)', -50)}</td>
-                    <td><input type="checkbox" checked={mod.playerStunned} disabled aria-label="Player stunned (auto)" /></td>
-                  </tr>
-                  <tr>
-                    <td>{movementLabel('Player knocked on the ground', -70)}</td>
-                    <td><input type="checkbox" checked={mod.playerKnockedOnGround} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerKnockedOnGround: e.target.checked }))} /></td>
-                  </tr>
-                  <tr>
-                    <td>{movementLabel('Any limb of the player is unusable', -30)}</td>
-                    <td><input type="checkbox" checked={mod.playerLimbUnusable} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerLimbUnusable: e.target.checked }))} /></td>
-                  </tr>
-                  <tr>
-                    <td>{movementLabel("Player's penalty (from Penalty)", -Math.abs(Number(attacker?.penaltyOfActions) || 0))}</td>
-                    <td>
-                      <input type="number" value={-Math.abs(Number(attacker?.penaltyOfActions) || 0)} disabled aria-label="Player's penalty (from Penalty)" style={{ width: 80, textAlign: 'right' }} />
                     </td>
                   </tr>
                   <tr>
@@ -678,13 +987,12 @@ export default function MM() {
                     <td>
                       <input
                         type="number"
-                        value={mod.modifierByGameMaster}
+                        value={cur.modifierByGameMaster}
                         onChange={(e) => {
                           const v = Math.floor(Number(e.target.value) || 0);
-                          setMod((m) => ({ ...m, modifierByGameMaster: v }));
+                          setManeuverMods((prev) => ({ ...prev, [maneuverType]: { ...(prev[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 }), modifierByGameMaster: v } }));
                         }}
                         style={{ width: 80, textAlign: 'right' }}
-                        disabled={movementDisabled}
                       />
                     </td>
                   </tr>
@@ -739,39 +1047,129 @@ export default function MM() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '0 0 180px', width: 180 }}>
                   <span className="result-label" style={{ width: '100%' }}>MODIFIERS</span>
                   {(() => {
-                    const a = attacker as Player | null;
-                    const mmBonus = Number(a?.mm) || 0;
-                    const specProf = Math.floor(Number(mod.specialProficiencyBonus) || 0);
-                    const stunned = mod.playerStunned ? -50 : 0;
-                    const knocked = mod.playerKnockedOnGround ? -70 : 0;
-                    const limb = mod.playerLimbUnusable ? -30 : 0;
-                    const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
-                    const gm = Math.floor(Number(mod.modifierByGameMaster) || 0);
-                    const items = [
-                      { label: 'MM bonus', val: mmBonus },
-                      { label: 'Special proficiency', val: specProf },
-                      { label: 'Player stunned', val: stunned },
-                      { label: 'Knocked on ground', val: knocked },
-                      { label: 'Limb unusable', val: limb },
-                      { label: "Player's penalty", val: playerPenalty },
-                      { label: 'GM modifier', val: gm },
-                    ];
-                    const modifiersTotal = mmBonus + specProf + stunned + knocked + limb + playerPenalty + gm;
-                    return (
-                      <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
-                        {items.map((p) => (
-                          <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
-                            <span style={{ color: '#555' }}>{p.label}</span>
-                            <strong style={{ color: '#555', fontWeight: 700 }}>{p.val}</strong>
+                    if (mmType === 'Movement') {
+                      const a = attacker as Player | null;
+                      const mmBonus = Number(a?.mm) || 0;
+                      const specProf = Math.floor(Number(mod.specialProficiencyBonus) || 0);
+                      const stealthBonus = maneuverType === 'Stealth' ? (Number((attacker as any)?.stealth) || 0) : 0;
+                      const stunned = mod.playerStunned ? -50 : 0;
+                      const knocked = mod.playerKnockedOnGround ? -70 : 0;
+                      const limb = mod.playerLimbUnusable ? -30 : 0;
+                      const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+                      const gm = Math.floor(Number(mod.modifierByGameMaster) || 0);
+                      const items = [
+                        { label: 'MM bonus', val: mmBonus },
+                        ...(maneuverType === 'Stealth' ? [{ label: 'Stealth bonus', val: stealthBonus }] : []),
+                        { label: 'Special proficiency', val: specProf },
+                        { label: 'Player stunned', val: stunned },
+                        { label: 'Knocked on ground', val: knocked },
+                        { label: 'Limb unusable', val: limb },
+                        { label: "Player's penalty", val: playerPenalty },
+                        { label: 'GM modifier', val: gm },
+                      ];
+                      const modifiersTotal = mmBonus + stealthBonus + specProf + stunned + knocked + limb + playerPenalty + gm;
+                      return (
+                        <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
+                          {items.map((p) => (
+                            <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                              <span style={{ color: '#555' }}>{p.label}</span>
+                              <strong style={{ color: '#555', fontWeight: 700 }}>{p.val}</strong>
+                            </div>
+                          ))}
+                          <div style={{ height: 1, background: '#555', margin: '2px 0' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                            <span style={{ fontWeight: 700, color: '#555' }}>Modifiers total</span>
+                            <span style={{ fontWeight: 900, color: '#555' }}>{modifiersTotal}</span>
                           </div>
-                        ))}
-                        <div style={{ height: 1, background: '#555', margin: '2px 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
-                          <span style={{ fontWeight: 700, color: '#555' }}>Modifiers total</span>
-                          <span style={{ fontWeight: 900, color: '#555' }}>{modifiersTotal}</span>
                         </div>
-                      </div>
-                    );
+                      );
+                    } else {
+                      const cur = maneuverMods[maneuverType] ?? { specialProficiencyBonus: 0, modifierByGameMaster: 0 };
+                      const includeDifficulty = !(maneuverType === 'Object usage' || maneuverType === 'Runes');
+                      const diff = includeDifficulty ? getDifficultyBonus(difficulty) : 0;
+                      const specProf = Math.floor(Number(cur.specialProficiencyBonus) || 0);
+                      const gm = Math.floor(Number(cur.modifierByGameMaster) || 0);
+                      let items: { label: string; val: number }[] = [
+                        ...(includeDifficulty ? [{ label: 'Difficulty', val: diff } as const] : []),
+                        { label: 'Special proficiency', val: specProf },
+                        { label: 'GM modifier', val: gm },
+                      ];
+                      let modifiersTotal = (includeDifficulty ? diff : 0) + specProf + gm;
+                      if (maneuverType === 'Perception' || maneuverType === 'Tracking') {
+                        const attrVal = maneuverType === 'Perception' ? (Number((attacker as any)?.perception) || 0) : (Number((attacker as any)?.tracking) || 0);
+                        const looking = !!cur.lookingForSpecificInfo;
+                        items = [
+                          ...(includeDifficulty ? [{ label: 'Difficulty', val: diff } as const] : []),
+                          { label: `${maneuverType} bonus`, val: attrVal },
+                          { label: 'Looking for specific info', val: looking ? 20 : 0 },
+                          { label: 'Special proficiency', val: specProf },
+                          { label: 'GM modifier', val: gm },
+                        ];
+                        modifiersTotal = (includeDifficulty ? diff : 0) + attrVal + (looking ? 20 : 0) + specProf + gm;
+                      } else if (maneuverType === 'Lockpicking' || maneuverType === 'Disarm traps') {
+                        const attrVal = maneuverType === 'Lockpicking' ? (Number((attacker as any)?.lockPicking) || 0) : (Number((attacker as any)?.disarmTraps) || 0);
+                        items = [
+                          ...(includeDifficulty ? [{ label: 'Difficulty', val: diff } as const] : []),
+                          { label: `${maneuverType} bonus`, val: attrVal },
+                          { label: 'Special proficiency', val: specProf },
+                          { label: 'GM modifier', val: gm },
+                        ];
+                        modifiersTotal = (includeDifficulty ? diff : 0) + attrVal + specProf + gm;
+                      } else if (maneuverType === 'Stealth') {
+                        const attrVal = Number((attacker as any)?.stealth) || 0;
+                        items = [
+                          ...(includeDifficulty ? [{ label: 'Difficulty', val: diff } as const] : []),
+                          { label: 'Stealth bonus', val: attrVal },
+                          { label: 'Special proficiency', val: specProf },
+                          { label: 'GM modifier', val: gm },
+                        ];
+                        modifiersTotal = (includeDifficulty ? diff : 0) + attrVal + specProf + gm;
+                      } else if (maneuverType === 'Influence') {
+                        const attrVal = Number((attacker as any)?.influence) || 0;
+                        const loyal = !!cur.loyalFollower ? 50 : 0;
+                        const hired = !!cur.audienceHired ? 20 : 0;
+                        items = [
+                          ...(includeDifficulty ? [{ label: 'Difficulty', val: diff } as const] : []),
+                          { label: 'Influence bonus', val: attrVal },
+                          { label: 'Audience loyal/fan', val: loyal },
+                          { label: 'Audience hired', val: hired },
+                          { label: 'Special proficiency', val: specProf },
+                          { label: 'GM modifier', val: gm },
+                        ];
+                        modifiersTotal = (includeDifficulty ? diff : 0) + attrVal + loyal + hired + specProf + gm;
+                      } else if (maneuverType === 'Object usage' || maneuverType === 'Runes') {
+                        const lvl = Number((attacker as any)?.lvl) || 0;
+                        const attrVal = maneuverType === 'Object usage' ? (Number((attacker as any)?.objectUsage) || 0) : (Number((attacker as any)?.runes) || 0);
+                        const magicTypeDiff = !!cur.magicTypeDifferent ? -30 : 0;
+                        const known = !!cur.knownMagicOrAbility ? 20 : -10;
+                        const sameSpell = !!cur.capableSameSpell ? 30 : 0;
+                        items = [
+                          { label: 'Level', val: lvl },
+                          { label: `${maneuverType} bonus`, val: attrVal },
+                          { label: "Magic type different", val: magicTypeDiff },
+                          { label: 'Known magic/ability', val: known },
+                          { label: 'Capable same spell', val: sameSpell },
+                          { label: 'Special proficiency', val: specProf },
+                          { label: 'GM modifier', val: gm },
+                        ];
+                        modifiersTotal = lvl + attrVal + magicTypeDiff + known + sameSpell + specProf + gm;
+                      }
+                      return (
+                        <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
+                          {items.map((p) => (
+                            <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                              <span style={{ color: '#555' }}>{p.label}</span>
+                              <strong style={{ color: '#555', fontWeight: 700 }}>{p.val}</strong>
+                            </div>
+                          ))}
+                          <div style={{ height: 1, background: '#555', margin: '2px 0' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                            <span style={{ fontWeight: 700, color: '#555' }}>Modifiers total</span>
+                            <span style={{ fontWeight: 900, color: '#555' }}>{modifiersTotal}</span>
+                          </div>
+                        </div>
+                      );
+                    }
                   })()}
                 </div>
               </div>
