@@ -27,14 +27,10 @@ export default function MM() {
 
   // Melee modifiers (copied/adapted from AdventureFightRound)
   const [mod, setMod] = useState({
-    attackFromWeakSide: false,
-    attackFromBehind: false,
-    defenderSurprised: false,
-    defenderStunned: false,
-    attackerWeaponChange: false,
-    attackerTargetChange: false,
-    attackerHPBelow50Percent: false,
-    attackerMoreThan3MetersMovement: false,
+    playerStunned: false,
+    playerKnockedOnGround: false,
+    playerLimbUnusable: false,
+    specialProficiencyBonus: 0,
     modifierByGameMaster: 0,
   });
 
@@ -271,63 +267,73 @@ export default function MM() {
     setManeuverType(mmType === 'Movement' ? 'Movement' : 'Other');
   }, [mmType]);
 
+  function resetAllUI() {
+    try {
+      setReadyToRoll(false);
+      setRolling(false);
+      setTensFace(0);
+      setOnesFace(0);
+      setOpenSign(0);
+      setOpenTotal(null);
+      setLastRoll(null);
+      setMmType('Movement');
+      setManeuverType('Movement');
+      setDifficulty('Average');
+      setDefenderToken('none');
+      setMod((m) => ({
+        ...m,
+        playerKnockedOnGround: false,
+        playerLimbUnusable: false,
+        specialProficiencyBonus: 0,
+        modifierByGameMaster: 0,
+      }));
+    } catch {}
+  }
+
   // Auto-computed melee flags
   const autoDefenderStunned = !!defender?.isStunned;
   const autoAttackerHPBelow50 = !!attacker && Number(attacker.hpActual) < Number(attacker.hpMax) * 0.5;
+  const autoPlayerStunned = !!attacker?.isStunned;
 
   // Keep auto fields synchronized
   useEffect(() => {
     setMod((m) => ({
       ...m,
-      defenderStunned: autoDefenderStunned,
-      attackerHPBelow50Percent: autoAttackerHPBelow50,
+      playerStunned: autoPlayerStunned,
     }));
-  }, [autoDefenderStunned, autoAttackerHPBelow50]);
+  }, [autoPlayerStunned]);
 
   // Reset manual melee modifiers when attacker changes
   useEffect(() => {
     setMod((m) => ({
       ...m,
-      attackFromWeakSide: false,
-      attackFromBehind: false,
-      defenderSurprised: false,
-      attackerWeaponChange: false,
-      attackerTargetChange: false,
-      attackerMoreThan3MetersMovement: false,
+      playerKnockedOnGround: false,
+      playerLimbUnusable: false,
+      specialProficiencyBonus: 0,
       modifierByGameMaster: 0,
     }));
   }, [attacker?.id]);
 
-  function meleeLabel(base: string, active: boolean, amt: number): string {
+  function movementLabel(base: string, amt: number): string {
     const sign = amt > 0 ? '+' : '';
     return `${base} (${sign}${amt})`;
   }
 
-  // Compute modified total (melee only)
+  // Compute modified total (movement modifiers only)
   function computeLocalModifiedTotal(): number | undefined {
     if (openTotal == null) return undefined;
     const a = attacker as Player | null;
-    const d = defender as Player | null;
-    const attackerTb = a ? (computeTb({ ...(a as any), attackType: attackerAttack } as Player) || 0) : 0;
-    const cAttackerTBForDefense = -Math.abs(Number(a?.tbUsedForDefense) || 0);
-    const cAttackerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
-    const cDefenderVB = -Math.abs(Number(d?.vb) || 0);
-    const cDefenderTBForDefense = -Math.abs(Number(d?.tbUsedForDefense) || 0);
-    const cDefenderShield = d?.shield ? -25 : 0;
-    const cDefenderPenalty = Math.abs(Number(d?.penaltyOfActions) || 0);
-
-    let meleeSum = 0;
-    if (mod.attackFromWeakSide) meleeSum += 15;
-    if (mod.attackFromBehind) meleeSum += 20;
-    if (mod.defenderSurprised) meleeSum += 20;
-    if (autoDefenderStunned) meleeSum += 20;
-    if (mod.attackerWeaponChange) meleeSum -= 30;
-    if (autoAttackerHPBelow50) meleeSum -= 20;
-    if (mod.attackerMoreThan3MetersMovement) meleeSum -= 10;
-    meleeSum += Number(mod.modifierByGameMaster) || 0;
-
-    const modifiersTotal = attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + meleeSum;
-    return openTotal + modifiersTotal;
+    const mmBonus = Number(a?.mm) || 0;
+    const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+    let sum = 0;
+    sum += mmBonus; // MM bonus from player attribute
+    sum += Math.floor(Number(mod.specialProficiencyBonus) || 0);
+    if (mod.playerStunned) sum += -50;
+    if (mod.playerKnockedOnGround) sum += -70;
+    if (mod.playerLimbUnusable) sum += -30;
+    sum += playerPenalty; // Player's penalty
+    sum += Math.floor(Number(mod.modifierByGameMaster) || 0); // GM modifier
+    return openTotal + sum;
   }
 
   async function handleRoll() {
@@ -418,7 +424,7 @@ export default function MM() {
           type="button"
           onClick={() => {
             try {
-              window.location.reload();
+              resetAllUI();
             } catch {}
           }}
           style={{ padding: '6px 12px', background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}
@@ -452,7 +458,7 @@ export default function MM() {
         <table className="table">
           <thead>
             <tr>
-              <th rowSpan={2}>Target of Attack</th>
+              <th rowSpan={2}>Player</th>
               <th rowSpan={2}>ID</th>
               <th rowSpan={2}>Name</th>
               <th rowSpan={2}>Gender</th>
@@ -612,11 +618,10 @@ export default function MM() {
       {/* Modifiers + Dice panel row */}
       <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
         {(() => {
-          const meleeActive = (attacker?.playerActivity as string | undefined) === '_3PhisicalAttackOrMovement';
-          const meleeDisabled = !meleeActive;
+          const movementDisabled = false;
           return (
-            <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginBottom: 8, opacity: meleeDisabled ? 0.6 : 1 }} title={meleeDisabled ? 'Inactive: only for Attack or Movement' : undefined}>
-              <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Melee Modifiers</h2>
+            <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginBottom: 8 }}>
+              <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Movement Modifiers</h2>
               <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
                 <colgroup>
                   <col style={{ width: '75%' }} />
@@ -624,42 +629,49 @@ export default function MM() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Melee Modifier</th>
+                    <th>Movement Modifier</th>
                     <th>Value</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{meleeLabel('Attack from weak side', mod.attackFromWeakSide, 15)}</td>
-                    <td><input type="checkbox" checked={mod.attackFromWeakSide} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromWeakSide: e.target.checked }))} /></td>
+                    <td>{movementLabel('MM bonus (from player attribute)', Number(attacker?.mm) || 0)}</td>
+                    <td>
+                      <input type="number" value={Number(attacker?.mm) || 0} disabled aria-label="MM bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
+                    </td>
                   </tr>
                   <tr>
-                    <td>{meleeLabel('Attack from behind', mod.attackFromBehind, 20)}</td>
-                    <td><input type="checkbox" checked={mod.attackFromBehind} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromBehind: e.target.checked }))} /></td>
+                    <td>{movementLabel('Special proficiency bonus', Number(mod.specialProficiencyBonus) || 0)}</td>
+                    <td>
+                      <input
+                        type="number"
+                        value={mod.specialProficiencyBonus}
+                        onChange={(e) => {
+                          const v = Math.floor(Number(e.target.value) || 0);
+                          setMod((m) => ({ ...m, specialProficiencyBonus: v }));
+                        }}
+                        style={{ width: 80, textAlign: 'right' }}
+                        disabled={movementDisabled}
+                      />
+                    </td>
                   </tr>
                   <tr>
-                    <td>{meleeLabel('Defender surprised', mod.defenderSurprised, 20)}</td>
-                    <td><input type="checkbox" checked={mod.defenderSurprised} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, defenderSurprised: e.target.checked }))} /></td>
+                    <td>{movementLabel('Player stunned (auto)', -50)}</td>
+                    <td><input type="checkbox" checked={mod.playerStunned} disabled aria-label="Player stunned (auto)" /></td>
                   </tr>
                   <tr>
-                    <td>{meleeLabel('Defender stunned', mod.defenderStunned, 20)}</td>
-                    <td><input type="checkbox" checked={mod.defenderStunned} disabled aria-label="Defender stunned (auto)" /></td>
+                    <td>{movementLabel('Player knocked on the ground', -70)}</td>
+                    <td><input type="checkbox" checked={mod.playerKnockedOnGround} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerKnockedOnGround: e.target.checked }))} /></td>
                   </tr>
                   <tr>
-                    <td>{meleeLabel('Attacker weapon change', mod.attackerWeaponChange, -30)}</td>
-                    <td><input type="checkbox" checked={mod.attackerWeaponChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerWeaponChange: e.target.checked }))} /></td>
+                    <td>{movementLabel('Any limb of the player is unusable', -30)}</td>
+                    <td><input type="checkbox" checked={mod.playerLimbUnusable} disabled={movementDisabled} onChange={(e) => setMod((m) => ({ ...m, playerLimbUnusable: e.target.checked }))} /></td>
                   </tr>
                   <tr>
-                    <td>{meleeLabel('Attacker target change', mod.attackerTargetChange, -30)}</td>
-                    <td><input type="checkbox" checked={mod.attackerTargetChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerTargetChange: e.target.checked }))} /></td>
-                  </tr>
-                  <tr>
-                    <td>{meleeLabel('Attacker HP below 50%', mod.attackerHPBelow50Percent, -20)}</td>
-                    <td><input type="checkbox" checked={mod.attackerHPBelow50Percent} disabled aria-label="Attacker HP below 50% (auto)" /></td>
-                  </tr>
-                  <tr>
-                    <td>{meleeLabel('Attacker moved > 3m', mod.attackerMoreThan3MetersMovement, -10)}</td>
-                    <td><input type="checkbox" checked={mod.attackerMoreThan3MetersMovement} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerMoreThan3MetersMovement: e.target.checked }))} /></td>
+                    <td>{movementLabel("Player's penalty (from Penalty)", -Math.abs(Number(attacker?.penaltyOfActions) || 0))}</td>
+                    <td>
+                      <input type="number" value={-Math.abs(Number(attacker?.penaltyOfActions) || 0)} disabled aria-label="Player's penalty (from Penalty)" style={{ width: 80, textAlign: 'right' }} />
+                    </td>
                   </tr>
                   <tr>
                     <td>GM modifier</td>
@@ -672,7 +684,7 @@ export default function MM() {
                           setMod((m) => ({ ...m, modifierByGameMaster: v }));
                         }}
                         style={{ width: 80, textAlign: 'right' }}
-                        disabled={meleeDisabled}
+                        disabled={movementDisabled}
                       />
                     </td>
                   </tr>
@@ -728,34 +740,23 @@ export default function MM() {
                   <span className="result-label" style={{ width: '100%' }}>MODIFIERS</span>
                   {(() => {
                     const a = attacker as Player | null;
-                    const d = defender as Player | null;
-                    const attackerTb = a ? (computeTb({ ...(a as any), attackType: attackerAttack } as Player) || 0) : 0;
-                    const cAttackerTBForDefense = -Math.abs(Number(a?.tbUsedForDefense) || 0);
-                    const cAttackerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
-                    const cDefenderVB = -Math.abs(Number(d?.vb) || 0);
-                    const cDefenderTBForDefense = -Math.abs(Number(d?.tbUsedForDefense) || 0);
-                    const cDefenderShield = d?.shield ? -25 : 0;
-                    const cDefenderPenalty = Math.abs(Number(d?.penaltyOfActions) || 0);
-                    let meleeSum = 0;
-                    if (mod.attackFromWeakSide) meleeSum += 15;
-                    if (mod.attackFromBehind) meleeSum += 20;
-                    if (mod.defenderSurprised) meleeSum += 20;
-                    if (autoDefenderStunned) meleeSum += 20;
-                    if (mod.attackerWeaponChange) meleeSum -= 30;
-                    if (autoAttackerHPBelow50) meleeSum -= 20;
-                    if (mod.attackerMoreThan3MetersMovement) meleeSum -= 10;
-                    meleeSum += Number(mod.modifierByGameMaster) || 0;
+                    const mmBonus = Number(a?.mm) || 0;
+                    const specProf = Math.floor(Number(mod.specialProficiencyBonus) || 0);
+                    const stunned = mod.playerStunned ? -50 : 0;
+                    const knocked = mod.playerKnockedOnGround ? -70 : 0;
+                    const limb = mod.playerLimbUnusable ? -30 : 0;
+                    const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+                    const gm = Math.floor(Number(mod.modifierByGameMaster) || 0);
                     const items = [
-                      { label: 'Attacker TB', val: attackerTb },
-                      { label: 'Attacker TB for defense', val: cAttackerTBForDefense },
-                      { label: 'Attacker penalty', val: cAttackerPenalty },
-                      { label: 'Defender VB', val: cDefenderVB },
-                      { label: 'Defender TB for defense', val: cDefenderTBForDefense },
-                      { label: 'Defender shield', val: cDefenderShield },
-                      { label: 'Defender penalty', val: cDefenderPenalty },
-                      { label: 'Melee modifiers', val: meleeSum },
+                      { label: 'MM bonus', val: mmBonus },
+                      { label: 'Special proficiency', val: specProf },
+                      { label: 'Player stunned', val: stunned },
+                      { label: 'Knocked on ground', val: knocked },
+                      { label: 'Limb unusable', val: limb },
+                      { label: "Player's penalty", val: playerPenalty },
+                      { label: 'GM modifier', val: gm },
                     ];
-                    const modifiersTotal = attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + meleeSum;
+                    const modifiersTotal = mmBonus + specProf + stunned + knocked + limb + playerPenalty + gm;
                     return (
                       <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
                         {items.map((p) => (
