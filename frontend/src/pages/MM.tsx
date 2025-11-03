@@ -25,6 +25,28 @@ export default function MM() {
   const [maneuverType, setManeuverType] = useState<string>('Movement');
   const [difficulty, setDifficulty] = useState<string>('Average');
 
+  // Melee modifiers (copied/adapted from AdventureFightRound)
+  const [mod, setMod] = useState({
+    attackFromWeakSide: false,
+    attackFromBehind: false,
+    defenderSurprised: false,
+    defenderStunned: false,
+    attackerWeaponChange: false,
+    attackerTargetChange: false,
+    attackerHPBelow50Percent: false,
+    attackerMoreThan3MetersMovement: false,
+    modifierByGameMaster: 0,
+  });
+
+  // Dice roll state (like AdventureFightRound)
+  const [rolling, setRolling] = useState(false);
+  const [tensFace, setTensFace] = useState<number>(0);
+  const [onesFace, setOnesFace] = useState<number>(0);
+  const [openSign, setOpenSign] = useState<0 | 1 | -1>(0);
+  const [openTotal, setOpenTotal] = useState<number | null>(null);
+  const [lastRoll, setLastRoll] = useState<number | null>(null);
+  const [readyToRoll, setReadyToRoll] = useState(false);
+
   useEffect(() => {
     document.title = 'MM';
   }, []);
@@ -249,6 +271,107 @@ export default function MM() {
     setManeuverType(mmType === 'Movement' ? 'Movement' : 'Other');
   }, [mmType]);
 
+  // Auto-computed melee flags
+  const autoDefenderStunned = !!defender?.isStunned;
+  const autoAttackerHPBelow50 = !!attacker && Number(attacker.hpActual) < Number(attacker.hpMax) * 0.5;
+
+  // Keep auto fields synchronized
+  useEffect(() => {
+    setMod((m) => ({
+      ...m,
+      defenderStunned: autoDefenderStunned,
+      attackerHPBelow50Percent: autoAttackerHPBelow50,
+    }));
+  }, [autoDefenderStunned, autoAttackerHPBelow50]);
+
+  // Reset manual melee modifiers when attacker changes
+  useEffect(() => {
+    setMod((m) => ({
+      ...m,
+      attackFromWeakSide: false,
+      attackFromBehind: false,
+      defenderSurprised: false,
+      attackerWeaponChange: false,
+      attackerTargetChange: false,
+      attackerMoreThan3MetersMovement: false,
+      modifierByGameMaster: 0,
+    }));
+  }, [attacker?.id]);
+
+  function meleeLabel(base: string, active: boolean, amt: number): string {
+    const sign = amt > 0 ? '+' : '';
+    return `${base} (${sign}${amt})`;
+  }
+
+  // Compute modified total (melee only)
+  function computeLocalModifiedTotal(): number | undefined {
+    if (openTotal == null) return undefined;
+    const a = attacker as Player | null;
+    const d = defender as Player | null;
+    const attackerTb = a ? (computeTb({ ...(a as any), attackType: attackerAttack } as Player) || 0) : 0;
+    const cAttackerTBForDefense = -Math.abs(Number(a?.tbUsedForDefense) || 0);
+    const cAttackerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+    const cDefenderVB = -Math.abs(Number(d?.vb) || 0);
+    const cDefenderTBForDefense = -Math.abs(Number(d?.tbUsedForDefense) || 0);
+    const cDefenderShield = d?.shield ? -25 : 0;
+    const cDefenderPenalty = Math.abs(Number(d?.penaltyOfActions) || 0);
+
+    let meleeSum = 0;
+    if (mod.attackFromWeakSide) meleeSum += 15;
+    if (mod.attackFromBehind) meleeSum += 20;
+    if (mod.defenderSurprised) meleeSum += 20;
+    if (autoDefenderStunned) meleeSum += 20;
+    if (mod.attackerWeaponChange) meleeSum -= 30;
+    if (autoAttackerHPBelow50) meleeSum -= 20;
+    if (mod.attackerMoreThan3MetersMovement) meleeSum -= 10;
+    meleeSum += Number(mod.modifierByGameMaster) || 0;
+
+    const modifiersTotal = attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + meleeSum;
+    return openTotal + modifiersTotal;
+  }
+
+  async function handleRoll() {
+    if (rolling) return;
+    setRolling(true);
+    const id = window.setInterval(() => {
+      setTensFace((p) => (p + 1) % 10);
+      setOnesFace((p) => (p + 1) % 10);
+    }, 50);
+    try {
+      const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
+        if (!r.ok) throw new Error('Dice roll failed');
+        return r.json();
+      }) as Promise<number>;
+      const waitPromise = new Promise<void>((res) => setTimeout(res, 1200));
+      const [rolled] = await Promise.all([fetchPromise, waitPromise]);
+      const value = typeof rolled === 'number' ? rolled : 1;
+      const tens = value === 100 ? 0 : Math.floor(value / 10);
+      const ones = value === 100 ? 0 : value % 10;
+      setTensFace(tens);
+      setOnesFace(ones);
+      setLastRoll(value);
+
+      if (openSign === 0 || openTotal == null) {
+        if (value >= 96) { setOpenSign(1); setOpenTotal(value); }
+        else if (value <= 4) { setOpenSign(-1); setOpenTotal(value); }
+        else { setOpenSign(0); setOpenTotal(value); }
+      } else {
+        setOpenTotal((prev) => {
+          const base = prev == null ? 0 : prev;
+          if (openSign === 1) return base + value;
+          if (openSign === -1) return base - value;
+          return base;
+        });
+        if (openSign === 1 && value < 96) setOpenSign(0);
+        if (openSign === -1 && value > 4) setOpenSign(0);
+      }
+    } catch {}
+    finally {
+      window.clearInterval(id);
+      setRolling(false);
+    }
+  }
+
   // Width helpers for selects
   function maxLen(arr: string[]): number { return arr.reduce((m, s) => Math.max(m, (s || '').length), 0); }
   const idWidthCh = (() => {
@@ -309,6 +432,19 @@ export default function MM() {
           .table th, .table td { border: 1px solid #ddd; padding: 6px 8px; text-align: center; vertical-align: middle; }
           .table thead th { position: sticky; top: 0; background: #2f5597; color: #ffffff; z-index: 1; }
           .right { text-align: right; }
+          .mods-table th, .mods-table td { padding: 4px 6px !important; font-size: 12px; }
+          .dice-wrap { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 10px 0 18px; }
+          .die { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 24px; color: #fff; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.25); user-select: none; }
+          .die.tens { background: #e95f3dff; }
+          .die.ones { background: #a8e733ff; }
+          .die.rolling { animation: dice-bounce 300ms infinite alternate ease-in-out; }
+          @keyframes dice-bounce { from { transform: translateY(0) rotate(0deg); } to { transform: translateY(-4px) rotate(6deg); } }
+          .result { font-weight: 800; font-size: 22px; }
+          .result-box { display: inline-flex; align-items: center; justify-content: center; width: 120px; height: 120px; border: 1px solid #ddd; border-radius: 8px; background: #f9fafb; padding: 0; }
+          .result-box.orange { background: #fed7aa; border-color: #e67e22; }
+          .result-label { display: block; width: 120px; text-align: center; font-size: 14px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .4px; line-height: 1; align-self: center; white-space: nowrap; }
+          .result-value { font-size: 48px; font-weight: 900; color: #111; line-height: 1; }
+          .result-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 120px; }
         `}
       </style>
 
@@ -472,6 +608,178 @@ export default function MM() {
           </tbody>
         </table>
       </div>
+
+      {/* Modifiers + Dice panel row */}
+      <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
+        {(() => {
+          const meleeActive = (attacker?.playerActivity as string | undefined) === '_3PhisicalAttackOrMovement';
+          const meleeDisabled = !meleeActive;
+          return (
+            <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginBottom: 8, opacity: meleeDisabled ? 0.6 : 1 }} title={meleeDisabled ? 'Inactive: only for Attack or Movement' : undefined}>
+              <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Melee Modifiers</h2>
+              <table className="table mods-table" style={{ width: 700, tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '75%' }} />
+                  <col style={{ width: '25%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Melee Modifier</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{meleeLabel('Attack from weak side', mod.attackFromWeakSide, 15)}</td>
+                    <td><input type="checkbox" checked={mod.attackFromWeakSide} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromWeakSide: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Attack from behind', mod.attackFromBehind, 20)}</td>
+                    <td><input type="checkbox" checked={mod.attackFromBehind} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromBehind: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Defender surprised', mod.defenderSurprised, 20)}</td>
+                    <td><input type="checkbox" checked={mod.defenderSurprised} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, defenderSurprised: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Defender stunned', mod.defenderStunned, 20)}</td>
+                    <td><input type="checkbox" checked={mod.defenderStunned} disabled aria-label="Defender stunned (auto)" /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Attacker weapon change', mod.attackerWeaponChange, -30)}</td>
+                    <td><input type="checkbox" checked={mod.attackerWeaponChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerWeaponChange: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Attacker target change', mod.attackerTargetChange, -30)}</td>
+                    <td><input type="checkbox" checked={mod.attackerTargetChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerTargetChange: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Attacker HP below 50%', mod.attackerHPBelow50Percent, -20)}</td>
+                    <td><input type="checkbox" checked={mod.attackerHPBelow50Percent} disabled aria-label="Attacker HP below 50% (auto)" /></td>
+                  </tr>
+                  <tr>
+                    <td>{meleeLabel('Attacker moved > 3m', mod.attackerMoreThan3MetersMovement, -10)}</td>
+                    <td><input type="checkbox" checked={mod.attackerMoreThan3MetersMovement} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerMoreThan3MetersMovement: e.target.checked }))} /></td>
+                  </tr>
+                  <tr>
+                    <td>GM modifier</td>
+                    <td>
+                      <input
+                        type="number"
+                        value={mod.modifierByGameMaster}
+                        onChange={(e) => {
+                          const v = Math.floor(Number(e.target.value) || 0);
+                          setMod((m) => ({ ...m, modifierByGameMaster: v }));
+                        }}
+                        style={{ width: 80, textAlign: 'right' }}
+                        disabled={meleeDisabled}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+
+        {(() => {
+          const openStarted = openTotal != null && openSign !== 0;
+          const firstOpenAwaitingReroll = openStarted && (lastRoll == null || lastRoll === openTotal);
+          const canRollNow = openTotal == null ? true : openSign === 0 ? false : (firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96));
+          const disabled = rolling || !canRollNow;
+          const showGate = !readyToRoll && openTotal == null;
+          const usedTotal = computeLocalModifiedTotal();
+          return (
+            <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 500px', width: 500, minWidth: 500, maxWidth: 500, marginTop: 30, marginBottom: 4, padding: 10, border: '1px solid #ddd', borderRadius: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginBottom: 8 }}>
+                {showGate ? (
+                  <button
+                    type="button"
+                    onClick={() => setReadyToRoll(true)}
+                    style={{ background: '#f4a261', color: '#000', width: 75, height: 75, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}
+                  >
+                    All modifiers set
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRoll}
+                    disabled={disabled}
+                    style={{ background: disabled ? '#888' : '#0a7d2f', color: '#ffffff', width: 75, height: 75, borderRadius: 10, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12, letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}
+                  >
+                    ROLL
+                  </button>
+                )}
+              </div>
+              <div className="dice-wrap">
+                <div className={`die tens${rolling ? ' rolling' : ''}`} aria-label="tens-die">{tensFace}</div>
+                <div className={`die ones${rolling ? ' rolling' : ''}`} aria-label="ones-die">{onesFace}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <span className="result-label">OPEN ROLL</span>
+                  <div className="result-box"><span className="result-value">{openTotal != null ? openTotal : ''}</span></div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                  <span className="result-label">MODIFIED ROLL</span>
+                  <div className="result-box orange"><span className="result-value">{openTotal != null ? (usedTotal ?? '') : ''}</span></div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '0 0 180px', width: 180 }}>
+                  <span className="result-label" style={{ width: '100%' }}>MODIFIERS</span>
+                  {(() => {
+                    const a = attacker as Player | null;
+                    const d = defender as Player | null;
+                    const attackerTb = a ? (computeTb({ ...(a as any), attackType: attackerAttack } as Player) || 0) : 0;
+                    const cAttackerTBForDefense = -Math.abs(Number(a?.tbUsedForDefense) || 0);
+                    const cAttackerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
+                    const cDefenderVB = -Math.abs(Number(d?.vb) || 0);
+                    const cDefenderTBForDefense = -Math.abs(Number(d?.tbUsedForDefense) || 0);
+                    const cDefenderShield = d?.shield ? -25 : 0;
+                    const cDefenderPenalty = Math.abs(Number(d?.penaltyOfActions) || 0);
+                    let meleeSum = 0;
+                    if (mod.attackFromWeakSide) meleeSum += 15;
+                    if (mod.attackFromBehind) meleeSum += 20;
+                    if (mod.defenderSurprised) meleeSum += 20;
+                    if (autoDefenderStunned) meleeSum += 20;
+                    if (mod.attackerWeaponChange) meleeSum -= 30;
+                    if (autoAttackerHPBelow50) meleeSum -= 20;
+                    if (mod.attackerMoreThan3MetersMovement) meleeSum -= 10;
+                    meleeSum += Number(mod.modifierByGameMaster) || 0;
+                    const items = [
+                      { label: 'Attacker TB', val: attackerTb },
+                      { label: 'Attacker TB for defense', val: cAttackerTBForDefense },
+                      { label: 'Attacker penalty', val: cAttackerPenalty },
+                      { label: 'Defender VB', val: cDefenderVB },
+                      { label: 'Defender TB for defense', val: cDefenderTBForDefense },
+                      { label: 'Defender shield', val: cDefenderShield },
+                      { label: 'Defender penalty', val: cDefenderPenalty },
+                      { label: 'Melee modifiers', val: meleeSum },
+                    ];
+                    const modifiersTotal = attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + meleeSum;
+                    return (
+                      <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
+                        {items.map((p) => (
+                          <div key={p.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                            <span style={{ color: '#555' }}>{p.label}</span>
+                            <strong style={{ color: '#555', fontWeight: 700 }}>{p.val}</strong>
+                          </div>
+                        ))}
+                        <div style={{ height: 1, background: '#555', margin: '2px 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.1 }}>
+                          <span style={{ fontWeight: 700, color: '#555' }}>Modifiers total</span>
+                          <span style={{ fontWeight: 900, color: '#555' }}>{modifiersTotal}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              
+            </div>
+          );
+        })()}
+      </div>
     </div>
+    
   );
 }
