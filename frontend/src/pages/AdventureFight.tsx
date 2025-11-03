@@ -14,39 +14,37 @@ export default function AdventureFight() {
   const [roundCount, setRoundCount] = useState<number>(0);
   const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    setDropdownOpen(openTargetRowId != null);
+  }, [openTargetRowId]);
 
   useEffect(() => {
     document.title = 'Fight';
-  }, []);
+  }, [dropdownOpen]);
 
   // Refresh helpers to reflect updates coming from other pages (e.g., SingleAttack)
   useEffect(() => {
-    let clickTimer: number | null = null;
     async function refreshOrdered() {
+      if (dropdownOpen) return; // pause refresh while user interacts with dropdowns
       try {
         const res = await fetch('http://localhost:8081/api/players/ordered');
         if (!res.ok) return;
         const data = (await res.json()) as Player[];
-        setRows(Array.isArray(data) ? data.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
+        if (!dropdownOpen) setRows(Array.isArray(data) ? data.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
       } catch {}
     }
-    function onFocus() { refreshOrdered(); }
-    function onClick() {
-      if (clickTimer) window.clearTimeout(clickTimer);
-      clickTimer = window.setTimeout(() => refreshOrdered(), 150);
-    }
+    function onFocus() { if (!dropdownOpen) refreshOrdered(); }
     async function onStorage(e: StorageEvent) {
       if (!e.key) return;
-      if (e.key === 'merp:adventureRefresh') refreshOrdered();
+      if (e.key === 'merp:adventureRefresh' && !dropdownOpen) refreshOrdered();
     }
     window.addEventListener('focus', onFocus);
-    window.addEventListener('click', onClick);
     window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener('focus', onFocus);
-      window.removeEventListener('click', onClick);
       window.removeEventListener('storage', onStorage);
-      if (clickTimer) window.clearTimeout(clickTimer);
     };
   }, []);
 
@@ -452,27 +450,7 @@ export default function AdventureFight() {
     });
   }
 
-  useEffect(() => {
-    function persistOnUnload() {
-      try {
-        const payload = normalizeRows(rows);
-        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        // Best-effort save during navigation/unload
-        if ((navigator as any).sendBeacon) {
-          (navigator as any).sendBeacon('http://localhost:8081/api/players/bulk-update', blob);
-        } else {
-          fetch('http://localhost:8081/api/players/bulk-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true }).catch(() => {});
-        }
-      } catch {}
-    }
-    window.addEventListener('beforeunload', persistOnUnload);
-    window.addEventListener('pagehide', persistOnUnload);
-    return () => {
-      persistOnUnload();
-      window.removeEventListener('beforeunload', persistOnUnload);
-      window.removeEventListener('pagehide', persistOnUnload);
-    };
-  }, [rows]);
+  // Removed auto bulk-update on navigation to avoid stale local state overwriting server data
 
   return (
     <div style={{ padding: 8 }}>
@@ -841,6 +819,8 @@ export default function AdventureFight() {
                             className="sel-activity"
                             style={{ width: `${activityWidthCh + 2}ch` }}
                             value={curAct}
+                            onFocus={() => setDropdownOpen(true)}
+                            onBlur={() => setDropdownOpen(false)}
                             onChange={(e) => {
                               const value = e.target.value;
                               setRows((prev) =>
@@ -875,6 +855,8 @@ export default function AdventureFight() {
                         className="sel-attack"
                         style={{ width: `${attackWidthCh + 2}ch` }}
                         value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
+                        onFocus={() => setDropdownOpen(true)}
+                        onBlur={() => setDropdownOpen(false)}
                         onChange={(e) => {
                           const newAttack = e.target.value;
                           setRows((prev) =>
@@ -906,6 +888,8 @@ export default function AdventureFight() {
                             className="sel-crit"
                             style={{ width: `${critWidthCh + 2}ch` }}
                             value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                            onFocus={() => setDropdownOpen(true)}
+                            onBlur={() => setDropdownOpen(false)}
                             onChange={(e) => {
                               const value = e.target.value;
                               setRows((prev) =>
@@ -931,6 +915,8 @@ export default function AdventureFight() {
                         className="sel-armor"
                         style={{ width: `${armorWidthCh + 2}ch` }}
                         value={p.armorType ?? 'none'}
+                        onFocus={() => setDropdownOpen(true)}
+                        onBlur={() => setDropdownOpen(false)}
                         onChange={(e) => {
                           const value = e.target.value;
                           setRows((prev) =>

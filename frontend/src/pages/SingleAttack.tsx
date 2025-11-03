@@ -14,6 +14,8 @@ export default function SingleAttack() {
 
   // Players and selections
   const [players, setPlayers] = useState<Player[] | null>(null);
+  const [playersVersion, setPlayersVersion] = useState(0);
+
   const [attackerToken, setAttackerToken] = useState<string>('none'); // characterId token like Crit
   const [attacker, setAttacker] = useState<Player | null>(null);
   const [defenderToken, setDefenderToken] = useState<string>('none'); // selected in Target column
@@ -67,6 +69,19 @@ export default function SingleAttack() {
   const intervalRef = useRef<number | null>(null);
 
   // Modifiers (from AdventureFightRound)
+  function initialMod() {
+    return {
+      attackFromWeakSide: false,
+      attackFromBehind: false,
+      defenderSurprised: false,
+      defenderStunned: false,
+      attackerWeaponChange: false,
+      attackerTargetChange: false,
+      attackerHPBelow50Percent: false,
+      attackerMoreThan3MetersMovement: false,
+      modifierByGameMaster: 0,
+    };
+  }
   const [mod, setMod] = useState({
     attackFromWeakSide: false,
     attackFromBehind: false,
@@ -79,6 +94,21 @@ export default function SingleAttack() {
     modifierByGameMaster: 0,
   });
 
+  function initialRm() {
+    return {
+      distanceOfAttack: '_3_15m' as '_0_3m' | '_3_15m' | '_15_30m' | '_30_60m' | '_60_90m' | '_90m_plus',
+      prepareRounds: 0 as 0 | 1 | 2 | 3 | 4,
+      coverPenalty: 0 as number,
+      shieldInLoS: true,
+      inMiddleOfMagicBall: false,
+      targetAware: false,
+      targetNotMoving: false,
+      baseMageType: 'lenyeg' as 'lenyeg' | 'kapcsolat',
+      mdBonus: false,
+      agreeingTarget: false,
+      gmModifier: 0 as number,
+    };
+  }
   const [rm, setRm] = useState({
     distanceOfAttack: '_3_15m' as '_0_3m' | '_3_15m' | '_15_30m' | '_30_60m' | '_60_90m' | '_90m_plus',
     prepareRounds: 0 as 0 | 1 | 2 | 3 | 4,
@@ -109,11 +139,22 @@ export default function SingleAttack() {
         const res = await fetch('http://localhost:8081/api/players?isPlay=true');
         if (!res.ok) return;
         const list = (await res.json()) as Player[];
-        if (alive) setPlayers(list);
+        if (alive) { setPlayers(list); setPlayersVersion((v) => v + 1); }
       } catch {}
     })();
     return () => { alive = false; };
   }, []);
+
+  // Helper to refresh the whole players list (used on focus/storage)
+  async function refreshPlayersFromServer() {
+    try {
+      const res = await fetch('http://localhost:8081/api/players?isPlay=true');
+      if (!res.ok) return;
+      const list = (await res.json()) as Player[];
+      setPlayers(list);
+      setPlayersVersion((v) => v + 1);
+    } catch {}
+  }
 
   // Resolve tokens to full players
   useEffect(() => {
@@ -170,6 +211,29 @@ export default function SingleAttack() {
     if (!defender) { setDefenderArmor(undefined); return; }
     setDefenderArmor(defender.armorType as any);
   }, [defender?.id]);
+
+  // Enforce dependencies between target -> activity -> attack -> crit (same as AdventureMain)
+  useEffect(() => {
+    const allowedActs = allowedActivitiesByTarget(defenderToken);
+    const curAct = attackerActivity as string | undefined;
+    const enforcedAct = curAct && allowedActs.includes(curAct) ? curAct : allowedActs[0];
+    if (enforcedAct !== curAct) setAttackerActivity(enforcedAct);
+
+    const allowedAtks = attacksByActivity(enforcedAct);
+    const nextAttack = allowedAtks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAtks[0];
+    if (nextAttack !== attackerAttack) setAttackerAttack(nextAttack);
+
+    const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
+    const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+    if (nextCrit !== attackerCrit) setAttackerCrit(nextCrit);
+
+    // Update isActive immediately based on enforced activity and current attacker state
+    setAttacker((prev) => (prev ? { ...prev, isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds) } as Player : prev));
+
+    // Reset modifiers when target changes
+    setMod(initialMod());
+    setRm(initialRm());
+  }, [defenderToken]);
 
   // Reset rolling on key changes
   function resetRollState() {
@@ -233,6 +297,14 @@ export default function SingleAttack() {
     const map: Record<string, string> = { none: 'None', leather: 'Leather', heavyLeather: 'Heavy Leather', chainmail: 'Chainmail', plate: 'Plate' };
     return v && map[v] ? map[v] : (v || '');
   }
+  function deriveActive(activity?: string, isAlive?: boolean, stunnedForRounds?: number): boolean {
+    const alive = isAlive !== false;
+    const stunned = (stunnedForRounds ?? 0) > 0;
+    if (!alive) return false;
+    if (stunned) return false;
+    if (activity === '_5DoNothing' || activity === '_4PrepareMagic') return false;
+    return true;
+  }
 
   // Helpers to refresh players from backend so UI reflects applied results immediately
   async function fetchPlayerById(pid?: number | string | null): Promise<Player | null> {
@@ -258,6 +330,25 @@ export default function SingleAttack() {
   function broadcastAdventureRefresh() {
     try { localStorage.setItem('merp:adventureRefresh', String(Date.now())); } catch {}
   }
+
+  // Refresh current attacker/defender from DB when tab gains focus
+  useEffect(() => {
+    function onFocus() {
+      Promise.allSettled([refreshPlayersFromServer(), refreshAttackerFromServer(), refreshDefenderFromServer()]);
+    }
+    window.addEventListener('focus', onFocus);
+    function onStorage(e: StorageEvent) {
+      if (!e.key) return;
+      if (e.key === 'merp:adventureRefresh') {
+        Promise.allSettled([refreshPlayersFromServer(), refreshAttackerFromServer(), refreshDefenderFromServer()]);
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [attackerToken, defenderToken]);
 
   // Option helpers from AdventureMain
   const activityOptions = [
@@ -309,6 +400,11 @@ export default function SingleAttack() {
       case '_5DoNothing':
       default: return ['none'];
     }
+  }
+  function allowedActivitiesByTarget(target?: string): string[] {
+    const all = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'];
+    if (!target || target === 'none') return ['_5DoNothing', '_4PrepareMagic'];
+    return all;
   }
   const critByAttack: Record<string, string[]> = {
     none: ['none'],
@@ -689,6 +785,8 @@ export default function SingleAttack() {
             } catch {}
             resetRollState();
             setReadyToRoll(false);
+            setMod(initialMod());
+            setRm(initialRm());
           }}
           style={{ padding: '6px 12px', background: '#2f5597', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}
           title="Restart the attack process while keeping current selections"
@@ -768,18 +866,19 @@ export default function SingleAttack() {
           <tr>
             <td>
               <select
+                key={`att-sel-${playersVersion}`}
                 value={attackerToken}
                 onChange={(e) => { setAttackerToken(e.target.value); setDefenderToken('none'); }}
                 style={{ width: `${idWidthCh + 2}ch` }}
                 aria-label="Attacker ID"
               >
                 <option value="none">None</option>
-                {(players && players.length > 0 ? players : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 } as any]).map((pl: any) => {
+                {(players && players.length > 0 ? players.filter((pl: any) => !!pl.isPlaying) : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 } as any]).map((pl: any) => {
                   const dead = pl.isAlive === false; const stunned = (pl.stunnedForRounds ?? 0) > 0;
                   const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
                   const label = `${String(pl.characterId)} - ${pl.name || ''}${mark}`;
                   return (
-                    <option key={String(pl.characterId)} value={String(pl.characterId)} style={dead ? { color: '#d32f2f' } : undefined}>
+                    <option key={String(pl.characterId)} value={String(pl.characterId)} style={dead ? { color: '#d32f2f' } : {}}>
                       {label}
                     </option>
                   );
@@ -838,60 +937,96 @@ export default function SingleAttack() {
                 <td>
                   {attacker ? (
                     <select
+                      key={`def-sel-${playersVersion}-${attacker.characterId}`}
                       value={defenderToken}
                       onChange={(e) => setDefenderToken(e.target.value)}
                       style={{ minWidth: 140 }}
                     >
                       <option value="none">none</option>
-                      {(players || []).filter((o) => o.characterId !== attacker.characterId).map((o) => {
+                      {(players || []).filter((o: any) => o.characterId !== attacker.characterId).filter((o: any) => !!o.isPlaying).map((o: any) => {
                         const dead = o.isAlive === false; const stunned = !!o.isStunned || (o.stunnedForRounds ?? 0) > 0;
                         const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
-                        return (<option key={String(o.characterId)} value={String(o.characterId)} style={dead ? { color: '#d32f2f' } : undefined}>{String(o.characterId)}{mark}</option>);
+                        return (<option key={String(o.characterId)} value={String(o.characterId)} style={dead ? { color: '#d32f2f' } : {}}>{String(o.characterId)}{mark}</option>);
                       })}
                     </select>
                   ) : null}
                 </td>
                 <td>
-                  <select
-                    value={attackerActivity || ''}
-                    onChange={(e) => {
-                      const act = e.target.value as string;
-                      setAttackerActivity(act);
-                      const allowedAttacks = attacksByActivity(act);
-                      const nextAttack = allowedAttacks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAttacks[0];
-                      setAttackerAttack(nextAttack);
-                      const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
-                      const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
-                      setAttackerCrit(nextCrit);
-                    }}
-                    style={{ width: `${activityWidthCh + 2}ch` }}
-                  >
-                    {activityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  {(() => {
+                    const allowedActs = allowedActivitiesByTarget(defenderToken);
+                    const curAct = (attackerActivity && allowedActs.includes(attackerActivity)) ? attackerActivity : allowedActs[0];
+                    return (
+                      <select
+                        value={curAct || ''}
+                        onChange={(e) => {
+                          const act = e.target.value as string;
+                          const enforcedAct = allowedActs.includes(act) ? act : allowedActs[0];
+                          setAttackerActivity(enforcedAct);
+                          const allowedAttacks = attacksByActivity(enforcedAct);
+                          const nextAttack = allowedAttacks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAttacks[0];
+                          setAttackerAttack(nextAttack);
+                          const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
+                          const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+                          setAttackerCrit(nextCrit);
+                          // Update isActive immediately based on enforced activity
+                          setAttacker((prev) => (prev ? { ...prev, isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds) } as Player : prev));
+                          // Reset modifiers on activity change
+                          setMod(initialMod());
+                          setRm(initialRm());
+                        }}
+                        style={{ width: `${activityWidthCh + 2}ch` }}
+                      >
+                        {activityOptions.filter((o) => allowedActs.includes(o.value)).map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </td>
                 <td>
-                  <select
-                    value={attackerAttack || ''}
-                    onChange={(e) => {
-                      const atk = e.target.value as string;
-                      setAttackerAttack(atk);
-                      const allowedCrits = (critByAttack as any)[atk] ?? ['none'];
-                      const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
-                      setAttackerCrit(nextCrit);
-                    }}
-                    style={{ width: `${attackWidthCh + 2}ch` }}
-                  >
-                    {attackOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  {(() => {
+                    const curAct = attackerActivity as string | undefined;
+                    const allowedAtks = attacksByActivity(curAct);
+                    const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
+                    return (
+                      <select
+                        value={curAtk || ''}
+                        onChange={(e) => {
+                          const atk = e.target.value as string;
+                          const enforcedAtk = allowedAtks.includes(atk) ? atk : allowedAtks[0];
+                          setAttackerAttack(enforcedAtk);
+                          const allowedCrits = (critByAttack as any)[enforcedAtk] ?? ['none'];
+                          const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+                          setAttackerCrit(nextCrit);
+                        }}
+                        style={{ width: `${attackWidthCh + 2}ch` }}
+                      >
+                        {attackOptions.filter((o) => allowedAtks.includes(o.value)).map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </td>
                 <td>
-                  <select
-                    value={attackerCrit || ''}
-                    onChange={(e) => setAttackerCrit(e.target.value)}
-                    style={{ width: `${critWidthCh + 2}ch` }}
-                  >
-                    {critOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  {(() => {
+                    const curAct = attackerActivity as string | undefined;
+                    const allowedAtks = attacksByActivity(curAct);
+                    const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
+                    const allowedCrits = (critByAttack as any)[curAtk ?? 'none'] ?? ['none'];
+                    const curCrit = (attackerCrit && allowedCrits.includes(attackerCrit)) ? attackerCrit : 'none';
+                    return (
+                      <select
+                        value={curCrit || ''}
+                        onChange={(e) => setAttackerCrit(e.target.value)}
+                        style={{ width: `${critWidthCh + 2}ch` }}
+                      >
+                        {critOptions.filter((o) => allowedCrits.includes(o.value)).map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </td>
                 <td>
                   <select
@@ -997,10 +1132,10 @@ export default function SingleAttack() {
                     <span title="Not stunned" aria-label="Not stunned"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg></span>
                   )}
                 </td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
+                <td>{defender.target == null ? 'none' : String(defender.target)}</td>
+                <td>{labelActivity(defender.playerActivity as any)}</td>
+                <td>{labelAttack(defender.attackType as any)}</td>
+                <td>{labelCrit(defender.critType as any)}</td>
                 <td>
                   <select
                     value={defenderArmor || ''}
@@ -1227,7 +1362,7 @@ export default function SingleAttack() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span className="result-label">Modifiers</span>
                 {(() => {
-                  const activity = attacker?.playerActivity as string | undefined;
+                  const activity = attackerActivity as string | undefined;
                   const attackType = attackerAttack as string | undefined;
                   const usingMelee = activity === '_3PhisicalAttackOrMovement';
                   const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
