@@ -4,6 +4,17 @@ import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
 
+type MMFailResponse = {
+  failResultText?: string;
+  applied?: boolean;
+  failResultAdditionalDamage?: number;
+  failResultHPLossPerRound?: number;
+  failResultStunnedForRounds?: number;
+  failResultPenaltyOfActions?: number;
+  failResultPenaltyDurationRounds?: number;
+  failResultsInstantDeath?: boolean;
+};
+
 export default function MM() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Player[] | null>(null);
@@ -67,7 +78,7 @@ export default function MM() {
   const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
   const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
   const [failText, setFailText] = useState<string | null>(null);
-  const [failDto, setFailDto] = useState<any | null>(null);
+  const [failDto, setFailDto] = useState<MMFailResponse | null>(null);
 
   useEffect(() => {
     document.title = 'MM';
@@ -228,6 +239,28 @@ export default function MM() {
     }
   }
 
+  async function refreshAttackerFromServer(playerId: number) {
+    try {
+      const res = await fetch(`http://localhost:8081/api/players/${playerId}`);
+      if (!res.ok) return;
+      const fresh = (await res.json()) as Player;
+      setAttacker(fresh);
+      let listUpdated = false;
+      setPlayers((prev) => {
+        if (!prev) return prev;
+        const next = prev.map((pl) => {
+          if (pl.id === fresh.id) {
+            listUpdated = true;
+            return fresh;
+          }
+          return pl;
+        });
+        return listUpdated ? next : prev;
+      });
+      if (listUpdated) setPlayersVersion((v) => v + 1);
+    } catch {}
+  }
+
   async function handleFailRollMM() {
     if (!failEnabled || failRolling) return;
     setFailRolling(true);
@@ -272,16 +305,17 @@ export default function MM() {
         // Fetch fail text and apply effects
         const ft = await fetch(`http://localhost:8081/api/mm/fail-text?failRoll=${nextTotal}`);
         if (ft.ok) {
-          const dto = await ft.json();
+          const dto = (await ft.json()) as MMFailResponse;
           setFailText(dto?.failResultText ?? null);
         }
-        const pid = (attacker as any)?.id;
+        const pid = attacker?.id;
         if (pid != null) {
           const ap = await fetch(`http://localhost:8081/api/mm/apply-fail?playerId=${pid}&failRoll=${nextTotal}`, { method: 'POST' });
           if (ap.ok) {
-            const dto = await ap.json();
-            setFailDto(dto);
-            if (!failText && dto?.failResultText) setFailText(dto.failResultText);
+            const dto = (await ap.json()) as MMFailResponse | null;
+            setFailDto(dto ?? null);
+            if (dto?.failResultText) setFailText(dto.failResultText);
+            await refreshAttackerFromServer(pid);
           }
         }
         setFailEnabled(false);
@@ -703,6 +737,8 @@ export default function MM() {
               <th rowSpan={2}>Alive</th>
               <th rowSpan={2}>Active</th>
               <th rowSpan={2}>Stunned</th>
+              <th rowSpan={2}>Stunned rounds</th>
+              <th rowSpan={2}>HP loss/round</th>
               <th rowSpan={2}>MM type</th>
               <th rowSpan={2}>Maneuver type</th>
               <th rowSpan={2}>Difficulty</th>
@@ -792,6 +828,8 @@ export default function MM() {
                       <span title="Not stunned" aria-label="Not stunned"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg></span>
                     )}
                   </td>
+                  <td className="right">{attacker.stunnedForRounds ?? 0}</td>
+                  <td className="right">{attacker.hpLossPerRound ?? 0}</td>
                   <td>
                     <select value={mmType} onChange={(e) => setMmType(e.target.value as any)}>
                       <option value="Movement">Movement</option>
@@ -840,7 +878,7 @@ export default function MM() {
                   <td className="right">{attacker.stealth}</td>
                 </>
               ) : (
-                <td colSpan={26} style={{ color: '#888' }}>Select attacker…</td>
+                <td colSpan={28} style={{ color: '#888' }}>Select attacker…</td>
               )}
             </tr>
           </tbody>
@@ -1460,24 +1498,32 @@ export default function MM() {
                   <tbody>
                     <tr>
                       <td style={{ textAlign: 'left' }}>Extra dmg</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultAdditionalDamage ?? 0}</strong></td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultAdditionalDamage ?? 0}</strong></td>
                     </tr>
                     <tr>
                       <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultHPLossPerRound ?? 0}</strong></td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultHPLossPerRound ?? 0}</strong></td>
                     </tr>
                     <tr>
                       <td style={{ textAlign: 'left' }}>Stunned rounds</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultStunnedForRounds ?? 0}</strong></td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultStunnedForRounds ?? 0}</strong></td>
                     </tr>
                     <tr>
                       <td style={{ textAlign: 'left' }}>Penalty of actions</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultPenaltyOfActions ?? 0}</strong></td>
+                      <td>
+                        <strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>
+                          {(() => {
+                            const val = failDto?.failResultPenaltyOfActions ?? 0;
+                            const dur = failDto?.failResultPenaltyDurationRounds ?? 0;
+                            return dur > 0 ? `${val} (${dur}r)` : `${val}`;
+                          })()}
+                        </strong>
+                      </td>
                     </tr>
                     <tr>
                       <td style={{ textAlign: 'left' }}>Instant death</td>
                       <td>
-                        {(failDto as any)?.failResultsInstantDeath ? (
+                        {failDto?.failResultsInstantDeath ? (
                           <span title="Instant death" aria-label="Instant death">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>

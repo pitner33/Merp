@@ -112,48 +112,56 @@ public class MMServiceImpl implements MMService {
         List<String> row = mapsFromTabs.getMapFail().get(r);
         String text = (row != null && row.size() > 3) ? row.get(3) : ""; // COL4 text for MM
 
+        Integer extra = null;
+        Integer bleed = null;
+        Integer stun = null;
+        Integer penaltyVal = null;
+        Integer penaltyDur = null;
+        boolean instantDeath = false;
+
         // Apply MM block effects: cols 20-24 -> idx 19..23
         try {
             if (row != null) {
                 int startIdx = 19;
-                // extra damage
                 if (row.size() > startIdx) {
-                    Integer extra = parseIntSafe(row.get(startIdx));
-                    if (extra != null && extra > 0) attacker.setHpActual(attacker.getHpActual() - extra);
+                    extra = parseIntSafe(row.get(startIdx));
+                    if (extra != null && extra > 0) {
+                        attacker.setHpActual(attacker.getHpActual() - extra);
+                    }
                 }
-                // hp loss per round
                 if (row.size() > startIdx + 1) {
-                    Integer bleed = parseIntSafe(row.get(startIdx + 1));
-                    if (bleed != null && bleed > 0) attacker.setHpLossPerRound(attacker.getHpLossPerRound() + bleed);
+                    bleed = parseIntSafe(row.get(startIdx + 1));
+                    if (bleed != null && bleed > 0) {
+                        attacker.setHpLossPerRound(attacker.getHpLossPerRound() + bleed);
+                    }
                 }
-                // stunned rounds
                 if (row.size() > startIdx + 2) {
-                    Integer stun = parseIntSafe(row.get(startIdx + 2));
+                    stun = parseIntSafe(row.get(startIdx + 2));
                     if (stun != null && stun > 0) {
                         attacker.setStunnedForRounds(attacker.getStunnedForRounds() + stun);
                         attacker.setIsStunned(true);
                         attacker.setIsActive(false);
                     }
                 }
-                // penalty value or value/duration
                 if (row.size() > startIdx + 3) {
                     String penStr = row.get(startIdx + 3);
                     if (penStr != null && !penStr.isBlank()) {
-                        Integer val = null; Integer dur = null;
                         if (penStr.contains("/")) {
                             String[] parts = penStr.split("/");
-                            if (parts.length >= 1) val = parseIntSafe(parts[0]);
-                            if (parts.length >= 2) dur = parseIntSafe(parts[1]);
+                            if (parts.length >= 1) penaltyVal = parseIntSafe(parts[0]);
+                            if (parts.length >= 2) penaltyDur = parseIntSafe(parts[1]);
                         } else {
-                            val = parseIntSafe(penStr);
+                            penaltyVal = parseIntSafe(penStr);
                         }
-                        if (val != null && val != 0) attacker.addPenaltyEffect(Math.abs(val), Math.max(1, dur != null ? dur : 1));
+                        if (penaltyVal != null && penaltyVal != 0) {
+                            int dur = penaltyDur != null ? penaltyDur : 1;
+                            attacker.addPenaltyEffect(Math.abs(penaltyVal), Math.max(1, dur));
+                        }
                     }
                 }
-                // instant death flag "1"
                 if (row.size() > startIdx + 4) {
-                    boolean dead = "1".equals(row.get(startIdx + 4));
-                    if (dead) {
+                    instantDeath = "1".equals(row.get(startIdx + 4));
+                    if (instantDeath) {
                         attacker.setIsAlive(false);
                         attacker.setIsActive(false);
                         attacker.setIsStunned(false);
@@ -167,6 +175,13 @@ public class MMServiceImpl implements MMService {
 
         resp.setFailResultText(text != null ? text : "");
         resp.setApplied(true);
+        resp.setFailResultAdditionalDamage(extra != null ? extra : 0);
+        resp.setFailResultHPLossPerRound(bleed != null ? bleed : 0);
+        resp.setFailResultStunnedForRounds(stun != null ? stun : 0);
+        resp.setFailResultPenaltyOfActions(penaltyVal != null ? penaltyVal : 0);
+        resp.setFailResultPenaltyDurationRounds(penaltyDur != null ? penaltyDur : 0);
+        resp.setFailResultsInstantDeath(instantDeath);
+
         return resp;
     }
 
