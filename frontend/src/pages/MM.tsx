@@ -164,12 +164,11 @@ export default function MM() {
     setFailDto(null);
   }, [openTotal]);
 
-  // Auto-resolve for Movement when open roll sequence is closed
+  // Auto-resolve when open roll sequence is closed
   useEffect(() => {
     const run = async () => {
-      if (mmType !== 'Movement') return;
       if (openTotal == null) return;
-      if (openSign !== 0) return; // wait until open-ended closes
+      if (openSign !== 0) return;
       const used = computeLocalModifiedTotal();
       if (typeof used !== 'number') return;
       try {
@@ -177,16 +176,33 @@ export default function MM() {
         setError(null);
         setMmRes(null);
         const params = new URLSearchParams();
-        params.set('mmType', 'Movement');
-        params.set('difficulty', difficulty);
+        params.set('mmType', mmType);
+        if (mmType === 'Maneuver') {
+          params.set('maneuverType', maneuverType);
+        } else {
+          params.set('difficulty', difficulty);
+        }
         params.set('modifiedRoll', String(used));
         const r = await fetch(`http://localhost:8081/api/mm/resolve?${params.toString()}`);
         if (!r.ok) throw new Error('MM resolve failed');
         const data = await r.json();
         setMmRes({ resultText: data?.resultText ?? '', usedRow: data?.usedRow, usedCol: data?.usedCol, row: Array.isArray(data?.row) ? data.row as string[] : undefined });
-        const needFail = !!data?.failRequired;
-        if (needFail) {
-          setFailEnabled(true);
+        if (mmType === 'Movement') {
+          const needFail = !!data?.failRequired;
+          if (needFail) {
+            setFailEnabled(true);
+            setFailRolling(false);
+            setFailTensFace(0);
+            setFailOnesFace(0);
+            setFailLastRoll(null);
+            setFailOpenSign(0);
+            setFailOpenTotal(null);
+            setFailText(null);
+          } else {
+            setFailEnabled(false);
+          }
+        } else {
+          setFailEnabled(false);
           setFailRolling(false);
           setFailTensFace(0);
           setFailOnesFace(0);
@@ -202,42 +218,7 @@ export default function MM() {
       }
     };
     run();
-  }, [mmType, openTotal, openSign, difficulty]);
-
-  async function resolveMM() {
-    try {
-      if (openTotal == null) return;
-      const used = computeLocalModifiedTotal();
-      if (typeof used !== 'number') return;
-      setResolving(true);
-      setError(null);
-      setMmRes(null);
-      const params = new URLSearchParams();
-      params.set('mmType', mmType);
-      if (mmType === 'Maneuver') params.set('maneuverType', maneuverType);
-      if (mmType === 'Movement') params.set('difficulty', difficulty);
-      params.set('modifiedRoll', String(used));
-      const r = await fetch(`http://localhost:8081/api/mm/resolve?${params.toString()}`);
-      if (!r.ok) throw new Error('MM resolve failed');
-      const data = await r.json();
-      setMmRes({ resultText: data?.resultText ?? '', usedRow: data?.usedRow, usedCol: data?.usedCol, row: Array.isArray(data?.row) ? data.row as string[] : undefined });
-      const needFail = !!data?.failRequired && mmType === 'Movement';
-      if (needFail) {
-        setFailEnabled(true);
-        setFailRolling(false);
-        setFailTensFace(0);
-        setFailOnesFace(0);
-        setFailLastRoll(null);
-        setFailOpenSign(0);
-        setFailOpenTotal(null);
-        setFailText(null);
-      }
-    } catch (e: any) {
-      setError(e?.message || 'Resolve failed');
-    } finally {
-      setResolving(false);
-    }
-  }
+  }, [mmType, maneuverType, difficulty, openTotal, openSign]);
 
   async function refreshAttackerFromServer(playerId: number) {
     try {
@@ -886,7 +867,19 @@ export default function MM() {
       </div>
 
       {/* Modifiers + Dice panel row */}
-      <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 20,
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          width: 'fit-content',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          margin: '20px auto 0',
+        }}
+      >
         {(() => {
           const movementDisabled = false;
           if (mmType === 'Movement') {
@@ -1393,173 +1386,189 @@ export default function MM() {
         style={{
           display: 'flex',
           flexWrap: 'nowrap',
-          gap: 8,
-          alignItems: 'flex-start',
-          justifyContent: 'flex-start',
-          width: '100%',
+          gap: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 'fit-content',
+          maxWidth: '100%',
           overflowX: 'auto',
-          marginTop: 12,
+          margin: '18px auto 0',
           border: '1px solid #b0b0b0',
           borderRadius: 10,
           padding: 12,
           boxSizing: 'border-box',
         }}
       >
-        {/* MM result area copied from AFR (without Critical) */}
-        {(() => {
-          const usedTotalVal = computeLocalModifiedTotal();
-          const canResolve = openTotal != null && typeof usedTotalVal === 'number';
-          return (
-            <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
-                <div className="result-col">
-                  <span className="result-label">Modified roll</span>
-                  <div className="result-box orange">
-                    <span className="result-value">{openTotal != null ? usedTotalVal ?? '' : ''}</span>
+        {mmType === 'Maneuver' ? (
+          (() => {
+            const usedTotalVal = computeLocalModifiedTotal();
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: '1 1 0', minWidth: 360 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+                  <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                    <span className="result-label">Modified roll</span>
+                    <div className="result-box orange">
+                      <span className="result-value">{openTotal != null ? (usedTotalVal ?? '') : ''}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
-                  {mmType !== 'Movement' && (
-                    <button
-                      type="button"
-                      onClick={resolveMM}
-                      disabled={!canResolve || resolving}
-                      style={{ marginTop: 6, background: canResolve && !resolving ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!canResolve || resolving) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
-                    >
-                      {resolving ? 'Resolving…' : 'Resolve MM'}
-                    </button>
+                  <textarea
+                    readOnly
+                    placeholder="Result will appear here…"
+                    value={mmRes?.resultText ?? ''}
+                    style={{ width: 560, height: 96, padding: 12, fontSize: 16, fontWeight: 600, lineHeight: 1.4, border: '1px solid #d1d5db', borderRadius: 8, background: '#f9fafb', color: '#111', resize: 'none' }}
+                  />
+                  {resolving && (
+                    <span style={{ fontSize: 14, color: '#6b7280', fontStyle: 'italic' }}>Resolving…</span>
                   )}
-                  <span className="result-label" style={{ textAlign: 'center' }}>MM result</span>
-                  <div className="result-box">
-                    <span className="result-value">{mmRes?.resultText || ''}</span>
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <>
+            {(() => {
+              const usedTotalVal = computeLocalModifiedTotal();
+              return (
+                <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="result-col">
+                      <span className="result-label">Modified roll</span>
+                      <div className="result-box orange">
+                        <span className="result-value">{openTotal != null ? (usedTotalVal ?? '') : ''}</span>
+                      </div>
+                    </div>
+                    <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                      <span className="result-label" style={{ textAlign: 'center' }}>MM result</span>
+                      <div className="result-box">
+                        <span className="result-value">{mmRes?.resultText || ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {mmType === 'Movement' && mmRes?.row && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}></div>
+                      <table className="table" style={{ maxWidth: 560, tableLayout: 'fixed', width: 560 }}>
+                        <colgroup>
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                          <col style={{ width: '11.11%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th>Piece</th>
+                            <th>Very easy</th>
+                            <th>Easy</th>
+                            <th>Average</th>
+                            <th>Hard</th>
+                            <th>Very Hard</th>
+                            <th>Extremely</th>
+                            <th>Insane</th>
+                            <th>Absurd</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            {(mmRes.row || []).slice(0, 9).map((val, idx) => (
+                              <td key={idx} style={{ fontWeight: idx + 1 === (mmRes?.usedCol || 0) ? 900 : 600, background: idx + 1 === (mmRes?.usedCol || 0) ? '#d1fae5' : undefined, color: '#111' }}>{val ?? ''}</td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {mmType === 'Movement' && (failEnabled || failText || failDto) && (
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, minWidth: 220 }}>
+                <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                  <button
+                    type="button"
+                    onClick={handleFailRollMM}
+                    disabled={!failEnabled || failRolling}
+                    style={{ marginTop: 6, background: failEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!failEnabled || failRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                  >
+                    {failRolling ? 'Rolling…' : 'Roll Fail'}
+                  </button>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
+                    <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
+                  </div>
+                  <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
+                  <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail required'}>
+                    <span className="result-value">{failLastRoll != null ? `${failLastRoll}` : ''}</span>
                   </div>
                 </div>
               </div>
-              {mmType === 'Movement' && mmRes?.row && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}></div>
-                  <table className="table" style={{ maxWidth: 560, tableLayout: 'fixed', width: 560 }}>
-                    <colgroup>
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                      <col style={{ width: '11.11%' }} />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>Piece</th>
-                        <th>Very easy</th>
-                        <th>Easy</th>
-                        <th>Average</th>
-                        <th>Hard</th>
-                        <th>Very Hard</th>
-                        <th>Extremely</th>
-                        <th>Insane</th>
-                        <th>Absurd</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {(mmRes.row || []).slice(0,9).map((val, idx) => (
-                          <td key={idx} style={{ fontWeight: idx + 1 === (mmRes?.usedCol || 0) ? 900 : 600, background: idx + 1 === (mmRes?.usedCol || 0) ? '#d1fae5' : undefined, color: '#111' }}>{val ?? ''}</td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Fail roll (Movement only) */}
-        {mmType === 'Movement' && (failEnabled || failText || failDto) && (
-          <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, minWidth: 220 }}>
-            <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
-              <button
-                type="button"
-                onClick={handleFailRollMM}
-                disabled={!failEnabled || failRolling}
-                style={{ marginTop: 6, background: failEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!failEnabled || failRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
-              >
-                {failRolling ? 'Rolling…' : 'Roll Fail'}
-              </button>
-              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
-                <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
-              </div>
-              <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
-              <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail required'}>
-                <span className="result-value">{failLastRoll != null ? `${failLastRoll}` : ''}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Fail result (Movement only) */}
-        {mmType === 'Movement' && (failEnabled || failText || failDto) && (
-          <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: failDto ? '#FFF5EB' : '#f9fafb', color: failDto ? '#7a2e0c' : '#555', maxWidth: 560 }}>
-            {failDto || failText ? (
-              <>
-                <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>FAIL</div>
-                <div style={{ marginBottom: 4, border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', background: '#fff', color: '#111' }}>
-                  <strong>{failDto?.failResultText ?? failText ?? ''}</strong>
-                </div>
-                <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ textAlign: 'left' }}>Extra dmg</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultAdditionalDamage ?? 0}</strong></td>
-                    </tr>
-                    <tr>
-                      <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultHPLossPerRound ?? 0}</strong></td>
-                    </tr>
-                    <tr>
-                      <td style={{ textAlign: 'left' }}>Stunned rounds</td>
-                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultStunnedForRounds ?? 0}</strong></td>
-                    </tr>
-                    <tr>
-                      <td style={{ textAlign: 'left' }}>Penalty of actions</td>
-                      <td>
-                        <strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>
-                          {(() => {
-                            const val = failDto?.failResultPenaltyOfActions ?? 0;
-                            const dur = failDto?.failResultPenaltyDurationRounds ?? 0;
-                            return dur > 0 ? `${val} (${dur}r)` : `${val}`;
-                          })()}
-                        </strong>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ textAlign: 'left' }}>Instant death</td>
-                      <td>
-                        {failDto?.failResultsInstantDeath ? (
-                          <span title="Instant death" aria-label="Instant death">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>
-                              <circle cx="9" cy="11" r="1.5" fill="#fff" />
-                              <circle cx="15" cy="11" r="1.5" fill="#fff" />
-                              <path d="M9 15c1 .7 2 .7 3 .7s2 0 3-.7" fill="none" stroke="#fff" />
-                            </svg>
-                          </span>
-                        ) : (
-                          <span />
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', fontStyle: 'italic', color: '#777' }}>Awaiting fail result…</div>
             )}
-          </div>
+
+            {mmType === 'Movement' && (failEnabled || failText || failDto) && (
+              <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: failDto ? '#FFF5EB' : '#f9fafb', color: failDto ? '#7a2e0c' : '#555', maxWidth: 560 }}>
+                {failDto || failText ? (
+                  <>
+                    <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>FAIL</div>
+                    <div style={{ marginBottom: 4, border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', background: '#fff', color: '#111' }}>
+                      <strong>{failDto?.failResultText ?? failText ?? ''}</strong>
+                    </div>
+                    <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+                      <tbody>
+                        <tr>
+                          <td style={{ textAlign: 'left' }}>Extra dmg</td>
+                          <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultAdditionalDamage ?? 0}</strong></td>
+                        </tr>
+                        <tr>
+                          <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
+                          <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultHPLossPerRound ?? 0}</strong></td>
+                        </tr>
+                        <tr>
+                          <td style={{ textAlign: 'left' }}>Stunned rounds</td>
+                          <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultStunnedForRounds ?? 0}</strong></td>
+                        </tr>
+                        <tr>
+                          <td style={{ textAlign: 'left' }}>Penalty of actions</td>
+                          <td>
+                            <strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>
+                              {(() => {
+                                const val = failDto?.failResultPenaltyOfActions ?? 0;
+                                const dur = failDto?.failResultPenaltyDurationRounds ?? 0;
+                                return dur > 0 ? `${val} (${dur}r)` : `${val}`;
+                              })()}
+                            </strong>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style={{ textAlign: 'left' }}>Instant death</td>
+                          <td>
+                            {failDto?.failResultsInstantDeath ? (
+                              <span title="Instant death" aria-label="Instant death">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>
+                                  <circle cx="9" cy="11" r="1.5" fill="#fff" />
+                                  <circle cx="15" cy="11" r="1.5" fill="#fff" />
+                                  <path d="M9 15c1 .7 2 .7 3 .7s2 0 3-.7" fill="none" stroke="#fff" />
+                                </svg>
+                              </span>
+                            ) : (
+                              <span />
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', fontStyle: 'italic', color: '#777' }}>Awaiting fail result…</div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
