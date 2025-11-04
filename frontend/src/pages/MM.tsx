@@ -1388,7 +1388,23 @@ export default function MM() {
         })()}
       </div>
       {/* MM result + Fail area container (same style as L804) */}
-      <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
+      <div
+        className="mmresultcontainer"
+        style={{
+          display: 'flex',
+          flexWrap: 'nowrap',
+          gap: 8,
+          alignItems: 'flex-start',
+          justifyContent: 'flex-start',
+          width: '100%',
+          overflowX: 'auto',
+          marginTop: 12,
+          border: '1px solid #b0b0b0',
+          borderRadius: 10,
+          padding: 12,
+          boxSizing: 'border-box',
+        }}
+      >
         {/* MM result area copied from AFR (without Critical) */}
         {(() => {
           const usedTotalVal = computeLocalModifiedTotal();
