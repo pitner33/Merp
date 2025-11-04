@@ -30,13 +30,10 @@ public class ExcelToDbImporter {
     @PostConstruct
     public void importOnce() {
         ensureStatusTable();
-        if (alreadyImported()) {
-            logger.info("Excel already imported previously, skipping.");
-            return;
-        }
+        boolean alreadyImported = alreadyImported();
         try {
             Map<String,Integer> maxCols = new LinkedHashMap<>();
-            List<String> tabs = Arrays.asList(
+            List<String> allTabs = Arrays.asList(
                     "Slashing","Blunt","Twohanded","Ranged","ClawsAndFangs","GrabOrBalance",
                     "MagicProjectile","MagicBall","BaseMagic","BaseMagicMD",
                     "Critical_Slashing","Critical_Blunt","Critical_Piercing","Critical_Heat","Critical_Cold",
@@ -44,6 +41,14 @@ public class ExcelToDbImporter {
                     "Critical_BigCreaturePhisical","Critical_BigCreatureMagic",
                     "Fail","MM","OtherManeuver"
             );
+            List<String> tabs = alreadyImported ? findMissingTabs(allTabs) : allTabs;
+            if (tabs.isEmpty()) {
+                logger.info("Excel data already present for all tabs, skipping import.");
+                return;
+            }
+            if (alreadyImported) {
+                logger.info("Missing/empty tables detected for tabs: {}. Re-importing from Excel.", tabs);
+            }
             ExcelSheetLoader loader = new ExcelSheetLoader();
             Map<String, ValueRange> data = new LinkedHashMap<>();
             for (String tab : tabs) {
@@ -58,7 +63,9 @@ public class ExcelToDbImporter {
                 createTableIfNotExists(table, cols);
                 insertAll(table, data.get(tab), cols);
             }
-            markImported();
+            if (!alreadyImported) {
+                markImported();
+            }
             logger.info("Excel import finished successfully.");
         } catch (Exception e) {
             logger.error("Excel import failed", e);
@@ -142,5 +149,57 @@ public class ExcelToDbImporter {
             if (s.matches("^-?\\d+\\.0+$")) return (int) Double.parseDouble(s);
         } catch (NumberFormatException ignore) {}
         return null;
+    }
+
+    private List<String> findMissingTabs(List<String> allTabs) {
+        List<String> missing = new ArrayList<>();
+        for (String tab : allTabs) {
+            String table = tablePrefix + tab;
+            if (tableNeedsImport(table)) {
+                missing.add(tab);
+            }
+        }
+        return missing;
+    }
+
+    private boolean tableNeedsImport(String table) {
+        if (!tableExists(table)) {
+            return true;
+        }
+        try {
+            Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+            return count == null || count == 0;
+        } catch (Exception e) {
+            logger.warn("Unable to count rows for table '{}', re-import will be attempted. Cause: {}", table, e.getMessage());
+            return true;
+        }
+    }
+
+    private boolean tableExists(String table) {
+        String schema = currentSchema();
+        try {
+            Integer count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_SCHEMA)=? AND UPPER(TABLE_NAME)=?",
+                    new Object[]{schema, table.toUpperCase()},
+                    Integer.class
+            );
+            return count != null && count > 0;
+        } catch (Exception e) {
+            logger.warn("Unable to verify existence of table '{}', assuming missing. Cause: {}", table, e.getMessage());
+            return false;
+        }
+    }
+
+    private String currentSchema() {
+        try {
+            String schema = jdbc.queryForObject("SELECT SCHEMA()", String.class);
+            if (schema == null || schema.isBlank()) {
+                return "PUBLIC";
+            }
+            return schema.toUpperCase();
+        } catch (Exception e) {
+            logger.warn("Failed to determine current schema, defaulting to PUBLIC. Cause: {}", e.getMessage());
+            return "PUBLIC";
+        }
     }
 }
