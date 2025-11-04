@@ -55,6 +55,20 @@ export default function MM() {
   const [lastRoll, setLastRoll] = useState<number | null>(null);
   const [readyToRoll, setReadyToRoll] = useState(false);
 
+  // MM resolve + fail flow (no Critical)
+  const [mmRes, setMmRes] = useState<null | { resultText: string; usedRow?: number; usedCol?: number; row?: string[] }>(null);
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [failEnabled, setFailEnabled] = useState(false);
+  const [failRolling, setFailRolling] = useState(false);
+  const [failTensFace, setFailTensFace] = useState<number>(0);
+  const [failOnesFace, setFailOnesFace] = useState<number>(0);
+  const [failLastRoll, setFailLastRoll] = useState<number | null>(null);
+  const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
+  const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
+  const [failText, setFailText] = useState<string | null>(null);
+  const [failDto, setFailDto] = useState<any | null>(null);
+
   useEffect(() => {
     document.title = 'MM';
   }, []);
@@ -122,6 +136,161 @@ export default function MM() {
       case 'magicBall':
       case 'magicProjectile': return p.tbTargetMagic;
       default: return p.tb;
+    }
+  }
+
+  // Reset MM result when a fresh open roll starts
+  useEffect(() => {
+    setMmRes(null);
+    setFailEnabled(false);
+    setFailRolling(false);
+    setFailTensFace(0);
+    setFailOnesFace(0);
+    setFailLastRoll(null);
+    setFailOpenSign(0);
+    setFailOpenTotal(null);
+    setFailText(null);
+    setFailDto(null);
+  }, [openTotal]);
+
+  // Auto-resolve for Movement when open roll sequence is closed
+  useEffect(() => {
+    const run = async () => {
+      if (mmType !== 'Movement') return;
+      if (openTotal == null) return;
+      if (openSign !== 0) return; // wait until open-ended closes
+      const used = computeLocalModifiedTotal();
+      if (typeof used !== 'number') return;
+      try {
+        setResolving(true);
+        setError(null);
+        setMmRes(null);
+        const params = new URLSearchParams();
+        params.set('mmType', 'Movement');
+        params.set('difficulty', difficulty);
+        params.set('modifiedRoll', String(used));
+        const r = await fetch(`http://localhost:8081/api/mm/resolve?${params.toString()}`);
+        if (!r.ok) throw new Error('MM resolve failed');
+        const data = await r.json();
+        setMmRes({ resultText: data?.resultText ?? '', usedRow: data?.usedRow, usedCol: data?.usedCol, row: Array.isArray(data?.row) ? data.row as string[] : undefined });
+        const needFail = !!data?.failRequired;
+        if (needFail) {
+          setFailEnabled(true);
+          setFailRolling(false);
+          setFailTensFace(0);
+          setFailOnesFace(0);
+          setFailLastRoll(null);
+          setFailOpenSign(0);
+          setFailOpenTotal(null);
+          setFailText(null);
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Resolve failed');
+      } finally {
+        setResolving(false);
+      }
+    };
+    run();
+  }, [mmType, openTotal, openSign, difficulty]);
+
+  async function resolveMM() {
+    try {
+      if (openTotal == null) return;
+      const used = computeLocalModifiedTotal();
+      if (typeof used !== 'number') return;
+      setResolving(true);
+      setError(null);
+      setMmRes(null);
+      const params = new URLSearchParams();
+      params.set('mmType', mmType);
+      if (mmType === 'Maneuver') params.set('maneuverType', maneuverType);
+      if (mmType === 'Movement') params.set('difficulty', difficulty);
+      params.set('modifiedRoll', String(used));
+      const r = await fetch(`http://localhost:8081/api/mm/resolve?${params.toString()}`);
+      if (!r.ok) throw new Error('MM resolve failed');
+      const data = await r.json();
+      setMmRes({ resultText: data?.resultText ?? '', usedRow: data?.usedRow, usedCol: data?.usedCol, row: Array.isArray(data?.row) ? data.row as string[] : undefined });
+      const needFail = !!data?.failRequired && mmType === 'Movement';
+      if (needFail) {
+        setFailEnabled(true);
+        setFailRolling(false);
+        setFailTensFace(0);
+        setFailOnesFace(0);
+        setFailLastRoll(null);
+        setFailOpenSign(0);
+        setFailOpenTotal(null);
+        setFailText(null);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Resolve failed');
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  async function handleFailRollMM() {
+    if (!failEnabled || failRolling) return;
+    setFailRolling(true);
+    const localInterval = window.setInterval(() => {
+      setFailTensFace((p) => (p + 1) % 10);
+      setFailOnesFace((p) => (p + 1) % 10);
+    }, 50);
+
+    try {
+      const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
+        if (!r.ok) throw new Error('Fail dice roll failed');
+        return r.json();
+      }) as Promise<number>;
+      const waitPromise = new Promise<void>((res) => setTimeout(res, 1200));
+      const [rolled] = await Promise.all([fetchPromise, waitPromise]);
+      const value = typeof rolled === 'number' ? rolled : 1;
+      const tens = value === 100 ? 0 : Math.floor(value / 10);
+      const ones = value === 100 ? 0 : value % 10;
+      setFailTensFace(tens);
+      setFailOnesFace(ones);
+      setFailLastRoll(value);
+
+      // Compute next open-ended state locally
+      let nextSign = failOpenSign;
+      let nextTotal = failOpenTotal == null ? null : failOpenTotal;
+      if (nextSign === 0 || nextTotal == null) {
+        if (value >= 96) { nextSign = 1; nextTotal = value; }
+        else if (value <= 4) { nextSign = -1; nextTotal = value; }
+        else { nextSign = 0; nextTotal = value; }
+      } else {
+        const base = nextTotal == null ? 0 : nextTotal;
+        if (nextSign === 1) nextTotal = base + value;
+        if (nextSign === -1) nextTotal = base - value;
+        if (nextSign === 1 && value < 96) nextSign = 0;
+        if (nextSign === -1 && value > 4) nextSign = 0;
+      }
+      setFailOpenTotal(nextTotal);
+      setFailOpenSign(nextSign);
+
+      const sequenceClosed = nextTotal != null && nextSign === 0;
+      if (sequenceClosed) {
+        // Fetch fail text and apply effects
+        const ft = await fetch(`http://localhost:8081/api/mm/fail-text?failRoll=${nextTotal}`);
+        if (ft.ok) {
+          const dto = await ft.json();
+          setFailText(dto?.failResultText ?? null);
+        }
+        const pid = (attacker as any)?.id;
+        if (pid != null) {
+          const ap = await fetch(`http://localhost:8081/api/mm/apply-fail?playerId=${pid}&failRoll=${nextTotal}`, { method: 'POST' });
+          if (ap.ok) {
+            const dto = await ap.json();
+            setFailDto(dto);
+            if (!failText && dto?.failResultText) setFailText(dto.failResultText);
+          }
+        }
+        setFailEnabled(false);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Fail roll failed');
+    } finally {
+      window.clearInterval(localInterval);
+      setFailRolling(false);
     }
   }
 
@@ -1173,12 +1342,164 @@ export default function MM() {
                   })()}
                 </div>
               </div>
+
               
             </div>
+            
           );
         })()}
       </div>
+      {/* MM result + Fail area container (same style as L804) */}
+      <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto', marginTop: 12 }}>
+        {/* MM result area copied from AFR (without Critical) */}
+        {(() => {
+          const usedTotalVal = computeLocalModifiedTotal();
+          const canResolve = openTotal != null && typeof usedTotalVal === 'number';
+          return (
+            <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+                <div className="result-col">
+                  <span className="result-label">Modified roll</span>
+                  <div className="result-box orange">
+                    <span className="result-value">{openTotal != null ? usedTotalVal ?? '' : ''}</span>
+                  </div>
+                </div>
+                <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                  {mmType !== 'Movement' && (
+                    <button
+                      type="button"
+                      onClick={resolveMM}
+                      disabled={!canResolve || resolving}
+                      style={{ marginTop: 6, background: canResolve && !resolving ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!canResolve || resolving) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                    >
+                      {resolving ? 'Resolving…' : 'Resolve MM'}
+                    </button>
+                  )}
+                  <span className="result-label" style={{ textAlign: 'center' }}>MM result</span>
+                  <div className="result-box">
+                    <span className="result-value">{mmRes?.resultText || ''}</span>
+                  </div>
+                </div>
+              </div>
+              {mmType === 'Movement' && mmRes?.row && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}></div>
+                  <table className="table" style={{ maxWidth: 560, tableLayout: 'fixed', width: 560 }}>
+                    <colgroup>
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                      <col style={{ width: '11.11%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Piece</th>
+                        <th>Very easy</th>
+                        <th>Easy</th>
+                        <th>Average</th>
+                        <th>Hard</th>
+                        <th>Very Hard</th>
+                        <th>Extremely</th>
+                        <th>Insane</th>
+                        <th>Absurd</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {(mmRes.row || []).slice(0,9).map((val, idx) => (
+                          <td key={idx} style={{ fontWeight: idx + 1 === (mmRes?.usedCol || 0) ? 900 : 600, background: idx + 1 === (mmRes?.usedCol || 0) ? '#d1fae5' : undefined, color: '#111' }}>{val ?? ''}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Fail roll (Movement only) */}
+        {mmType === 'Movement' && (failEnabled || failText || failDto) && (
+          <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, minWidth: 220 }}>
+            <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+              <button
+                type="button"
+                onClick={handleFailRollMM}
+                disabled={!failEnabled || failRolling}
+                style={{ marginTop: 6, background: failEnabled ? '#16a34a' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (!failEnabled || failRolling) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+              >
+                {failRolling ? 'Rolling…' : 'Roll Fail'}
+              </button>
+              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
+                <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
+              </div>
+              <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
+              <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail required'}>
+                <span className="result-value">{failLastRoll != null ? `${failLastRoll}` : ''}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fail result (Movement only) */}
+        {mmType === 'Movement' && (failEnabled || failText || failDto) && (
+          <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, background: failDto ? '#FFF5EB' : '#f9fafb', color: failDto ? '#7a2e0c' : '#555', maxWidth: 560 }}>
+            {failDto || failText ? (
+              <>
+                <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center' }}>FAIL</div>
+                <div style={{ marginBottom: 4, border: '1px solid #ddd', borderRadius: 6, padding: '6px 8px', background: '#fff', color: '#111' }}>
+                  <strong>{failDto?.failResultText ?? failText ?? ''}</strong>
+                </div>
+                <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+                  <tbody>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Extra dmg</td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultAdditionalDamage ?? 0}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultHPLossPerRound ?? 0}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Stunned rounds</td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultStunnedForRounds ?? 0}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Penalty of actions</td>
+                      <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{(failDto as any)?.failResultPenaltyOfActions ?? 0}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>Instant death</td>
+                      <td>
+                        {(failDto as any)?.failResultsInstantDeath ? (
+                          <span title="Instant death" aria-label="Instant death">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#b91c1c" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M12 2C7 2 3 6 3 11c0 3.9 2.5 7.2 6 8.4V22h6v-2.6c3.5-1.2 6-4.5 6-8.4 0-5-4-9-9-9z"/>
+                              <circle cx="9" cy="11" r="1.5" fill="#fff" />
+                              <circle cx="15" cy="11" r="1.5" fill="#fff" />
+                              <path d="M9 15c1 .7 2 .7 3 .7s2 0 3-.7" fill="none" stroke="#fff" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', fontStyle: 'italic', color: '#777' }}>Awaiting fail result…</div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
-    
   );
 }
