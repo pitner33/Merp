@@ -96,7 +96,7 @@ public class Player {
             355000  // 20
     };
 
-    private static double getLevelCap(Integer level) {
+    public static double getLevelCap(Integer level) {
         if (level == null || level < 1) return 0d;
         int idx = Math.min(Math.max(level, 1), 20);
         return (double) LEVEL_CAPS[idx];

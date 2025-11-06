@@ -1,9 +1,13 @@
 package com.sol.merp.controllers;
 
 import com.sol.merp.attributes.AttackType;
+import com.sol.merp.attributes.ArmorType;
 import com.sol.merp.attributes.CritType;
+import com.sol.merp.attributes.Gender;
 import com.sol.merp.attributes.PlayerActivity;
+import com.sol.merp.attributes.PlayerClass;
 import com.sol.merp.attributes.PlayerTarget;
+import com.sol.merp.attributes.Race;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
@@ -15,6 +19,7 @@ import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @RestController
@@ -65,6 +71,138 @@ public class ApiController {
     @GetMapping("/players/ordered")
     public List<Player> getOrderedPlayersWhoPlay() {
         return playerService.adventurersOrderedList();
+    }
+
+    @PostMapping("/players")
+    public ResponseEntity<Player> createPlayer(@RequestBody Player incoming) {
+        if (incoming == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (incoming.getCharacterId() == null || incoming.getCharacterId().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        String allocatedCharacterId = allocateCharacterId(incoming.getCharacterId());
+        if (allocatedCharacterId == null) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        incoming.setCharacterId(allocatedCharacterId);
+        if (incoming.getName() == null || incoming.getName().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+
+        incoming.setId(null);
+
+        if (incoming.getActivePenaltyEffects() == null) {
+            incoming.setActivePenaltyEffects(new ArrayList<>());
+        }
+
+        if (incoming.getIsPlaying() == null) incoming.setIsPlaying(false);
+        if (incoming.getIsAlive() == null) incoming.setIsAlive(true);
+        if (incoming.getIsActive() == null) incoming.setIsActive(true);
+        if (incoming.getIsStunned() == null) incoming.setIsStunned(false);
+        if (incoming.getShield() == null) incoming.setShield(false);
+
+        if (incoming.getPlayerActivity() == null) incoming.setPlayerActivity(PlayerActivity._5DoNothing);
+        if (incoming.getAttackType() == null) incoming.setAttackType(AttackType.none);
+        if (incoming.getCritType() == null) incoming.setCritType(CritType.none);
+        if (incoming.getArmorType() == null) incoming.setArmorType(ArmorType.none);
+        if (incoming.getTarget() == null) incoming.setTarget(PlayerTarget.none);
+
+        if (incoming.getLvl() == null) incoming.setLvl(1);
+        if (incoming.getXp() == null) {
+            incoming.setXp(Player.getLevelCap(incoming.getLvl()));
+        }
+        if (incoming.getHpMax() == null) incoming.setHpMax(0D);
+        if (incoming.getHpActual() == null) incoming.setHpActual(incoming.getHpMax());
+        if (incoming.getMm() == null) incoming.setMm(0);
+        if (incoming.getTbUsedForDefense() == null) incoming.setTbUsedForDefense(0);
+        if (incoming.getTbOneHanded() == null) incoming.setTbOneHanded(0);
+        if (incoming.getTbTwoHanded() == null) incoming.setTbTwoHanded(0);
+        if (incoming.getTbRanged() == null) incoming.setTbRanged(0);
+        if (incoming.getTbBaseMagic() == null) incoming.setTbBaseMagic(0);
+        if (incoming.getTbTargetMagic() == null) incoming.setTbTargetMagic(0);
+        if (incoming.getSecondaryTB() == null) incoming.setSecondaryTB(0);
+        if (incoming.getVb() == null) incoming.setVb(0);
+        if (incoming.getAgilityBonus() == null) incoming.setAgilityBonus(0);
+        if (incoming.getMdLenyeg() == null) incoming.setMdLenyeg(0);
+        if (incoming.getMdKapcsolat() == null) incoming.setMdKapcsolat(0);
+        if (incoming.getStunnedForRounds() == null || incoming.getStunnedForRounds() < 0) incoming.setStunnedForRounds(0);
+        if (incoming.getHpLossPerRound() == null || incoming.getHpLossPerRound() < 0) incoming.setHpLossPerRound(0);
+        if (incoming.getPenaltyOfActions() == null) incoming.setPenaltyOfActions(0);
+        if (incoming.getPerception() == null) incoming.setPerception(0);
+        if (incoming.getTracking() == null) incoming.setTracking(0);
+        if (incoming.getLockPicking() == null) incoming.setLockPicking(0);
+        if (incoming.getDisarmTraps() == null) incoming.setDisarmTraps(0);
+        if (incoming.getObjectUsage() == null) incoming.setObjectUsage(0);
+        if (incoming.getRunes() == null) incoming.setRunes(0);
+        if (incoming.getInfluence() == null) incoming.setInfluence(0);
+        if (incoming.getStealth() == null) incoming.setStealth(0);
+
+        Double hpAct = incoming.getHpActual();
+        Double hpMax = incoming.getHpMax();
+        if (hpAct == null) hpAct = 0D;
+        if (hpAct < 0D) hpAct = 0D;
+        if (hpMax != null && hpAct > hpMax) hpAct = hpMax;
+        incoming.setHpActual(hpAct);
+
+        Integer computedTb = computeTb(incoming);
+        incoming.setTb(computedTb);
+
+        Integer tbUsed = incoming.getTbUsedForDefense();
+        if (tbUsed == null) tbUsed = 0;
+        if (tbUsed < 0) tbUsed = 0;
+        int maxDef = (incoming.getTb() != null ? incoming.getTb() : 0) / 2;
+        if (maxDef < 0) maxDef = 0;
+        if (tbUsed > maxDef) tbUsed = maxDef;
+        incoming.setTbUsedForDefense(tbUsed);
+
+        try {
+            Player saved = playerRepository.save(incoming);
+            playerService.checkAndSetStats(saved);
+            Player normalized = playerRepository.findById(saved.getId()).orElse(saved);
+            return ResponseEntity.status(HttpStatus.CREATED).body(normalized);
+        } catch (Exception ex) {
+            log.warn("Failed to create player charId={} name={} -> {}", incoming.getCharacterId(), incoming.getName(), ex.toString());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private String allocateCharacterId(String rawPrefix) {
+        if (rawPrefix == null) {
+            return null;
+        }
+        String prefix = rawPrefix.trim().toUpperCase();
+        if (prefix.isEmpty()) {
+            return null;
+        }
+
+        List<Player> matches = playerRepository.findAllByCharacterIdStartingWith(prefix);
+        int[] maxAndWidth = matches.stream()
+                .map(Player::getCharacterId)
+                .filter(Objects::nonNull)
+                .map(id -> id.trim())
+                .filter(id -> id.length() >= prefix.length())
+                .map(id -> id.substring(0, prefix.length()).equalsIgnoreCase(prefix) ? id.substring(prefix.length()) : null)
+                .filter(Objects::nonNull)
+                .map(part -> part.trim())
+                .filter(part -> !part.isEmpty())
+                .map(part -> part.matches("\\d+") ? part : null)
+                .filter(Objects::nonNull)
+                .map(part -> new int[] { Integer.parseInt(part), part.length() })
+                .reduce(new int[] { 0, 2 }, (acc, curr) -> {
+                    if (curr[0] > acc[0]) {
+                        return new int[] { curr[0], Math.max(curr[1], acc[1]) };
+                    }
+                    return new int[] { acc[0], Math.max(curr[1], acc[1]) };
+                });
+
+        int maxSuffix = maxAndWidth[0];
+        int width = Math.max(2, maxAndWidth[1]);
+        int next = Math.max(1, maxSuffix + 1);
+        String formatted = String.format("%0" + width + "d", next);
+        return prefix + formatted;
     }
 
     @GetMapping("/players/{id}")
@@ -380,6 +518,31 @@ public class ApiController {
     @GetMapping("/meta/player-activities")
     public List<PlayerActivity> playerActivities() {
         return Arrays.asList(PlayerActivity.values());
+    }
+
+    @GetMapping("/meta/genders")
+    public List<Gender> genders() {
+        return Arrays.asList(Gender.values());
+    }
+
+    @GetMapping("/meta/races")
+    public List<Race> races() {
+        return Arrays.asList(Race.values());
+    }
+
+    @GetMapping("/meta/player-classes")
+    public List<PlayerClass> playerClasses() {
+        return Arrays.asList(PlayerClass.values());
+    }
+
+    @GetMapping("/meta/armor-types")
+    public List<ArmorType> armorTypes() {
+        return Arrays.asList(ArmorType.values());
+    }
+
+    @GetMapping("/meta/player-targets")
+    public List<PlayerTarget> playerTargets() {
+        return Arrays.asList(PlayerTarget.values());
     }
 
     // Bulk update players from the Adventure page

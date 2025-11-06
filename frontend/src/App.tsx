@@ -10,6 +10,7 @@ import D100 from './pages/D100';
 import Crit from './pages/Crit';
 import SingleAttack from './pages/SingleAttack';
 import MM from './pages/MM';
+import GmAddCharacter from './pages/GmAddCharacter';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/adventure/crit" element={<Crit />} />
         <Route path="/adventure/attack" element={<SingleAttack />} />
         <Route path="/adventure/mm" element={<MM />} />
+        <Route path="/gm/addcharacter" element={<GmAddCharacter />} />
         <Route path="*" element={<p>Not Found</p>} />
       </Routes>
     </div>
