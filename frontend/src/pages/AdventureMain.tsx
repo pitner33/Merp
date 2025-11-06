@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
+import { sortPlayersByCharacterId } from '../utils/characterId';
 
 export default function AdventureMain() {
   const location = useLocation();
@@ -17,7 +18,7 @@ export default function AdventureMain() {
       return [];
     }
   })();
-  const players: Player[] = statePlayers.length > 0 ? statePlayers : storagePlayers;
+  const players: Player[] = sortPlayersByCharacterId(statePlayers.length > 0 ? statePlayers : storagePlayers);
   const [rows, setRows] = useState<Player[]>(players);
   const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
@@ -35,11 +36,11 @@ export default function AdventureMain() {
         if (!Array.isArray(saved) || saved.length === 0) return;
         const ids = saved.map((p) => p.characterId);
         const res = await fetch('http://localhost:8081/api/players/ordered');
-        if (!res.ok) { setRows(saved); return; }
+        if (!res.ok) { setRows(sortPlayersByCharacterId(saved)); return; }
         const data = (await res.json()) as Player[];
         const byId = new Map(data.map((p) => [p.characterId, p] as const));
         const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
-        if (selected.length > 0) setRows(selected);
+        if (selected.length > 0) setRows(sortPlayersByCharacterId(selected));
       } catch {}
     })();
   }, [location.key]);
@@ -52,11 +53,11 @@ export default function AdventureMain() {
         if (!Array.isArray(saved) || saved.length === 0) return;
         const ids = saved.map((p) => p.characterId);
         const res = await fetch('http://localhost:8081/api/players/ordered');
-        if (!res.ok) { setRows(saved); return; }
+        if (!res.ok) { setRows(sortPlayersByCharacterId(saved)); return; }
         const data = (await res.json()) as Player[];
         const byId = new Map(data.map((p) => [p.characterId, p] as const));
         const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
-        if (selected.length > 0) setRows(selected);
+        if (selected.length > 0) setRows(sortPlayersByCharacterId(selected));
       } catch {}
     }
     window.addEventListener('focus', onFocus);
@@ -80,11 +81,11 @@ export default function AdventureMain() {
           if (!Array.isArray(saved) || saved.length === 0) return;
           const ids = saved.map((p) => p.characterId);
           const res = await fetch('http://localhost:8081/api/players/ordered');
-          if (!res.ok) { setRows(saved); return; }
+          if (!res.ok) { setRows(sortPlayersByCharacterId(saved)); return; }
           const data = (await res.json()) as Player[];
           const byId = new Map(data.map((p) => [p.characterId, p] as const));
           const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
-          if (selected.length > 0) setRows(selected);
+          if (selected.length > 0) setRows(sortPlayersByCharacterId(selected));
         } catch {}
       }
     }
@@ -379,8 +380,8 @@ export default function AdventureMain() {
               top: pos.top,
               width: pos.width,
               zIndex: 10000,
-              maxHeight: 220,
-              overflowY: 'auto',
+              maxHeight: 'none',
+              overflowY: 'visible',
               background: '#2b2b2b',
               color: '#fff',
               border: '1px solid #555',

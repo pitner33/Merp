@@ -3,6 +3,7 @@ import { get, patch, del } from '../api/client';
 import type { Player } from '../types';
 import { Link } from 'react-router-dom';
 import { isXpOverCap, formatXp } from '../utils/xp';
+import { sortPlayersByCharacterId } from '../utils/characterId';
 
 export default function Landing() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -57,7 +58,7 @@ export default function Landing() {
     try {
       setLoading(true);
       const data = await get<Player[]>('/players');
-      setPlayers(data);
+      setPlayers(sortPlayersByCharacterId(data));
     } catch (e) {
       setError('Failed to load players');
     } finally {
@@ -162,8 +163,9 @@ export default function Landing() {
   }
 
   const sorted = (() => {
-    if (!sortKey) return players;
-    const arr = [...players];
+    const base = sortPlayersByCharacterId(players);
+    if (!sortKey) return base;
+    const arr = [...base];
     arr.sort((a, b) => {
       const va = (a as any)[sortKey];
       const vb = (b as any)[sortKey];
