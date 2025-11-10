@@ -333,7 +333,8 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('critType' as keyof Player)}>Crit {sortKey==='critType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('armorType' as keyof Player)}>Armor {sortKey==='armorType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('tb' as keyof Player)}>TB {sortKey==='tb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th colSpan={6} style={{ textAlign: 'center' }}>TB</th>
+            <th rowSpan={2}><button onClick={() => toggleSort('tbOffHand' as keyof Player)}>TB OH {sortKey==='tbOffHand' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
             <th rowSpan={2}><button onClick={() => toggleSort('vb' as keyof Player)}>VB {sortKey==='vb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('shield' as keyof Player)}>Shield {sortKey==='shield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('mm' as keyof Player)}>MM {sortKey==='mm' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -351,7 +352,6 @@ export default function Landing() {
           </tr>
           <tr>
             <th><button onClick={() => toggleSort('tbOneHanded' as keyof Player)}>1H {sortKey==='tbOneHanded' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th><button onClick={() => toggleSort('secondaryTB' as keyof Player)}>OH {sortKey==='secondaryTB' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbTwoHanded' as keyof Player)}>2H {sortKey==='tbTwoHanded' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbRanged' as keyof Player)}>Ranged {sortKey==='tbRanged' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbBaseMagic' as keyof Player)}>Base Magic {sortKey==='tbBaseMagic' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -404,8 +404,8 @@ export default function Landing() {
               <td>{p.critType}</td>
               <td>{p.armorType}</td>
               <td className="right">{p.tb}</td>
+              <td className="right">{p.tbOffHand ?? 0}</td>
               <td className="right">{p.tbOneHanded}</td>
-              <td className="right">{p.secondaryTB}</td>
               <td className="right">{p.tbTwoHanded}</td>
               <td className="right">{p.tbRanged}</td>
               <td className="right">{p.tbBaseMagic}</td>

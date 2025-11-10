@@ -331,6 +331,7 @@ export default function MM() {
     { value: 'slashing', label: 'Slashing' },
     { value: 'blunt', label: 'Blunt' },
     { value: 'twoHanded', label: 'Two-handed' },
+    { value: 'dualWield', label: 'Dual Wield' },
     { value: 'ranged', label: 'Ranged' },
     { value: 'clawsAndFangs', label: 'Claws and Fangs' },
     { value: 'grabOrBalance', label: 'Grab or Balance' },
@@ -360,11 +361,15 @@ export default function MM() {
     { value: 'plate', label: 'Plate' },
   ];
 
-  function attacksByActivity(activity?: string): string[] {
+  function attacksByActivity(activity?: string, player?: Player): string[] {
     switch (activity) {
       case '_1PerformMagic': return ['baseMagic', 'magicBall', 'magicProjectile'];
       case '_2RangedAttack': return ['ranged'];
-      case '_3PhisicalAttackOrMovement': return ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+      case '_3PhisicalAttackOrMovement': {
+        const base = ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+        const canDual = Boolean(player?.dualWield && player.dualWield > 0);
+        return canDual ? [...base.slice(0, 3), 'dualWield', ...base.slice(3)] : base;
+      }
       case '_4PrepareMagic':
       case '_5DoNothing':
       default: return ['none'];
@@ -380,6 +385,7 @@ export default function MM() {
     slashing: ['none', 'slashing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisial'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+    dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
     clawsAndFangs: ['none', 'slashing', 'piercing', 'crushing', 'grab', 'bigCreaturePhisical'],
     grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
@@ -449,7 +455,7 @@ export default function MM() {
     const curAct = attackerActivity as string | undefined;
     const enforcedAct = curAct && allowedActs.includes(curAct) ? curAct : allowedActs[0];
     if (enforcedAct !== curAct) setAttackerActivity(enforcedAct);
-    const allowedAtks = attacksByActivity(enforcedAct);
+    const allowedAtks = attacksByActivity(enforcedAct, attacker ?? undefined);
     const nextAttack = allowedAtks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAtks[0];
     if (nextAttack !== attackerAttack) setAttackerAttack(nextAttack);
     const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];

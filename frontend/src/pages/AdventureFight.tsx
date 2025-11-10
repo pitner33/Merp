@@ -32,7 +32,7 @@ export default function AdventureFight() {
         const res = await fetch('http://localhost:8081/api/players/ordered');
         if (!res.ok) return;
         const data = (await res.json()) as Player[];
-        if (!dropdownOpen) setRows(Array.isArray(data) ? data.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
+        if (!dropdownOpen) setRows(Array.isArray(data) ? data : rows);
       } catch {}
     }
     function onFocus() { if (!dropdownOpen) refreshOrdered(); }
@@ -76,7 +76,7 @@ export default function AdventureFight() {
         if (!res.ok) throw new Error(`Failed to load ordered players (${res.status})`);
         const data = (await res.json()) as Player[];
         if (isMounted && Array.isArray(data)) {
-          setRows(data.map((p) => ({ ...p, tbUsedForDefense: 0 })));
+          setRows(data);
         }
       } catch (e) {
         // Fallback: keep navigation state order if fetch fails
@@ -89,11 +89,6 @@ export default function AdventureFight() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  // Reset TB used for defense on landing
-  useEffect(() => {
-    setRows((prev) => prev.map((p) => ({ ...p, tbUsedForDefense: 0 })));
   }, []);
 
   function showToast(message: string, x?: number, y?: number) {
@@ -110,6 +105,30 @@ export default function AdventureFight() {
     window.setTimeout(() => setToast(null), 2000);
   }
 
+  function normalizePlayerTargetToken(value?: string | null, selfId?: string | null): string {
+    if (!value) return 'none';
+    if (value === 'none') return 'none';
+    if (value === 'self') {
+      if (!selfId) return 'none';
+      return normalizePlayerTargetToken(selfId, selfId);
+    }
+    const source = value.toUpperCase();
+    const match = source.match(/^(JK|NJK)(\d{1,2})$/);
+    if (!match) return 'none';
+    const num = Number(match[2]);
+    if (!Number.isFinite(num) || num < 1 || num > 15) return 'none';
+    return `${match[1]}${num.toString().padStart(2, '0')}`;
+  }
+
+  function displayTargetToken(target?: string | null, selfId?: string | null): string {
+    const enumToken = normalizePlayerTargetToken(target, selfId);
+    if (enumToken === 'none') return 'none';
+    const selfToken = selfId ? normalizePlayerTargetToken(selfId, selfId) : null;
+    if (selfToken && enumToken === selfToken) return 'self';
+    const match = rows.find((r) => normalizePlayerTargetToken(r.characterId, null) === enumToken);
+    return match?.characterId ?? enumToken;
+  }
+
   const activityOptions = [
     { value: '_1PerformMagic', label: 'Perform Magic' },
     { value: '_2RangedAttack', label: 'Ranged Attack' },
@@ -123,6 +142,7 @@ export default function AdventureFight() {
     { value: 'slashing', label: 'Slashing' },
     { value: 'blunt', label: 'Blunt' },
     { value: 'twoHanded', label: 'Two-handed' },
+    { value: 'dualWield', label: 'Dual Wield' },
     { value: 'ranged', label: 'Ranged' },
     { value: 'clawsAndFangs', label: 'Claws and Fangs' },
     { value: 'grabOrBalance', label: 'Grab or Balance' },
@@ -151,6 +171,7 @@ export default function AdventureFight() {
     slashing: ['none', 'slashing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisical'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+    dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
     clawsAndFangs: ['none', 'slashing', 'piercing', 'crushing', 'grab', 'bigCreaturePhisical'],
     grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
@@ -173,6 +194,7 @@ export default function AdventureFight() {
     blunt: true,
     grabOrBalance: true,
     twoHanded: false,
+    dualWield: false,
     ranged: false,
     clawsAndFangs: false,
     baseMagic: false,
@@ -244,7 +266,7 @@ export default function AdventureFight() {
       case '_2RangedAttack':
         return ['ranged'];
       case '_3PhisicalAttackOrMovement':
-        return ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+        return ['slashing', 'blunt', 'twoHanded', 'dualWield', 'clawsAndFangs', 'grabOrBalance'];
       case '_4PrepareMagic':
       case '_5DoNothing':
       default:
@@ -252,9 +274,10 @@ export default function AdventureFight() {
     }
   }
 
-  function allowedActivitiesByTarget(target?: string): string[] {
+  function allowedActivitiesByTarget(target?: string, selfId?: string): string[] {
     const all = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'];
-    if (!target) return ['_5DoNothing', '_4PrepareMagic'];
+    const norm = normalizePlayerTargetToken(target, selfId);
+    if (norm === 'none') return ['_5DoNothing', '_4PrepareMagic'];
     return all;
   }
 
@@ -435,18 +458,30 @@ export default function AdventureFight() {
   function normalizeRows(payloadRows: Player[]): Player[] {
     return payloadRows.map((r) => {
       const candidate = r.target ?? 'none';
-      const targetToken = candidate ?? 'none';
-      let act = r.playerActivity;
-      if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
-      let atk = r.attackType;
-      let crit = r.critType;
-      if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
-      let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
-      if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
-      const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+      const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
+      const allowedActs = allowedActivitiesByTarget(targetToken, r.characterId);
+      const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
+      const allowedAttacks = attacksByActivity(enforcedAct);
+      const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
+      const allowedCrits = critByAttack[nextAttack ?? 'none'] ?? ['none'];
+      const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+      const nextShield = canUseShield(nextAttack) ? r.shield : false;
+      const tbBase = computeTb({ ...r, attackType: nextAttack } as Player) ?? r.tb;
+      const tbVal = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : tbBase;
+      const isActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
       const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
       const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
-      return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+      return {
+        ...r,
+        playerActivity: enforcedAct,
+        attackType: nextAttack,
+        critType: nextCrit,
+        shield: nextShield,
+        tb: tbVal,
+        tbUsedForDefense: nextDef,
+        target: targetToken,
+        isActive,
+      } as Player;
     });
   }
 
@@ -464,7 +499,8 @@ export default function AdventureFight() {
               // Normalize payload like in AdventureMain
               const payload = rows.map((r) => {
                 const candidate = r.target ?? 'none';
-                const targetToken = candidate ?? 'none';
+                const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
+
                 let act = r.playerActivity;
                 if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
                 let atk = r.attackType;
@@ -534,7 +570,7 @@ export default function AdventureFight() {
               // 1) Persist the current table to backend so it's aware of targets/activities/etc
               const payload = rows.map((r) => {
                 const candidate = r.target ?? 'none';
-                const targetToken = candidate ?? 'none';
+                const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
                 let act = r.playerActivity;
                 if ((targetToken === 'none' || targetToken == null) && act !== '_4PrepareMagic') act = '_5DoNothing';
                 let atk = r.attackType;
@@ -558,7 +594,7 @@ export default function AdventureFight() {
                 const resOrdered = await fetch('http://localhost:8081/api/players/ordered');
                 if (resOrdered.ok) {
                   const refreshed = (await resOrdered.json()) as Player[];
-                  setRows(Array.isArray(refreshed) ? refreshed.map((p) => ({ ...p, tbUsedForDefense: 0 })) : rows);
+                  setRows(Array.isArray(refreshed) ? normalizeRows(refreshed) : rows);
                 }
               } catch {}
 
@@ -649,8 +685,9 @@ export default function AdventureFight() {
                 <th rowSpan={2}>Crit</th>
                 <th rowSpan={2}>Armor</th>
                 <th rowSpan={2}>TB</th>
+                <th rowSpan={2}>TB OH</th>
                 <th rowSpan={2}>TB for Defense</th>
-                <th colSpan={6} style={{ textAlign: 'center' }}>TB</th>
+                <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
                 <th rowSpan={2}>Stunned Rounds</th>
@@ -670,7 +707,6 @@ export default function AdventureFight() {
               </tr>
               <tr>
                 <th>1H</th>
-                <th>OH</th>
                 <th>2H</th>
                 <th>Ranged</th>
                 <th>Base Magic</th>
@@ -777,7 +813,7 @@ export default function AdventureFight() {
                         ];
                         return (
                           <TargetDropdown
-                            valueToken={p.target == null ? 'none' : p.target === p.characterId ? 'self' : (p.target as string)}
+                            valueToken={displayTargetToken(p.target as string | undefined, p.characterId)}
                             selfId={p.characterId}
                             widthCh={targetWidthCh + 6}
                             options={opts}
@@ -792,7 +828,7 @@ export default function AdventureFight() {
                                   else if (value === 'self') nextTarget = r.characterId;
                                   else nextTarget = value;
 
-                                  const allowedActs = allowedActivitiesByTarget(nextTarget);
+                                  const allowedActs = allowedActivitiesByTarget(nextTarget, r.characterId);
                                   const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
                                   const allowedAttacks = attacksByActivity(enforcedAct);
                                   const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
@@ -812,7 +848,12 @@ export default function AdventureFight() {
                     </td>
                     <td>
                       {(() => {
-                        const allowedActs = allowedActivitiesByTarget(p.target);
+                        const normalizeTarget = (target: string | undefined) => {
+                          if (target === 'self') return p.characterId;
+                          if (target === 'none') return undefined;
+                          return target;
+                        };
+                        const allowedActs = allowedActivitiesByTarget(normalizeTarget(p.target), p.characterId);
                         const curAct = (p.playerActivity && allowedActs.includes(p.playerActivity)) ? p.playerActivity : allowedActs[0];
                         return (
                           <select
@@ -826,7 +867,8 @@ export default function AdventureFight() {
                               setRows((prev) =>
                                 prev.map((r) => {
                                   if (r.id !== p.id) return r;
-                                  const enforcedAct = allowedActivitiesByTarget(r.target).includes(value) ? value : allowedActivitiesByTarget(r.target)[0];
+                                  const allowedActsForRow = allowedActivitiesByTarget(r.target, r.characterId);
+                                  const enforcedAct = allowedActsForRow.includes(value) ? value : allowedActsForRow[0];
                                   const allowedAttacks = attacksByActivity(enforcedAct);
                                   const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
                                   const allowedCrits = critByAttack[nextAttack] ?? ['none'];
@@ -934,6 +976,7 @@ export default function AdventureFight() {
                       </select>
                     </td>
                     <td className="right">{computeTb(p)}</td>
+                    <td className="right">{p.tbOffHand ?? 0}</td>
                     <td>
                       {(() => {
                         const tb = computeTb(p) ?? 0;
@@ -962,7 +1005,6 @@ export default function AdventureFight() {
                       })()}
                     </td>
                   <td className="right">{p.tbOneHanded}</td>
-                  <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>
                   <td className="right">{p.tbRanged}</td>
                   <td className="right">{p.tbBaseMagic}</td>

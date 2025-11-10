@@ -107,11 +107,28 @@ export default function AdventureMain() {
     window.setTimeout(() => setToast(null), 2000);
   }
 
-  function isValidPlayerTarget(token: string): boolean {
-    // Valid values: none, JK1..JK15, NJK1..NJK15
-    if (token === 'none') return true;
-    const re = /^(?:JK|NJK)(?:[1-9]|1[0-5])$/;
-    return re.test(token);
+  function normalizePlayerTargetToken(value?: string | null, selfId?: string | null): string {
+    if (!value) return 'none';
+    if (value === 'none') return 'none';
+    if (value === 'self') {
+      if (!selfId) return 'none';
+      return normalizePlayerTargetToken(selfId, selfId);
+    }
+    const source = value.toUpperCase();
+    const match = source.match(/^(JK|NJK)(\d{1,2})$/);
+    if (!match) return 'none';
+    const num = Number(match[2]);
+    if (!Number.isFinite(num) || num < 1 || num > 15) return 'none';
+    return `${match[1]}${num.toString().padStart(2, '0')}`;
+  }
+
+  function displayTargetToken(target?: string | null, selfId?: string | null): string {
+    const enumToken = normalizePlayerTargetToken(target, selfId);
+    if (enumToken === 'none') return 'none';
+    const selfToken = selfId ? normalizePlayerTargetToken(selfId, selfId) : null;
+    if (selfToken && enumToken === selfToken) return 'self';
+    const match = rows.find((r) => normalizePlayerTargetToken(r.characterId, null) === enumToken);
+    return match?.characterId ?? enumToken;
   }
 
   const activityOptions = [
@@ -127,6 +144,7 @@ export default function AdventureMain() {
     { value: 'slashing', label: 'Slashing' },
     { value: 'blunt', label: 'Blunt' },
     { value: 'twoHanded', label: 'Two-handed' },
+    { value: 'dualWield', label: 'Dual Wield' },
     { value: 'ranged', label: 'Ranged' },
     { value: 'clawsAndFangs', label: 'Claws and Fangs' },
     { value: 'grabOrBalance', label: 'Grab or Balance' },
@@ -155,6 +173,7 @@ export default function AdventureMain() {
     slashing: ['none', 'slashing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisical'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+    dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
     clawsAndFangs: ['none', 'slashing', 'piercing', 'crushing', 'grab', 'bigCreaturePhisical'],
     grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
@@ -215,15 +234,17 @@ export default function AdventureMain() {
     }
   }
 
-  function attacksByActivity(activity?: string): string[] {
+  function attacksByActivity(activity?: string, player?: Player): string[] {
     switch (activity) {
       case '_1PerformMagic':
         return ['baseMagic', 'magicBall', 'magicProjectile'];
       case '_2RangedAttack':
         return ['ranged'];
-      case '_3PhisicalAttackOrMovement':
-        return ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
-      case '_4PrepareMagic':
+      case '_3PhisicalAttackOrMovement': {
+        const base = ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+        const canDual = Boolean(player?.dualWield && player.dualWield > 0);
+        return canDual ? [...base.slice(0, 3), 'dualWield', ...base.slice(3)] : base;
+      }
       case '_5DoNothing':
       default:
         return ['none'];
@@ -446,7 +467,7 @@ export default function AdventureMain() {
             try {
               const payload = rows.map((r) => {
                 const candidate = r.target ?? 'none';
-                const targetToken = isValidPlayerTarget(candidate) ? candidate : 'none';
+                const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
                 let act = r.playerActivity;
                 if (targetToken === 'none' && act !== '_4PrepareMagic') act = '_5DoNothing';
                 let atk = r.attackType;
@@ -474,6 +495,18 @@ export default function AdventureMain() {
                 showToast(`Saved ${savedCount}/${payload.length}. ${missing} failed.`);
                 return;
               }
+              try {
+                const orderedRes = await fetch('http://localhost:8081/api/players/ordered');
+                if (orderedRes.ok) {
+                  const ordered = (await orderedRes.json()) as Player[];
+                  const sorted = sortPlayersByCharacterId(Array.isArray(ordered) ? ordered : rows);
+                  setRows(sorted);
+                  try {
+                    localStorage.setItem('merp:selectedPlayers', JSON.stringify(sorted));
+                    localStorage.setItem('merp:adventureRefresh', String(Date.now()));
+                  } catch {}
+                }
+              } catch {}
               const homeUrl = new URL('/home', window.location.origin).toString();
               if (window.opener && !window.opener.closed) {
                 try {
@@ -498,7 +531,7 @@ export default function AdventureMain() {
             try {
               const payload = rows.map((r) => {
                 const candidate = r.target ?? 'none';
-                const targetToken = isValidPlayerTarget(candidate) ? candidate : 'none';
+                const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
                 let act = r.playerActivity;
                 if (targetToken === 'none' && act !== '_4PrepareMagic') act = '_5DoNothing';
                 let atk = r.attackType;
@@ -522,7 +555,20 @@ export default function AdventureMain() {
               const savedCount = Array.isArray(data?.saved) ? data.saved.length : 0;
               const missing = Array.isArray(data?.notFound) ? data.notFound.length : 0;
               showToast(`Saved ${savedCount} player(s)` + (missing ? `, ${missing} not found` : ''));
-              navigate('/adventure/fight', { state: { players: rows } });
+              let nextRows = rows;
+              try {
+                const orderedRes = await fetch('http://localhost:8081/api/players/ordered');
+                if (orderedRes.ok) {
+                  const ordered = (await orderedRes.json()) as Player[];
+                  const sorted = sortPlayersByCharacterId(Array.isArray(ordered) ? ordered : rows);
+                  nextRows = sorted;
+                  try {
+                    localStorage.setItem('merp:selectedPlayers', JSON.stringify(sorted));
+                    localStorage.setItem('merp:adventureRefresh', String(Date.now()));
+                  } catch {}
+                }
+              } catch {}
+              navigate('/adventure/fight', { state: { players: nextRows } });
             } catch (e) {
               showToast('Failed to save to server.');
             }
@@ -590,8 +636,9 @@ export default function AdventureMain() {
                 <th rowSpan={2}>Crit</th>
                 <th rowSpan={2}>Armor</th>
                 <th rowSpan={2}>TB</th>
+                <th rowSpan={2}>TB OH</th>
                 <th rowSpan={2}>TB for Defense</th>
-                <th colSpan={6} style={{ textAlign: 'center' }}>TB</th>
+                <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
                 <th rowSpan={2}>Stunned Rounds</th>
@@ -611,7 +658,6 @@ export default function AdventureMain() {
               </tr>
               <tr>
                 <th>1H</th>
-                <th>OH</th>
                 <th>2H</th>
                 <th>Ranged</th>
                 <th>Base Magic</th>
@@ -718,7 +764,7 @@ export default function AdventureMain() {
                       ];
                       return (
                         <TargetDropdown
-                          valueToken={p.target == null ? 'none' : p.target === p.characterId ? 'self' : (p.target as string)}
+                          valueToken={displayTargetToken(p.target as string | undefined, p.characterId)}
                           selfId={p.characterId}
                           widthCh={targetWidthCh + 6}
                           options={opts}
@@ -735,14 +781,14 @@ export default function AdventureMain() {
 
                                 const allowedActs = allowedActivitiesByTarget(nextTarget);
                                 const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                                const allowedAttacks = attacksByActivity(enforcedAct);
+                                const allowedAttacks = attacksByActivity(enforcedAct, r);
                                 const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
                                 const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
                                 const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
                                 const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                                return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
+                                return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
                               })
                             );
                             setOpenTargetRowId(null);
@@ -766,16 +812,17 @@ export default function AdventureMain() {
                               prev.map((r) => {
                                 if (r.id !== p.id) return r;
                                 const enforcedAct = allowedActivitiesByTarget(r.target).includes(value) ? value : allowedActivitiesByTarget(r.target)[0];
-                                const allowedAttacks = attacksByActivity(enforcedAct);
+                                const allowedAttacks = attacksByActivity(enforcedAct, r);
                                 const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
                                 const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
                                 const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
                                 const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb };
+                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
                               })
                             );
+                            setOpenTargetRowId(null);
                           }}
                         >
                           {activityOptions
@@ -790,51 +837,28 @@ export default function AdventureMain() {
                     })()}
                   </td>
                   <td>
-                    <select
-                      style={{ width: `${attackWidthCh + 2}ch` }}
-                      className="sel-attack"
-                      value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
-                      onChange={(e) => {
-                        const newAttack = e.target.value;
-                        setRows((prev) =>
-                          prev.map((r) => {
-                            if (r.id !== p.id) return r;
-                            const allowedCrits = critByAttack[newAttack] ?? ['none'];
-                            const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                            const nextShield = canUseShield(newAttack) ? r.shield : false;
-                            return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield };
-                          })
-                        );
-                      }}
-                    >
-                      {attackOptions
-                        .filter((opt) => attacksByActivity(p.playerActivity).includes(opt.value))
-                        .map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                    </select>
-                  </td>
-                  <td>
                     {(() => {
-                      const curAttack = (attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none';
-                      const allowed = critByAttack[curAttack ?? 'none'] ?? ['none'];
+                      const allowed = attacksByActivity(p.playerActivity, p);
+                      const curAttack = allowed.includes(p.attackType || '') ? (p.attackType as string) : allowed[0];
                       return (
                         <select
-                          style={{ width: `${critWidthCh + 2}ch` }}
-                          className="sel-crit"
-                          value={p.critType && allowed.includes(p.critType) ? p.critType : 'none'}
+                          className="sel-attack"
+                          style={{ width: `${attackWidthCh + 2}ch` }}
+                          value={curAttack ?? 'none'}
                           onChange={(e) => {
-                            const value = e.target.value;
+                            const newAttack = e.target.value;
                             setRows((prev) =>
-                              prev.map((r) =>
-                                r.id === p.id ? { ...r, critType: value } : r
-                              )
+                              prev.map((r) => {
+                                if (r.id !== p.id) return r;
+                                const allowedCrits = critByAttack[newAttack] ?? ['none'];
+                                const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
+                                const nextShield = canUseShield(newAttack) ? r.shield : false;
+                                return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                              })
                             );
                           }}
                         >
-                          {critOptions
+                          {attackOptions
                             .filter((opt) => allowed.includes(opt.value))
                             .map((opt) => (
                               <option key={opt.value} value={opt.value}>
@@ -846,16 +870,43 @@ export default function AdventureMain() {
                     })()}
                   </td>
                   <td>
+                    {(() => {
+                      const allowedAttacks = attacksByActivity(p.playerActivity, p);
+                      const curAttack = allowedAttacks.includes(p.attackType || '') ? (p.attackType as string) : allowedAttacks[0];
+                      const allowedCrits = critByAttack[curAttack ?? 'none'] ?? ['none'];
+                      const curCrit = p.critType && allowedCrits.includes(p.critType) ? p.critType : 'none';
+                      return (
+                        <select
+                          className="sel-crit"
+                          style={{ width: `${critWidthCh + 2}ch` }}
+                          value={curCrit}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setRows((prev) =>
+                              prev.map((r) => (r.id === p.id ? { ...r, critType: value } : r))
+                            );
+                          }}
+                        >
+                          {critOptions
+                            .filter((opt) => allowedCrits.includes(opt.value))
+                            .map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                        </select>
+                      );
+                    })()}
+                  </td>
+                  <td>
                     <select
-                      style={{ width: `${armorWidthCh + 2}ch` }}
                       className="sel-armor"
+                      style={{ width: `${armorWidthCh + 2}ch` }}
                       value={p.armorType ?? 'none'}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRows((prev) =>
-                          prev.map((r) =>
-                            r.id === p.id ? { ...r, armorType: value } : r
-                          )
+                          prev.map((r) => (r.id === p.id ? { ...r, armorType: value } : r))
                         );
                       }}
                     >
@@ -867,9 +918,37 @@ export default function AdventureMain() {
                     </select>
                   </td>
                   <td className="right">{computeTb(p)}</td>
-                  <td className="right">{p.tbUsedForDefense}</td>
+                  <td className="right">{p.tbOffHand ?? 0}</td>
+                  <td>
+                    {(() => {
+                      const tb = computeTb(p) ?? 0;
+                      const neg = tb < 0;
+                      const max = Math.floor(Math.max(0, tb) * 0.5);
+                      const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
+                      return (
+                        <input
+                          type="number"
+                          min={0}
+                          max={max}
+                          step={1}
+                          disabled={neg}
+                          value={value}
+                          onChange={(e) => {
+                            if (neg) return;
+                            const raw = Number(e.target.value);
+                            const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
+                            setRows((prev) =>
+                              prev.map((r) => (r.id === p.id ? { ...r, tbUsedForDefense: val } : r))
+                            );
+                          }}
+                          style={{ width: 70, textAlign: 'right' }}
+                          aria-label="TB used for defense"
+                          title={neg ? 'TB < 0 ➜ Defense TB fixed at 0' : `Max ${max} (50% of TB)`}
+                        />
+                      );
+                    })()}
+                  </td>
                   <td className="right">{p.tbOneHanded}</td>
-                  <td className="right">{p.secondaryTB}</td>
                   <td className="right">{p.tbTwoHanded}</td>
                   <td className="right">{p.tbRanged}</td>
                   <td className="right">{p.tbBaseMagic}</td>

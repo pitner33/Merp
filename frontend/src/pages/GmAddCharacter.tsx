@@ -38,7 +38,7 @@ const FIELD_DEFS: readonly FieldDefBase[] = [
   { key: 'tbRanged', label: 'TB Ranged', type: 'number', numberKind: 'int' },
   { key: 'tbBaseMagic', label: 'TB Base Magic', type: 'number', numberKind: 'int' },
   { key: 'tbTargetMagic', label: 'TB Target Magic', type: 'number', numberKind: 'int' },
-  { key: 'secondaryTB', label: 'TB Offhand', type: 'number', numberKind: 'int' },
+  { key: 'tbOffHand', label: 'TB Offhand', type: 'number', numberKind: 'int' },
   { key: 'vb', label: 'VB', type: 'number', numberKind: 'int' },
   { key: 'armorType', label: 'Armor', type: 'select', metaKey: 'armorTypes' },
   { key: 'shield', label: 'Shield', type: 'boolean' },
@@ -267,7 +267,7 @@ export default function GmAddCharacter() {
                   || field.key === 'tbRanged'
                   || field.key === 'tbBaseMagic'
                   || field.key === 'tbTargetMagic'
-                  || field.key === 'secondaryTB';
+                  || field.key === 'tbOffHand';
                 if (field.key === 'tbOneHanded') {
                   return (
                     <th
@@ -317,7 +317,7 @@ export default function GmAddCharacter() {
                 || field.key === 'tbRanged'
                 || field.key === 'tbBaseMagic'
                 || field.key === 'tbTargetMagic'
-                || field.key === 'secondaryTB'
+                || field.key === 'tbOffHand'
               ).map((field) => (
                 <th
                   key={field.key}

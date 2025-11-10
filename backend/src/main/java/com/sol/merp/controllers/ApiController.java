@@ -15,6 +15,7 @@ import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.fight.FightServiceImpl;
+import com.sol.merp.fight.DualWieldCalculator;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
@@ -123,7 +124,8 @@ public class ApiController {
         if (incoming.getTbRanged() == null) incoming.setTbRanged(0);
         if (incoming.getTbBaseMagic() == null) incoming.setTbBaseMagic(0);
         if (incoming.getTbTargetMagic() == null) incoming.setTbTargetMagic(0);
-        if (incoming.getSecondaryTB() == null) incoming.setSecondaryTB(0);
+        if (incoming.getTbOffHand() == null) incoming.setTbOffHand(0);
+        if (incoming.getDualWield() == null) incoming.setDualWield(0);
         if (incoming.getVb() == null) incoming.setVb(0);
         if (incoming.getAgilityBonus() == null) incoming.setAgilityBonus(0);
         if (incoming.getMdLenyeg() == null) incoming.setMdLenyeg(0);
@@ -620,6 +622,7 @@ public class ApiController {
             if (incoming.getTbRanged() == null || incoming.getTbRanged() < 0) incoming.setTbRanged(0);
             if (incoming.getTbBaseMagic() == null || incoming.getTbBaseMagic() < 0) incoming.setTbBaseMagic(0);
             if (incoming.getTbTargetMagic() == null || incoming.getTbTargetMagic() < 0) incoming.setTbTargetMagic(0);
+            if (incoming.getDualWield() == null || incoming.getDualWield() < 0) incoming.setDualWield(0);
 
             // 4) Derive isActive from activity if alive
             if (Boolean.TRUE.equals(incoming.getIsAlive())) {
@@ -772,17 +775,27 @@ public class ApiController {
             case blunt:
             case clawsAndFangs:
             case grabOrBalance:
+                p.setTbOffHand(0);
                 return p.getTbOneHanded();
+            case dualWield:
+                int mainTb = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
+                p.setTbOffHand(DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield()));
+                return mainTb;
             case twoHanded:
+                p.setTbOffHand(0);
                 return p.getTbTwoHanded();
             case ranged:
+                p.setTbOffHand(0);
                 return p.getTbRanged();
             case baseMagic:
+                p.setTbOffHand(0);
                 return p.getTbBaseMagic();
             case magicBall:
             case magicProjectile:
+                p.setTbOffHand(0);
                 return p.getTbTargetMagic();
             default:
+                p.setTbOffHand(0);
                 return p.getTb();
         }
     }

@@ -114,7 +114,7 @@ export default function PlayersList() {
             <th>TB BaseMagic</th>
             <th>TB TargetMagic</th>
             <th>TB UsedDef</th>
-            <th>Secondary TB</th>
+            <th>TB Offhand</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -183,7 +183,7 @@ export default function PlayersList() {
               <td>{p.tbBaseMagic}</td>
               <td>{p.tbTargetMagic}</td>
               <td>{p.tbUsedForDefense}</td>
-              <td>{p.secondaryTB}</td>
+              <td>{p.tbOffHand}</td>
               <td>
                 <button onClick={() => togglePlay(p.id)}>Toggle Play</button>{' '}
                 <Link to={`/players/${p.id}/edit`}>

@@ -44,7 +44,8 @@ public class Player {
     private Integer tbBaseMagic;
     private Integer tbTargetMagic;
     private Integer tbUsedForDefense;
-    private Integer secondaryTB; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
+    private Integer tbOffHand = 0; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
+    private Integer dualWield = 0;
 //    private Integer baseMagicTB;
 //    private Integer targetMagicTB;
     private Integer vb;
@@ -102,11 +103,62 @@ public class Player {
         return (double) LEVEL_CAPS[idx];
     }
 
-    //this one is used for charactercreation when starting the app
-    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
-                  PlayerTarget target, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer secondaryTB, Integer vb,
-                  Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
-                  Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+//     //this one is used for charactercreation when starting the app
+//     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
+//                   PlayerTarget target, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer dualWield, Integer vb,
+//                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
+//                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+//         this.characterId = characterId;
+//         this.name = name;
+//         this.gender = gender;
+//         this.race = race;
+//         this.playerClass = playerClass;
+//         this.isPlaying = false;
+//         this.isActive = true;
+//         this.isAlive = true;
+//         this.lvl = lvl;
+//         this.xp = getLevelCap(lvl);
+//         this.playerActivity = playerActivity;
+//         this.attackType = attackType;
+//         this.critType = critType;
+//         this.target = target;
+//         this.hpMax = hpMax;
+//         this.hpActual = hpMax;
+//         this.mm = mm;
+//         this.tb = 0;
+//         this.tbOneHanded = tbOneHanded;
+//         this.tbTwoHanded = tbTwoHanded;
+//         this.tbRanged = tbRanged;
+//         this.tbBaseMagic = tbBaseMagic;
+//         this.tbTargetMagic = tbTargetMagic;
+//         this.tbUsedForDefense = 0;
+//         this.tbOffHand = 0;
+//         this.dualWield = dualWield != null ? dualWield : 0;
+// //        this.baseMagicTB = baseMagicTB;
+// //        this.targetMagicTB = targetMagicTB;
+//         this.vb = vb;
+//         this.shield = shield;
+//         this.agilityBonus = agilityBonus;
+//         this.mdLenyeg = mdLenyeg;
+//         this.mdKapcsolat = mdKapcsolat;
+//         this.armorType = armorType;
+//         this.isStunned = false;
+//         this.stunnedForRounds = 0;
+//         this.penaltyOfActions = 0;
+//         this.hpLossPerRound = 0;
+//         this.perception = perception;
+//         this.tracking = tracking;
+//         this.lockPicking = lockPicking;
+//         this.disarmTraps = disarmTraps;
+//         this.objectUsage = objectUsage;
+//         this.runes = runes;
+//         this.influence = influence;
+//         this.stealth = stealth;
+//         this.activePenaltyEffects = new ArrayList<>();
+//     }
+
+       //this one is used for charactercreation when starting the app
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer dualWield, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
         this.gender = gender;
@@ -117,10 +169,10 @@ public class Player {
         this.isAlive = true;
         this.lvl = lvl;
         this.xp = getLevelCap(lvl);
-        this.playerActivity = playerActivity;
-        this.attackType = attackType;
-        this.critType = critType;
-        this.target = target;
+        this.playerActivity = PlayerActivity._5DoNothing;
+        this.attackType = AttackType.none;
+        this.critType = CritType.none;
+        this.target = PlayerTarget.none;
         this.hpMax = hpMax;
         this.hpActual = hpMax;
         this.mm = mm;
@@ -131,9 +183,8 @@ public class Player {
         this.tbBaseMagic = tbBaseMagic;
         this.tbTargetMagic = tbTargetMagic;
         this.tbUsedForDefense = 0;
-        this.secondaryTB = secondaryTB;
-//        this.baseMagicTB = baseMagicTB;
-//        this.targetMagicTB = targetMagicTB;
+        this.tbOffHand = 0;
+        this.dualWield = dualWield != null ? dualWield : 0;
         this.vb = vb;
         this.shield = shield;
         this.agilityBonus = agilityBonus;
@@ -156,50 +207,51 @@ public class Player {
     }
 
     //TODO delete / ideiglenes a playertarget beallitashoz
-    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType,
-                  Double hpMax, Integer mm, Integer tb, Integer secondaryTB, Integer vb,
-                  Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
-                  Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
-        this.characterId = characterId;
-        this.name = name;
-        this.gender = gender;
-        this.race = race;
-        this.playerClass = playerClass;
-        this.isPlaying = false;
-        this.isActive = true;
-        this.lvl = lvl;
-        this.xp = getLevelCap(lvl);
-        this.playerActivity = PlayerActivity._5DoNothing;
-        this.attackType = attackType;
-        this.critType = critType;
-        this.target = PlayerTarget.none;
-        this.hpMax = hpMax;
-        this.hpActual = hpMax;
-        this.mm = mm;
-        this.tb = tb;
-        this.tbUsedForDefense = 0;
-        this.secondaryTB = secondaryTB;
-//        this.baseMagicTB = baseMagicTB;
-//        this.targetMagicTB = targetMagicTB;
-        this.vb = vb;
-        this.shield = shield;
-        this.agilityBonus = agilityBonus;
-        this.mdLenyeg = mdLenyeg;
-        this.mdKapcsolat = mdKapcsolat;
-        this.armorType = armorType;
-        this.isStunned = false;
-        this.stunnedForRounds = 0;
-        this.penaltyOfActions = 0;
-        this.hpLossPerRound = 0;
-        this.perception = perception;
-        this.tracking = tracking;
-        this.lockPicking = lockPicking;
-        this.disarmTraps = disarmTraps;
-        this.objectUsage = objectUsage;
-        this.runes = runes;
-        this.influence = influence;
-        this.stealth = stealth;
-    }
+//     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType,
+//                   Double hpMax, Integer mm, Integer dualWield, Integer vb,
+//                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
+//                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+//         this.characterId = characterId;
+//         this.name = name;
+//         this.gender = gender;
+//         this.race = race;
+//         this.playerClass = playerClass;
+//         this.isPlaying = false;
+//         this.isActive = true;
+//         this.lvl = lvl;
+//         this.xp = getLevelCap(lvl);
+//         this.playerActivity = PlayerActivity._5DoNothing;
+//         this.attackType = attackType;
+//         this.critType = critType;
+//         this.target = PlayerTarget.none;
+//         this.hpMax = hpMax;
+//         this.hpActual = hpMax;
+//         this.mm = mm;
+//         this.tb = 0;
+//         this.tbUsedForDefense = 0;
+//         this.tbOffHand = 0;
+//         this.dualWield = dualWield != null ? dualWield : 0;
+// //        this.baseMagicTB = baseMagicTB;
+// //        this.targetMagicTB = targetMagicTB;
+//         this.vb = vb;
+//         this.shield = shield;
+//         this.agilityBonus = agilityBonus;
+//         this.mdLenyeg = mdLenyeg;
+//         this.mdKapcsolat = mdKapcsolat;
+//         this.armorType = armorType;
+//         this.isStunned = false;
+//         this.stunnedForRounds = 0;
+//         this.penaltyOfActions = 0;
+//         this.hpLossPerRound = 0;
+//         this.perception = perception;
+//         this.tracking = tracking;
+//         this.lockPicking = lockPicking;
+//         this.disarmTraps = disarmTraps;
+//         this.objectUsage = objectUsage;
+//         this.runes = runes;
+//         this.influence = influence;
+//         this.stealth = stealth;
+//     }
 
 
     //    public void setTbUsedForDefense(Integer tbUsedForDefense) {

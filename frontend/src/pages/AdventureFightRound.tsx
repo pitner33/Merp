@@ -444,6 +444,22 @@ export default function AdventureFightRound() {
     }
   }
 
+  function attacksByActivity(activity?: string): string[] {
+    switch (activity) {
+      case '_1PerformMagic':
+        return ['baseMagic', 'magicBall', 'magicProjectile'];
+      case '_2RangedAttack':
+        return ['ranged'];
+      case '_3PhisicalAttackOrMovement':
+        return ['slashing', 'blunt', 'twoHanded', 'dualWield', 'clawsAndFangs', 'grabOrBalance'];
+      case '_4PrepareMagic':
+      case '_5DoNothing':
+        return [];
+      default:
+        return [];
+    }
+  }
+
   function labelActivity(v?: string): string {
     const map: Record<string, string> = {
       _1PerformMagic: 'Perform Magic',
@@ -457,9 +473,11 @@ export default function AdventureFightRound() {
 
   function labelAttack(v?: string): string {
     const map: Record<string, string> = {
+      none: 'None',
       slashing: 'Slashing',
       blunt: 'Blunt',
       twoHanded: 'Two-handed',
+      dualWield: 'Dual Wield',
       ranged: 'Ranged',
       clawsAndFangs: 'Claws and Fangs',
       grabOrBalance: 'Grab or Balance',
@@ -471,6 +489,19 @@ export default function AdventureFightRound() {
   }
 
   function labelCrit(v?: string): string {
+    const critByAttack: Record<string, string[]> = {
+      none: ['none'],
+      slashing: ['none', 'slashing', 'bigCreaturePhisical'],
+      blunt: ['none', 'blunt', 'bigCreaturePhisical'],
+      twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+      dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+      ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
+      clawsAndFangs: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
+      grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
+      baseMagic: ['none', 'heat', 'cold', 'electricity', 'balance', 'crushing', 'grab', 'bigCreatureMagic'],
+      magicBall: ['none', 'heat', 'cold', 'electricity', 'balance', 'crushing', 'grab', 'bigCreatureMagic'],
+      magicProjectile: ['none', 'heat', 'cold', 'electricity', 'balance', 'crushing', 'grab', 'bigCreatureMagic'],
+    };
     const map: Record<string, string> = {
       none: 'None',
       slashing: 'Slashing',
@@ -911,6 +942,7 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>Crit</th>
               <th rowSpan={2}>Armor</th>
               <th rowSpan={2}>TB</th>
+              <th rowSpan={2}>TB OH</th>
               <th rowSpan={2}>TB for Defense</th>
               <th rowSpan={2}>VB</th>
               <th rowSpan={2}>Shield</th>
@@ -1017,6 +1049,7 @@ export default function AdventureFightRound() {
                 <td>{labelCrit(p?.critType as any)}</td>
                 <td>{labelArmor(p?.armorType as any)}</td>
                 <td className="right">{p ? computeTb(p) : ''}</td>
+                <td className="right">{p?.tbOffHand ?? 0}</td>
                 <td className="right">{p?.tbUsedForDefense}</td>
                 <td className="right">{p?.vb}</td>
                 <td>

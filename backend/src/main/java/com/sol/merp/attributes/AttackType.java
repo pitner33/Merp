@@ -4,6 +4,7 @@ public enum AttackType {
     slashing("Slashing"),
     blunt("Blunt"),
     twoHanded("Two-handed"),
+    dualWield("Dual Wield"),
     ranged("Ranged"),
     clawsAndFangs("Claws and Fangs"),
     grabOrBalance("Grab or Balance"),

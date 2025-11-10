@@ -59,17 +59,27 @@ public class FightServiceImpl implements FightService {
             case blunt:
             case clawsAndFangs:
             case grabOrBalance:
+                p.setTbOffHand(0);
                 return p.getTbOneHanded();
+            case dualWield:
+                int mainTb = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
+                p.setTbOffHand(DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield()));
+                return mainTb;
             case twoHanded:
+                p.setTbOffHand(0);
                 return p.getTbTwoHanded();
             case ranged:
+                p.setTbOffHand(0);
                 return p.getTbRanged();
             case baseMagic:
+                p.setTbOffHand(0);
                 return p.getTbBaseMagic();
             case magicBall:
             case magicProjectile:
+                p.setTbOffHand(0);
                 return p.getTbTargetMagic();
             default:
+                p.setTbOffHand(0);
                 return p.getTb();
         }
     }
@@ -109,6 +119,9 @@ public class FightServiceImpl implements FightService {
         Player defender = pairSafe.get(1);
 
         int attackerTbBase = attacker != null ? (computeTb(attacker) != null ? computeTb(attacker) : 0) : 0;
+        if (attacker != null && attacker.getAttackType() == AttackType.dualWield) {
+            attacker.setTb(attackerTbBase);
+        }
         int cAttackerTBForDefense = -Math.abs(attacker != null ? (attacker.getTbUsedForDefense() != null ? attacker.getTbUsedForDefense() : 0) : 0);
         int cAttackerPenalty = -Math.abs(attacker != null ? (attacker.getPenaltyOfActions() != null ? attacker.getPenaltyOfActions() : 0) : 0);
         int cDefenderVB = -Math.abs(defender != null ? (defender.getVb() != null ? defender.getVb() : 0) : 0);

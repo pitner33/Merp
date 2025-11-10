@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class PlayerServiceImpl implements PlayerService {
@@ -36,6 +38,42 @@ public class PlayerServiceImpl implements PlayerService {
 
     // Temporary buffer to keep ACTIVE players list across next-round calls
     private List<Player> activePlayersBuffer = null; // null means not initialized for the current round
+    private static final Pattern CHARACTER_ID_PATTERN = Pattern.compile("^(N?JK)(\\d{1,2})$");
+
+    private String normalizeCharacterId(String rawId) {
+        if (rawId == null) {
+            return null;
+        }
+        String trimmed = rawId.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if ("none".equalsIgnoreCase(trimmed)) {
+            return "none";
+        }
+        Matcher matcher = CHARACTER_ID_PATTERN.matcher(trimmed.toUpperCase());
+        if (!matcher.matches()) {
+            return trimmed.toUpperCase();
+        }
+        int number = Integer.parseInt(matcher.group(2));
+        if (number < 1 || number > 99) {
+            return trimmed.toUpperCase();
+        }
+        return matcher.group(1) + String.format("%02d", number);
+    }
+
+    private Player resolveTargetPlayer(PlayerTarget target) {
+        if (target == null || target == PlayerTarget.none) {
+            return null;
+        }
+        String raw = target.name();
+        String normalized = normalizeCharacterId(raw);
+        Player found = normalized != null ? playerRepository.findByCharacterId(normalized) : null;
+        if (found == null && normalized != null && !normalized.equalsIgnoreCase(raw)) {
+            found = playerRepository.findByCharacterId(raw.toUpperCase());
+        }
+        return found;
+    }
 
     @Override
     public void changeIsPlayStatus(Player player) {
@@ -148,12 +186,11 @@ public class PlayerServiceImpl implements PlayerService {
     //checks if player's target was in ordered list, and if not, set to inactive
     @Override
     public void checkIfTargetIsInOrderedList(Player attacker) {
-        Boolean isTargetInOrderedList;
+        Player target = resolveTargetPlayer(attacker.getTarget());
+        List<Player> ordered = adventurerOrderedListObject.getPlayerList();
+        boolean targetPresent = target != null && ordered != null && ordered.stream().anyMatch(p -> Objects.equals(p.getId(), target.getId()));
 
-        String targetCharacterId = attacker.getTarget().toString();
-        Player target = playerRepository.findByCharacterId(targetCharacterId);
-
-        if (!adventurerOrderedListObject.getPlayerList().contains(target)) {
+        if (!targetPresent) {
             attacker.setTarget(PlayerTarget.none);
             attacker.setIsActive(false);
         }
@@ -192,10 +229,19 @@ public class PlayerServiceImpl implements PlayerService {
         }
 
         Player attackerFromList = this.activePlayersBuffer.get(0);
-        Player attacker = playerRepository.findByCharacterId(attackerFromList.getCharacterId());
+        Player attacker = attackerFromList != null ? playerRepository.findByCharacterId(normalizeCharacterId(attackerFromList.getCharacterId())) : null;
+        if (attacker == null) {
+            nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(Collections.emptyList());
+            return nextTwoPlayersToFigthObject;
+        }
 
-        String defenderCharacterId = attacker.getTarget().toString();
-        Player defender = playerRepository.findByCharacterId(defenderCharacterId);
+        Player defender = resolveTargetPlayer(attacker.getTarget());
+        if (defender == null) {
+            attacker.setTarget(PlayerTarget.none);
+            playerRepository.save(attacker);
+            nextTwoPlayersToFigthObject.setNextTwoPlayersToFight(Collections.singletonList(attacker));
+            return nextTwoPlayersToFigthObject;
+        }
 
         List<Player> nextTwoPLayersToFight = new ArrayList<>();
         nextTwoPLayersToFight.add(attacker);
@@ -277,10 +323,11 @@ public class PlayerServiceImpl implements PlayerService {
         targetsFromOrderedList.add(PlayerTarget.none);
 
         adventurerOrderedListObject.getPlayerList().forEach(player -> {
-            String charId = player.getCharacterId();
-            for (int i = 0; i < playerTargetValues.size(); i++) {
-                if (playerTargetValues.get(i).toString().equals(charId)) {
-                    targetsFromOrderedList.add(playerTargetValues.get(i));
+            String charId = normalizeCharacterId(player.getCharacterId());
+            for (PlayerTarget playerTargetValue : playerTargetValues) {
+                String targetName = normalizeCharacterId(playerTargetValue.name());
+                if (charId != null && charId.equals(targetName) && !targetsFromOrderedList.contains(playerTargetValue)) {
+                    targetsFromOrderedList.add(playerTargetValue);
                 }
             }
         });
@@ -399,6 +446,7 @@ public class PlayerServiceImpl implements PlayerService {
         switch (at) {
             case slashing:
             case blunt:
+            case dualWield:
             case clawsAndFangs:
             case grabOrBalance:
                 player.setTb(player.getTbOneHanded());

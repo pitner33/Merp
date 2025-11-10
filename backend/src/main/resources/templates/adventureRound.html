@@ -40,7 +40,7 @@
                         <th>HP actual</th>
                         <th>MM</th>
                         <th>TB</th>
-                        <th>Secondary TB</th>
+                        <th>TB Offhand</th>
 
                         <th>TB for defense</th>
 
@@ -177,8 +177,8 @@
                         </td>
                         <td>
                             <input class="form-control" type="hidden"
-                                   th:text="*{playerList[__${i.index}__].secondaryTB}"
-                                   th:field="*{playerList[__${i.index}__].secondaryTB}">
+                                   th:text="*{playerList[__${i.index}__].tbOffHand}"
+                                   th:field="*{playerList[__${i.index}__].tbOffHand}">
                         </td>
 
                         <!--###### CHANGEABLE ##########################################################################-->
@@ -391,7 +391,7 @@
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-                <th>Secondary TB</th>
+                <th>TB Offhand</th>
 
                 <th>TB for defense</th>
 
@@ -439,7 +439,7 @@
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-                <td th:text="${player.getSecondaryTB()}"></td>
+                <td th:text="${player.getTbOffHand()}"></td>
 
                 <td th:text="${player.getTbUsedForDefense()}"></td>
 
@@ -490,7 +490,7 @@
                 <th>HP actual</th>
                 <th>MM</th>
                 <th>TB</th>
-                <th>Secondary TB</th>
+                <th>TB Offhand</th>
 
                 <th>TB for defense</th>
 
@@ -538,7 +538,7 @@
                 <td th:text="${player.getHpActual()}"></td>
                 <td th:text="${player.getMm()}"></td>
                 <td th:text="${player.getTb()}"></td>
-                <td th:text="${player.getSecondaryTB()}"></td>
+                <td th:text="${player.getTbOffHand()}"></td>
 
                 <td th:text="${player.getTbUsedForDefense()}"></td>
 

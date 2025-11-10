@@ -18,7 +18,8 @@ export type Player = {
   hpActual: number;
   mm?: number;
   tb?: number;
-  secondaryTB?: number;
+  tbOffHand?: number;
+  dualWield?: number;
   tbUsedForDefense?: number;
   tbOneHanded?: number;
   tbTwoHanded?: number;

@@ -219,7 +219,7 @@ export default function SingleAttack() {
     const enforcedAct = curAct && allowedActs.includes(curAct) ? curAct : allowedActs[0];
     if (enforcedAct !== curAct) setAttackerActivity(enforcedAct);
 
-    const allowedAtks = attacksByActivity(enforcedAct);
+    const allowedAtks = attacksByActivity(enforcedAct, attacker ?? undefined);
     const nextAttack = allowedAtks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAtks[0];
     if (nextAttack !== attackerAttack) setAttackerAttack(nextAttack);
 
@@ -363,6 +363,7 @@ export default function SingleAttack() {
     { value: 'slashing', label: 'Slashing' },
     { value: 'blunt', label: 'Blunt' },
     { value: 'twoHanded', label: 'Two-handed' },
+    { value: 'dualWield', label: 'Dual Wield' },
     { value: 'ranged', label: 'Ranged' },
     { value: 'clawsAndFangs', label: 'Claws and Fangs' },
     { value: 'grabOrBalance', label: 'Grab or Balance' },
@@ -395,7 +396,11 @@ export default function SingleAttack() {
     switch (activity) {
       case '_1PerformMagic': return ['baseMagic', 'magicBall', 'magicProjectile'];
       case '_2RangedAttack': return ['ranged'];
-      case '_3PhisicalAttackOrMovement': return ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+      case '_3PhisicalAttackOrMovement': {
+        const base = ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+        const canDual = Boolean(attacker?.dualWield && attacker.dualWield > 0);
+        return canDual ? [...base.slice(0, 3), 'dualWield', ...base.slice(3)] : base;
+      }
       case '_4PrepareMagic':
       case '_5DoNothing':
       default: return ['none'];
@@ -411,6 +416,7 @@ export default function SingleAttack() {
     slashing: ['none', 'slashing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisial'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
+    dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],
     clawsAndFangs: ['none', 'slashing', 'piercing', 'crushing', 'grab', 'bigCreaturePhisical'],
     grabOrBalance: ['none', 'grab', 'balance', 'crushing', 'bigCreaturePhisical'],
@@ -838,6 +844,7 @@ export default function SingleAttack() {
             <th rowSpan={2}>Crit</th>
             <th rowSpan={2}>Armor</th>
             <th rowSpan={2}>TB</th>
+            <th rowSpan={2}>TB OH</th>
             <th rowSpan={2}>TB for Defense</th>
             <th rowSpan={2}>VB</th>
             <th rowSpan={2}>Shield</th>
@@ -962,7 +969,7 @@ export default function SingleAttack() {
                           const act = e.target.value as string;
                           const enforcedAct = allowedActs.includes(act) ? act : allowedActs[0];
                           setAttackerActivity(enforcedAct);
-                          const allowedAttacks = attacksByActivity(enforcedAct);
+                          const allowedAttacks = attacksByActivity(enforcedAct, attacker ?? undefined);
                           const nextAttack = allowedAttacks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAttacks[0];
                           setAttackerAttack(nextAttack);
                           const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
@@ -986,7 +993,7 @@ export default function SingleAttack() {
                 <td>
                   {(() => {
                     const curAct = attackerActivity as string | undefined;
-                    const allowedAtks = attacksByActivity(curAct);
+                    const allowedAtks = attacksByActivity(curAct, attacker ?? undefined);
                     const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
                     return (
                       <select
@@ -1011,7 +1018,7 @@ export default function SingleAttack() {
                 <td>
                   {(() => {
                     const curAct = attackerActivity as string | undefined;
-                    const allowedAtks = attacksByActivity(curAct);
+                    const allowedAtks = attacksByActivity(curAct, attacker ?? undefined);
                     const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
                     const allowedCrits = (critByAttack as any)[curAtk ?? 'none'] ?? ['none'];
                     const curCrit = (attackerCrit && allowedCrits.includes(attackerCrit)) ? attackerCrit : 'none';
@@ -1038,6 +1045,7 @@ export default function SingleAttack() {
                   </select>
                 </td>
                 <td className="right">{computeTb({ ...(attacker as any), attackType: attackerAttack } as Player)}</td>
+                <td className="right">{attacker.tbOffHand ?? 0}</td>
                 <td>
                   {(() => {
                     const tb = (computeTb({ ...(attacker as any), attackType: attackerAttack } as Player) ?? 0);
@@ -1146,6 +1154,7 @@ export default function SingleAttack() {
                   </select>
                 </td>
                 <td className="right">{defender.tb}</td>
+                <td className="right">{defender.tbOffHand ?? 0}</td>
                 <td>
                   {(() => {
                     const tb = Number(defender.tb) || 0;

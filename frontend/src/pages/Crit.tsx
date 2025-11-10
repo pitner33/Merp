@@ -363,6 +363,7 @@ export default function Crit() {
             <th rowSpan={2}>Crit</th>
             <th rowSpan={2}>Armor</th>
             <th rowSpan={2}>TB</th>
+            <th rowSpan={2}>TB OH</th>
             <th rowSpan={2}>TB for Defense</th>
             <th rowSpan={2}>VB</th>
             <th rowSpan={2}>Shield</th>
@@ -483,6 +484,7 @@ export default function Crit() {
             <td>{labelCrit(p.critType as any)}</td>
             <td>{labelArmor(p.armorType as any)}</td>
             <td className="right">{computeTb(p)}</td>
+            <td className="right">{p.tbOffHand ?? 0}</td>
             <td className="right">{p.tbUsedForDefense}</td>
             <td className="right">{p.vb}</td>
             <td>
