@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @RestController
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
@@ -259,6 +260,11 @@ public class ApiController {
     @GetMapping("/dice/d100")
     public Integer rollD100() {
         return d100Roll.d100Random();
+    }
+
+    @GetMapping("/dice/d10")
+    public Integer rollD10() {
+        return ThreadLocalRandom.current().nextInt(1, 11);
     }
 
     // Compute Modified Roll

@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 export default function D100() {
   const navigate = useNavigate();
 
+  // Simple D10 state
+  const [simpleD10Rolling, setSimpleD10Rolling] = useState(false);
+  const [simpleD10Face, setSimpleD10Face] = useState(0);
+  const [simpleD10Value, setSimpleD10Value] = useState<number | null>(null);
+  const simpleD10IntervalRef = useRef<number | null>(null);
+
   // Simple D100 state
   const [simpleRolling, setSimpleRolling] = useState(false);
   const [simpleTens, setSimpleTens] = useState(0);
@@ -24,12 +30,41 @@ export default function D100() {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (simpleIntervalRef.current) window.clearInterval(simpleIntervalRef.current);
+      if (simpleD10IntervalRef.current) window.clearInterval(simpleD10IntervalRef.current);
     };
   }, []);
 
   useEffect(() => {
     document.title = 'D100';
   }, []);
+
+  async function rollSimpleD10() {
+    if (simpleD10Rolling) return;
+    setSimpleD10Rolling(true);
+    if (simpleD10IntervalRef.current) window.clearInterval(simpleD10IntervalRef.current);
+    simpleD10IntervalRef.current = window.setInterval(() => {
+      setSimpleD10Face((p) => (p % 10) + 1);
+    }, 50);
+    try {
+      const fetchPromise = fetch('http://localhost:8081/api/dice/d10').then((r) => {
+        if (!r.ok) throw new Error('Dice roll failed');
+        return r.json();
+      }) as Promise<number>;
+      const waitPromise = new Promise<void>((res) => setTimeout(res, 800));
+      const [rolled] = await Promise.all([fetchPromise, waitPromise]);
+      const value = typeof rolled === 'number' ? rolled : 1;
+      setSimpleD10Face(value);
+      setSimpleD10Value(value);
+    } catch {
+      // ignore
+    } finally {
+      if (simpleD10IntervalRef.current) {
+        window.clearInterval(simpleD10IntervalRef.current);
+        simpleD10IntervalRef.current = null;
+      }
+      setSimpleD10Rolling(false);
+    }
+  }
 
   async function rollSimple() {
     if (simpleRolling) return;
@@ -143,6 +178,9 @@ export default function D100() {
     setSimpleTens(0);
     setSimpleOnes(0);
     setSimpleValue(null);
+    setSimpleD10Rolling(false);
+    setSimpleD10Face(0);
+    setSimpleD10Value(null);
     setRolling(false);
     setTensFace(0);
     setOnesFace(0);
@@ -200,6 +238,45 @@ export default function D100() {
       </style>
 
       <div style={{ display: 'flex', gap: 24, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', textAlign: 'center' }}>
+        {/* Simple D10 */}
+        <div style={{ flex: '0 0 480px', width: 480, minWidth: 320, border: '1px solid #ddd', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Simple D10</h2>
+          <div>
+            <button
+              type="button"
+              onClick={rollSimpleD10}
+              disabled={simpleD10Rolling}
+              style={{
+                background: simpleD10Rolling ? '#888' : '#0a7d2f',
+                color: '#ffffff',
+                width: 75,
+                height: 75,
+                borderRadius: 10,
+                border: 'none',
+                cursor: simpleD10Rolling ? 'not-allowed' : 'pointer',
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: 0.5,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                lineHeight: 1.1,
+              }}
+            >
+              ROLL
+            </button>
+          </div>
+          <div className="dice-wrap">
+            <div className={`die ones${simpleD10Rolling ? ' rolling' : ''}`} aria-label="d10-die">{simpleD10Face}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
+            <div className="result-box">
+              <span className="result-value">{simpleD10Value != null ? `${simpleD10Value}` : ''}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Simple D100 */}
         <div style={{ flex: '0 0 480px', width: 480, minWidth: 320, border: '1px solid #ddd', borderRadius: 8, padding: 12, textAlign: 'center' }}>
           <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Simple D100</h2>
