@@ -367,6 +367,7 @@ export default function Crit() {
             <th rowSpan={2}>TB for Defense</th>
             <th rowSpan={2}>VB</th>
             <th rowSpan={2}>Shield</th>
+            <th rowSpan={2}>Dual Wield</th>
             <th rowSpan={2}>Stunned Rounds</th>
             <th rowSpan={2}>Penalty</th>
             <th rowSpan={2}>HP Loss/Round</th>
@@ -504,6 +505,7 @@ export default function Crit() {
                 </span>
               )}
             </td>
+            <td className="right">{p.dualWield ?? 0}</td>
             <td className="right">{p.stunnedForRounds}</td>
             <td className="right">{p.penaltyOfActions}</td>
             <td className="right">{p.hpLossPerRound}</td>

@@ -848,6 +848,7 @@ export default function SingleAttack() {
             <th rowSpan={2}>TB for Defense</th>
             <th rowSpan={2}>VB</th>
             <th rowSpan={2}>Shield</th>
+            <th rowSpan={2}>Dual Wield</th>
             <th rowSpan={2}>Stunned Rounds</th>
             <th rowSpan={2}>Penalty</th>
             <th rowSpan={2}>HP Loss/Round</th>
@@ -1081,6 +1082,7 @@ export default function SingleAttack() {
                     <span title="Shield: No" aria-label="Shield: No"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-3z"/><line x1="6" y1="6" x2="18" y2="18" /></svg></span>
                   )}
                 </td>
+                <td className="right">{attacker.dualWield ?? 0}</td>
                 <td className="right">{attacker.stunnedForRounds}</td>
                 <td className="right">{attacker.penaltyOfActions}</td>
                 <td className="right">{attacker.hpLossPerRound}</td>
@@ -1190,6 +1192,7 @@ export default function SingleAttack() {
                     <span title="Shield: No" aria-label="Shield: No"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-3z"/><line x1="6" y1="6" x2="18" y2="18" /></svg></span>
                   )}
                 </td>
+                <td className="right">{defender.dualWield ?? 0}</td>
                 <td className="right">{defender.stunnedForRounds}</td>
                 <td className="right">{defender.penaltyOfActions}</td>
                 <td className="right">{defender.hpLossPerRound}</td>

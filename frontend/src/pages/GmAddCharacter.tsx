@@ -42,6 +42,7 @@ const FIELD_DEFS: readonly FieldDefBase[] = [
   { key: 'vb', label: 'VB', type: 'number', numberKind: 'int' },
   { key: 'armorType', label: 'Armor', type: 'select', metaKey: 'armorTypes' },
   { key: 'shield', label: 'Shield', type: 'boolean' },
+  { key: 'dualWield', label: 'Dual Wield', type: 'number', numberKind: 'int' },
   { key: 'mdLenyeg', label: 'MD Lényeg', type: 'number', numberKind: 'int' },
   { key: 'mdKapcsolat', label: 'MD Kapcsolat', type: 'number', numberKind: 'int' },
   { key: 'mm', label: 'MM', type: 'number', numberKind: 'int' },

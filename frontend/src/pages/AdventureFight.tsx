@@ -690,6 +690,7 @@ export default function AdventureFight() {
                 <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
+                <th rowSpan={2}>Dual Wield</th>
                 <th rowSpan={2}>Stunned Rounds</th>
                 <th rowSpan={2}>Penalty</th>
                 <th rowSpan={2}>HP Loss/Round</th>
@@ -1010,10 +1011,10 @@ export default function AdventureFight() {
                   <td className="right">{p.tbBaseMagic}</td>
                   <td className="right">{p.tbTargetMagic}</td>
                   <td className="right">{p.vb}</td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={(e) => {
+                    <td>
+                      <button
+                        type="button"
+                        onClick={(e) => {
                         setRows((prev) =>
                           prev.map((r) => {
                             if (r.id !== p.id) return r;
@@ -1046,6 +1047,7 @@ export default function AdventureFight() {
                       )}
                     </button>
                   </td>
+                  <td className="right">{p.dualWield ?? 0}</td>
                   <td className="right">{p.stunnedForRounds}</td>
                   <td className="right">{p.penaltyOfActions}</td>
                   <td className="right">{p.hpLossPerRound}</td>

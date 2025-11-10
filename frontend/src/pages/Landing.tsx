@@ -337,6 +337,7 @@ export default function Landing() {
             <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
             <th rowSpan={2}><button onClick={() => toggleSort('vb' as keyof Player)}>VB {sortKey==='vb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('shield' as keyof Player)}>Shield {sortKey==='shield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}><button onClick={() => toggleSort('dualWield' as keyof Player)}>Dual Wield {sortKey==='dualWield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('mm' as keyof Player)}>MM {sortKey==='mm' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('agilityBonus' as keyof Player)}>AGI Bonus {sortKey==='agilityBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th colSpan={2} style={{ textAlign: 'center' }}>MD</th>
@@ -427,6 +428,72 @@ export default function Landing() {
                     </svg>
                   </span>
                 )}
+              </td>
+              <td className="right">{p.dualWield ?? 0}</td>
+              <td className="right">{p.mm}</td>
+              <td className="right">{p.agilityBonus}</td>
+              <td className="right">{p.mdLenyeg}</td>
+              <td className="right">{p.mdKapcsolat}</td>
+              <td className="right">{p.perception}</td>
+              <td className="right">{p.tracking}</td>
+              <td className="right">{p.lockPicking}</td>
+              <td className="right">{p.disarmTraps}</td>
+              <td className="right">{p.objectUsage}</td>
+              <td className="right">{p.runes}</td>
+              <td className="right">{p.influence}</td>
+              <td className="right">{p.stealth}</td>
+              <td className="actions-cell">
+                <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                  <Link to={`/players/${p.id}/edit`}>
+                    <button
+                      aria-label="Edit"
+                      title="Edit"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      </svg>
+                    </button>
+                  </Link>
+                  <button
+                    aria-label="Revive"
+                    title="Revive"
+                    onClick={() => {
+                      if (isRevived(p)) return;
+                      setClosing(false);
+                      setReviveError(null);
+                      setReviving(false);
+                      setConfirmReviveFor(p);
+                    }}
+                    disabled={isRevived(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
+                      <path d="M9 12h6" />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="Delete"
+                    title="Delete"
+                    onClick={() => { setDeleting(false); setClosingDelete(false); setDeleteError(null); setConfirmDeleteFor(p); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       {confirmDeleteFor && (
         <div
           role="dialog"
@@ -496,71 +563,6 @@ export default function Landing() {
           </div>
         </div>
       )}
-              </td>
-              <td className="right">{p.mm}</td>
-              <td className="right">{p.agilityBonus}</td>
-              <td className="right">{p.mdLenyeg}</td>
-              <td className="right">{p.mdKapcsolat}</td>
-              <td className="right">{p.perception}</td>
-              <td className="right">{p.tracking}</td>
-              <td className="right">{p.lockPicking}</td>
-              <td className="right">{p.disarmTraps}</td>
-              <td className="right">{p.objectUsage}</td>
-              <td className="right">{p.runes}</td>
-              <td className="right">{p.influence}</td>
-              <td className="right">{p.stealth}</td>
-              <td className="actions-cell">
-                <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                  <Link to={`/players/${p.id}/edit`}>
-                    <button
-                      aria-label="Edit"
-                      title="Edit"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                      </svg>
-                    </button>
-                  </Link>
-                  <button
-                    aria-label="Revive"
-                    title="Revive"
-                    onClick={() => {
-                      if (isRevived(p)) return;
-                      setClosing(false);
-                      setReviveError(null);
-                      setReviving(false);
-                      setConfirmReviveFor(p);
-                    }}
-                    disabled={isRevived(p)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
-                      <path d="M9 12h6" />
-                    </svg>
-                  </button>
-                  <button
-                    aria-label="Delete"
-                    title="Delete"
-                    onClick={() => { setDeleting(false); setClosingDelete(false); setDeleteError(null); setConfirmDeleteFor(p); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
       {confirmReviveFor && (
         <div
           role="dialog"
