@@ -6,6 +6,7 @@ import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.attributes.CritType;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.fight.FightCount;
+import com.sol.merp.fight.DualWieldCalculator;
 import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.modifiers.ExperienceModifiers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -372,6 +373,7 @@ public class PlayerServiceImpl implements PlayerService {
             player.setCritType(CritType.none);
             player.setTarget(PlayerTarget.none);
             player.setTb(0);
+            player.setTbOffHand(0);
             player.setTbUsedForDefense(0);
         }
 
@@ -387,6 +389,7 @@ public class PlayerServiceImpl implements PlayerService {
             player.setCritType(CritType.none);
             player.setTarget(PlayerTarget.none);
             player.setTb(0);
+            player.setTbOffHand(0);
             player.setTbUsedForDefense(0);
         }
 
@@ -446,30 +449,43 @@ public class PlayerServiceImpl implements PlayerService {
         switch (at) {
             case slashing:
             case blunt:
-            case dualWield:
             case clawsAndFangs:
             case grabOrBalance:
                 player.setTb(player.getTbOneHanded());
+                player.setTbOffHand(0);
                 break;
+            case dualWield: {
+                int main = DualWieldCalculator.computeMainHandTb(player.getTbOneHanded(), player.getDualWield());
+                int off = DualWieldCalculator.computeOffHandTb(player.getTbOneHanded(), player.getDualWield());
+                player.setTb(main);
+                player.setTbOffHand(off);
+                break;
+            }
             case twoHanded:
                 player.setTb(player.getTbTwoHanded());
+                player.setTbOffHand(0);
                 break;
             case ranged:
                 player.setTb(player.getTbRanged());
+                player.setTbOffHand(0);
                 break;
             case baseMagic:
                 player.setTb(player.getTbBaseMagic());
+                player.setTbOffHand(0);
                 break;
             case magicBall:
             case magicProjectile:
                 player.setTb(player.getTbTargetMagic());
+                player.setTbOffHand(0);
                 break;
             case none:
                 player.setTb(0);
+                player.setTbOffHand(0);
                 player.setCritType(CritType.none);
                 break;
             default:
                 player.setTb(0);
+                player.setTbOffHand(0);
         }
 
     }

@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { sortPlayersByCharacterId } from '../utils/characterId';
+import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 
 export default function AdventureMain() {
   const location = useLocation();
@@ -210,27 +211,34 @@ export default function AdventureMain() {
     return `${pct}%`;
   }
 
-  function computeTb(p: Player): number | undefined {
-    const a = p.attackType ?? 'slashing';
-    switch (a) {
+  function computeTbPair(p: Player): { main: number; offhand: number } {
+    const attackType = p.attackType ?? 'slashing';
+    switch (attackType) {
       case 'none':
-        return 0;
+        return { main: 0, offhand: 0 };
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
-      case 'grabOrBalance':
-        return p.tbOneHanded;
+      case 'grabOrBalance': {
+        const base = p.tbOneHanded ?? 0;
+        return { main: base, offhand: 0 };
+      }
+      case 'dualWield': {
+        const main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        const offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        return { main, offhand };
+      }
       case 'twoHanded':
-        return p.tbTwoHanded;
+        return { main: p.tbTwoHanded ?? 0, offhand: 0 };
       case 'ranged':
-        return p.tbRanged;
+        return { main: p.tbRanged ?? 0, offhand: 0 };
       case 'baseMagic':
-        return p.tbBaseMagic;
+        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
       case 'magicBall':
       case 'magicProjectile':
-        return p.tbTargetMagic;
+        return { main: p.tbTargetMagic ?? 0, offhand: 0 };
       default:
-        return p.tb;
+        return { main: p.tb ?? 0, offhand: 0 };
     }
   }
 
@@ -473,12 +481,23 @@ export default function AdventureMain() {
                 let atk = r.attackType;
                 let crit = r.critType;
                 if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
-                let tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
-                if (act === '_4PrepareMagic' || act === '_5DoNothing') tbVal = 0;
+                const pair = computeTbPair({ ...r, attackType: atk } as Player);
+                const tbVal = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.main;
+                const tbOff = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.offhand;
                 const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
-                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
-                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
-                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+                const maxDef = Math.floor(Math.max(0, tbVal) / 2);
+                const nextDef = tbVal < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return {
+                  ...r,
+                  playerActivity: act,
+                  attackType: atk,
+                  critType: crit,
+                  tb: tbVal,
+                  tbOffHand: tbOff,
+                  tbUsedForDefense: nextDef,
+                  target: targetToken,
+                  isActive,
+                } as Player;
               });
               const res = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
@@ -537,11 +556,23 @@ export default function AdventureMain() {
                 let atk = r.attackType;
                 let crit = r.critType;
                 if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
-                const tbVal = computeTb({ ...r, attackType: atk } as Player) ?? r.tb;
+                const pair = computeTbPair({ ...r, attackType: atk } as Player);
+                const tbVal = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.main;
+                const tbOff = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.offhand;
                 const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
-                const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
-                const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
-                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+                const maxDef = Math.floor(Math.max(0, tbVal) / 2);
+                const nextDef = tbVal < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                return {
+                  ...r,
+                  playerActivity: act,
+                  attackType: atk,
+                  critType: crit,
+                  tb: tbVal,
+                  tbOffHand: tbOff,
+                  tbUsedForDefense: nextDef,
+                  target: targetToken,
+                  isActive,
+                } as Player;
               });
               const res = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
@@ -788,8 +819,21 @@ export default function AdventureMain() {
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
                                 const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                                return { ...r, target: nextTarget, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
+                                const pair = computeTbPair({ ...r, attackType: nextAttack } as Player);
+                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.main;
+                                const nextTbOff = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.offhand;
+                                return {
+                                  ...r,
+                                  target: nextTarget,
+                                  playerActivity: enforcedAct,
+                                  attackType: nextAttack,
+                                  critType: nextCrit,
+                                  shield: nextShield,
+                                  isActive: nextActive,
+                                  tb: nextTb,
+                                  tbOffHand: nextTbOff,
+                                  tbUsedForDefense: 0,
+                                };
                               })
                             );
                             setOpenTargetRowId(null);
@@ -819,8 +863,20 @@ export default function AdventureMain() {
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(nextAttack) ? r.shield : false;
                                 const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : r.tb;
-                                return { ...r, playerActivity: enforcedAct, attackType: nextAttack, critType: nextCrit, shield: nextShield, isActive: nextActive, tb: nextTb, tbUsedForDefense: 0 };
+                                const pair = computeTbPair({ ...r, attackType: nextAttack } as Player);
+                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.main;
+                                const nextTbOff = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.offhand;
+                                return {
+                                  ...r,
+                                  playerActivity: enforcedAct,
+                                  attackType: nextAttack,
+                                  critType: nextCrit,
+                                  shield: nextShield,
+                                  isActive: nextActive,
+                                  tb: nextTb,
+                                  tbOffHand: nextTbOff,
+                                  tbUsedForDefense: 0,
+                                };
                               })
                             );
                             setOpenTargetRowId(null);
@@ -854,7 +910,19 @@ export default function AdventureMain() {
                                 const allowedCrits = critByAttack[newAttack] ?? ['none'];
                                 const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                 const nextShield = canUseShield(newAttack) ? r.shield : false;
-                                return { ...r, attackType: newAttack, critType: nextCrit, shield: nextShield, tbUsedForDefense: 0 };
+                                const pair = computeTbPair({ ...r, attackType: newAttack } as Player);
+                                const inactive = r.playerActivity === '_4PrepareMagic' || r.playerActivity === '_5DoNothing';
+                                const nextTb = inactive ? 0 : pair.main;
+                                const nextTbOff = inactive ? 0 : pair.offhand;
+                                return {
+                                  ...r,
+                                  attackType: newAttack,
+                                  critType: nextCrit,
+                                  shield: nextShield,
+                                  tb: nextTb,
+                                  tbOffHand: nextTbOff,
+                                  tbUsedForDefense: 0,
+                                };
                               })
                             );
                           }}
@@ -918,11 +986,11 @@ export default function AdventureMain() {
                       ))}
                     </select>
                   </td>
-                  <td className="right">{computeTb(p)}</td>
-                  <td className="right">{p.tbOffHand ?? 0}</td>
+                  <td className="right">{(() => computeTbPair(p).main)()}</td>
+                  <td className="right">{(() => computeTbPair(p).offhand)()}</td>
                   <td>
                     {(() => {
-                      const tb = computeTb(p) ?? 0;
+                      const tb = computeTbPair(p).main;
                       const neg = tb < 0;
                       const max = Math.floor(Math.max(0, tb) * 0.5);
                       const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);

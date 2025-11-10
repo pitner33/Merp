@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
+import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 
 export default function SingleAttack() {
   const navigate = useNavigate();
@@ -227,8 +228,19 @@ export default function SingleAttack() {
     const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
     if (nextCrit !== attackerCrit) setAttackerCrit(nextCrit);
 
-    // Update isActive immediately based on enforced activity and current attacker state
-    setAttacker((prev) => (prev ? { ...prev, isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds) } as Player : prev));
+    // Update attacker state with derived activity and recalculated TB pair
+    setAttacker((prev) => {
+      if (!prev) return prev;
+      const pair = computeTbPair({ ...prev, attackType: nextAttack } as Player);
+      const inactive = enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing';
+      return {
+        ...prev,
+        isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
+        tb: inactive ? 0 : pair.main,
+        tbOffHand: inactive ? 0 : pair.offhand,
+        tbUsedForDefense: 0,
+      } as Player;
+    });
 
     // Reset modifiers when target changes
     setMod(initialMod());
@@ -265,21 +277,39 @@ export default function SingleAttack() {
     const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
     return `${pct}%`;
   }
-  function computeTb(p: Player): number | undefined {
-    const a = (p.attackType || 'slashing') as string;
-    switch (a) {
-      case 'none': return 0;
+  function computeTbPair(p?: Player | null): { main: number; offhand: number } {
+    if (!p) return { main: 0, offhand: 0 };
+    const attackType = (p.attackType ?? 'slashing') as string;
+    switch (attackType) {
+      case 'none':
+        return { main: 0, offhand: 0 };
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
-      case 'grabOrBalance': return p.tbOneHanded;
-      case 'twoHanded': return p.tbTwoHanded;
-      case 'ranged': return p.tbRanged;
-      case 'baseMagic': return p.tbBaseMagic;
+      case 'grabOrBalance': {
+        const base = p.tbOneHanded ?? 0;
+        return { main: base, offhand: 0 };
+      }
+      case 'dualWield': {
+        const main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        const offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        return { main, offhand };
+      }
+      case 'twoHanded':
+        return { main: p.tbTwoHanded ?? 0, offhand: 0 };
+      case 'ranged':
+        return { main: p.tbRanged ?? 0, offhand: 0 };
+      case 'baseMagic':
+        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
       case 'magicBall':
-      case 'magicProjectile': return p.tbTargetMagic;
-      default: return p.tb;
+      case 'magicProjectile':
+        return { main: p.tbTargetMagic ?? 0, offhand: 0 };
+      default:
+        return { main: p.tb ?? 0, offhand: 0 };
     }
+  }
+  function computeTb(p?: Player | null): number {
+    return computeTbPair(p).main;
   }
   function labelActivity(v?: string): string {
     const map: Record<string, string> = { _1PerformMagic: 'Perform Magic', _2RangedAttack: 'Ranged Attack', _3PhisicalAttackOrMovement: 'Attack or Movement', _4PrepareMagic: 'Prepare Magic', _5DoNothing: 'Do Nothing' };
@@ -392,13 +422,13 @@ export default function SingleAttack() {
     { value: 'chainmail', label: 'Chainmail' },
     { value: 'plate', label: 'Plate' },
   ];
-  function attacksByActivity(activity?: string): string[] {
+  function attacksByActivity(activity?: string, player?: Player | null): string[] {
     switch (activity) {
       case '_1PerformMagic': return ['baseMagic', 'magicBall', 'magicProjectile'];
       case '_2RangedAttack': return ['ranged'];
       case '_3PhisicalAttackOrMovement': {
         const base = ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
-        const canDual = Boolean(attacker?.dualWield && attacker.dualWield > 0);
+        const canDual = Boolean(player?.dualWield && player.dualWield > 0);
         return canDual ? [...base.slice(0, 3), 'dualWield', ...base.slice(3)] : base;
       }
       case '_4PrepareMagic':
@@ -476,7 +506,7 @@ export default function SingleAttack() {
     }
 
     const atk = attacker ? ({ ...attacker, attackType: attackerAttack } as Player) : undefined;
-    const attackerTb = atk ? (computeTb(atk) || 0) : 0;
+    const attackerTb = atk ? computeTbPair(atk).main : 0;
     const cAttackerTBForDefense = -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
     const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
     const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
@@ -552,7 +582,7 @@ export default function SingleAttack() {
 
       // Compose local breakdown and echo via compute-modified-roll (overrides)
       const atk = { ...attacker, attackType: attackerAttack } as Player;
-      const attackerTb = computeTb(atk) || 0;
+      const attackerTb = computeTbPair(atk).main;
       const cAttackerTBForDefense = -Math.abs(Number(attacker.tbUsedForDefense) || 0);
       const cAttackerPenalty = -Math.abs(Number(attacker.penaltyOfActions) || 0);
       const cDefenderVB = -Math.abs(Number(defender.vb) || 0);
@@ -969,16 +999,28 @@ export default function SingleAttack() {
                         onChange={(e) => {
                           const act = e.target.value as string;
                           const enforcedAct = allowedActs.includes(act) ? act : allowedActs[0];
-                          setAttackerActivity(enforcedAct);
                           const allowedAttacks = attacksByActivity(enforcedAct, attacker ?? undefined);
                           const nextAttack = allowedAttacks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAttacks[0];
-                          setAttackerAttack(nextAttack);
                           const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
                           const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+                          const inactive = enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing';
+                          setAttackerActivity(enforcedAct);
+                          setAttackerAttack(nextAttack);
                           setAttackerCrit(nextCrit);
-                          // Update isActive immediately based on enforced activity
-                          setAttacker((prev) => (prev ? { ...prev, isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds) } as Player : prev));
-                          // Reset modifiers on activity change
+                          setAttacker((prev) => {
+                            if (!prev) return prev;
+                            const pair = computeTbPair({ ...prev, attackType: nextAttack } as Player);
+                            return {
+                              ...prev,
+                              playerActivity: enforcedAct,
+                              attackType: nextAttack,
+                              critType: nextCrit,
+                              isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
+                              tb: inactive ? 0 : pair.main,
+                              tbOffHand: inactive ? 0 : pair.offhand,
+                              tbUsedForDefense: 0,
+                            } as Player;
+                          });
                           setMod(initialMod());
                           setRm(initialRm());
                         }}
@@ -1002,10 +1044,23 @@ export default function SingleAttack() {
                         onChange={(e) => {
                           const atk = e.target.value as string;
                           const enforcedAtk = allowedAtks.includes(atk) ? atk : allowedAtks[0];
-                          setAttackerAttack(enforcedAtk);
                           const allowedCrits = (critByAttack as any)[enforcedAtk] ?? ['none'];
                           const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+                          const inactive = curAct === '_4PrepareMagic' || curAct === '_5DoNothing';
+                          setAttackerAttack(enforcedAtk);
                           setAttackerCrit(nextCrit);
+                          setAttacker((prev) => {
+                            if (!prev) return prev;
+                            const pair = computeTbPair({ ...prev, attackType: enforcedAtk } as Player);
+                            return {
+                              ...prev,
+                              attackType: enforcedAtk,
+                              critType: nextCrit,
+                              tb: inactive ? 0 : pair.main,
+                              tbOffHand: inactive ? 0 : pair.offhand,
+                              tbUsedForDefense: 0,
+                            } as Player;
+                          });
                         }}
                         style={{ width: `${attackWidthCh + 2}ch` }}
                       >
@@ -1026,7 +1081,21 @@ export default function SingleAttack() {
                     return (
                       <select
                         value={curCrit || ''}
-                        onChange={(e) => setAttackerCrit(e.target.value)}
+                        onChange={(e) => {
+                          const nextCrit = e.target.value;
+                          setAttackerCrit(nextCrit);
+                          setAttacker((prev) => {
+                            if (!prev) return prev;
+                            const pair = computeTbPair({ ...prev, attackType: curAtk } as Player);
+                            const inactive = (attackerActivity === '_4PrepareMagic' || attackerActivity === '_5DoNothing');
+                            return {
+                              ...prev,
+                              critType: nextCrit,
+                              tb: inactive ? 0 : pair.main,
+                              tbOffHand: inactive ? 0 : pair.offhand,
+                            } as Player;
+                          });
+                        }}
                         style={{ width: `${critWidthCh + 2}ch` }}
                       >
                         {critOptions.filter((o) => allowedCrits.includes(o.value)).map((o) => (
@@ -1045,11 +1114,12 @@ export default function SingleAttack() {
                     {armorOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </td>
-                <td className="right">{computeTb({ ...(attacker as any), attackType: attackerAttack } as Player)}</td>
-                <td className="right">{attacker.tbOffHand ?? 0}</td>
+                <td className="right">{(() => computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player).main)()}</td>
+                <td className="right">{(() => computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player).offhand)()}</td>
                 <td>
                   {(() => {
-                    const tb = (computeTb({ ...(attacker as any), attackType: attackerAttack } as Player) ?? 0);
+                    const pair = computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player);
+                    const tb = pair.main;
                     const neg = tb < 0;
                     const max = Math.floor(Math.max(0, tb) * 0.5);
                     const value = neg ? 0 : Math.min(Math.max(0, Number(attacker.tbUsedForDefense) || 0), max);
