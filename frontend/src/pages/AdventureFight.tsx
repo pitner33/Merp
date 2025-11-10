@@ -271,14 +271,18 @@ export default function AdventureFight() {
     return computeTbPair(p).main;
   }
 
-  function attacksByActivity(activity?: string): string[] {
+  function attacksByActivity(activity?: string, player?: Player): string[] {
     switch (activity) {
       case '_1PerformMagic':
         return ['baseMagic', 'magicBall', 'magicProjectile'];
       case '_2RangedAttack':
         return ['ranged'];
       case '_3PhisicalAttackOrMovement':
-        return ['slashing', 'blunt', 'twoHanded', 'dualWield', 'clawsAndFangs', 'grabOrBalance'];
+        {
+          const base = ['slashing', 'blunt', 'twoHanded', 'clawsAndFangs', 'grabOrBalance'];
+          const canDual = Boolean(player?.dualWield && player.dualWield > 0);
+          return canDual ? [...base.slice(0, 3), 'dualWield', ...base.slice(3)] : base;
+        }
       case '_4PrepareMagic':
       case '_5DoNothing':
       default:
@@ -473,7 +477,7 @@ export default function AdventureFight() {
       const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
       const allowedActs = allowedActivitiesByTarget(targetToken, r.characterId);
       const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-      const allowedAttacks = attacksByActivity(enforcedAct);
+      const allowedAttacks = attacksByActivity(enforcedAct, r);
       const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
       const allowedCrits = critByAttack[nextAttack ?? 'none'] ?? ['none'];
       const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
@@ -854,7 +858,7 @@ export default function AdventureFight() {
 
                                   const allowedActs = allowedActivitiesByTarget(nextTarget, r.characterId);
                                   const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                                  const allowedAttacks = attacksByActivity(enforcedAct);
+                                  const allowedAttacks = attacksByActivity(enforcedAct, r);
                                   const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
                                   const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                   const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
@@ -906,7 +910,7 @@ export default function AdventureFight() {
                                   if (r.id !== p.id) return r;
                                   const allowedActsForRow = allowedActivitiesByTarget(r.target, r.characterId);
                                   const enforcedAct = allowedActsForRow.includes(value) ? value : allowedActsForRow[0];
-                                  const allowedAttacks = attacksByActivity(enforcedAct);
+                                  const allowedAttacks = attacksByActivity(enforcedAct, r);
                                   const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
                                   const allowedCrits = critByAttack[nextAttack] ?? ['none'];
                                   const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
@@ -945,7 +949,7 @@ export default function AdventureFight() {
                       <select
                         className="sel-attack"
                         style={{ width: `${attackWidthCh + 2}ch` }}
-                        value={(attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none'}
+                        value={(attacksByActivity(p.playerActivity, p).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity, p)[0]) ?? 'none'}
                         onFocus={() => setDropdownOpen(true)}
                         onBlur={() => setDropdownOpen(false)}
                         onChange={(e) => {
@@ -974,7 +978,7 @@ export default function AdventureFight() {
                         }}
                       >
                         {attackOptions
-                          .filter((opt) => attacksByActivity(p.playerActivity).includes(opt.value))
+                          .filter((opt) => attacksByActivity(p.playerActivity, p).includes(opt.value))
                           .map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
@@ -984,7 +988,7 @@ export default function AdventureFight() {
                     </td>
                     <td>
                       {(() => {
-                        const curAttack = (attacksByActivity(p.playerActivity).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity)[0]) ?? 'none';
+                        const curAttack = (attacksByActivity(p.playerActivity, p).includes(p.attackType || '') ? p.attackType : attacksByActivity(p.playerActivity, p)[0]) ?? 'none';
                         const allowed = critByAttack[curAttack ?? 'none'] ?? ['none'];
                         return (
                           <select
