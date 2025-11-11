@@ -67,6 +67,11 @@ export default function SingleAttack() {
   const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
   const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
   const [failDto, setFailDto] = useState<any>(null);
+  const [offHandReady, setOffHandReady] = useState(false);
+  const [isOffHandSequence, setIsOffHandSequence] = useState(false);
+  const [offHandDone, setOffHandDone] = useState(false);
+  const [usingOffHandView, setUsingOffHandView] = useState(false);
+  const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   // Modifiers (from AdventureFightRound)
@@ -237,7 +242,7 @@ export default function SingleAttack() {
         ...prev,
         isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
         tb: inactive ? 0 : pair.main,
-        tbOffHand: inactive ? 0 : pair.offhand,
+        tbOffHand: inactive ? 0 : pair.offHand,
         tbUsedForDefense: 0,
       } as Player;
     });
@@ -248,16 +253,62 @@ export default function SingleAttack() {
   }, [defenderToken]);
 
   // Reset rolling on key changes
-  function resetRollState() {
+  function resetRollSequence() {
     if (intervalRef.current) { window.clearInterval(intervalRef.current); intervalRef.current = null; }
-    setRolling(false); setTensFace(0); setOnesFace(0); setOpenSign(0); setOpenTotal(null); setLastRoll(null);
-    setBeRoll(null); setAttackRes(null); setResolveAttempted(false); setError(null);
-    setCritEnabled(false); setCritRolling(false); setCritTensFace(0); setCritOnesFace(0); setCritLastRoll(null); setCritDto(null);
-    setFailEnabled(false); setFailRolling(false); setFailTensFace(0); setFailOnesFace(0); setFailLastRoll(null); setFailOpenSign(0); setFailOpenTotal(null); setFailDto(null);
+    setRolling(false);
+    setTensFace(0);
+    setOnesFace(0);
+    setOpenSign(0);
+    setOpenTotal(null);
+    setLastRoll(null);
+    setBeRoll(null);
+    setAttackRes(null);
+    setResolveAttempted(false);
+    setError(null);
+    setCritEnabled(false);
+    setCritRolling(false);
+    setCritTensFace(0);
+    setCritOnesFace(0);
+    setCritLastRoll(null);
+    setCritDto(null);
+    setFailEnabled(false);
+    setFailRolling(false);
+    setFailTensFace(0);
+    setFailOnesFace(0);
+    setFailLastRoll(null);
+    setFailOpenSign(0);
+    setFailOpenTotal(null);
+    setFailDto(null);
+  }
+
+  function resetRollState() {
+    resetRollSequence();
+    setOffHandReady(false);
+    setIsOffHandSequence(false);
+    setOffHandDone(false);
+    setUsingOffHandView(false);
+    setOffHandAwaitingRoll(false);
   }
 
   useEffect(() => { resetRollState(); }, []);
   useEffect(() => { setResolveAttempted(false); }, [openTotal]);
+
+  function markOffHandReadyAfterPrimary() {
+    if (attackerAttack !== 'dualWield' || offHandDone) return;
+    setIsOffHandSequence(false);
+    setOffHandDone(false);
+    setOffHandReady(true);
+    setUsingOffHandView(true);
+    setOffHandAwaitingRoll(true);
+  }
+
+  function markOffHandComplete() {
+    setIsOffHandSequence(false);
+    setOffHandReady(false);
+    setOffHandDone(true);
+    setReadyToRoll(false);
+    setOffHandAwaitingRoll(false);
+  }
 
   // Helpers copied from pages
   function hpStyle(p: Player): CSSProperties {
@@ -277,35 +328,35 @@ export default function SingleAttack() {
     const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
     return `${pct}%`;
   }
-  function computeTbPair(p?: Player | null): { main: number; offhand: number } {
-    if (!p) return { main: 0, offhand: 0 };
+  function computeTbPair(p?: Player | null): { main: number; offHand: number } {
+    if (!p) return { main: 0, offHand: 0 };
     const attackType = (p.attackType ?? 'slashing') as string;
     switch (attackType) {
       case 'none':
-        return { main: 0, offhand: 0 };
+        return { main: 0, offHand: 0 };
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
       case 'grabOrBalance': {
         const base = p.tbOneHanded ?? 0;
-        return { main: base, offhand: 0 };
+        return { main: base, offHand: 0 };
       }
       case 'dualWield': {
         const main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
         const offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
-        return { main, offhand };
+        return { main, offHand: offhand };
       }
       case 'twoHanded':
-        return { main: p.tbTwoHanded ?? 0, offhand: 0 };
+        return { main: p.tbTwoHanded ?? 0, offHand: 0 };
       case 'ranged':
-        return { main: p.tbRanged ?? 0, offhand: 0 };
+        return { main: p.tbRanged ?? 0, offHand: 0 };
       case 'baseMagic':
-        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
+        return { main: p.tbBaseMagic ?? 0, offHand: 0 };
       case 'magicBall':
       case 'magicProjectile':
-        return { main: p.tbTargetMagic ?? 0, offhand: 0 };
+        return { main: p.tbTargetMagic ?? 0, offHand: 0 };
       default:
-        return { main: p.tb ?? 0, offhand: 0 };
+        return { main: p.tb ?? 0, offHand: 0 };
     }
   }
   function computeTb(p?: Player | null): number {
@@ -505,9 +556,11 @@ export default function SingleAttack() {
       modSum += Number(rm.gmModifier) || 0;
     }
 
+    const usingOffHand = usingOffHandView;
     const atk = attacker ? ({ ...attacker, attackType: attackerAttack } as Player) : undefined;
-    const attackerTb = atk ? computeTbPair(atk).main : 0;
-    const cAttackerTBForDefense = -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
+    const tbPair = atk ? computeTbPair(atk) : { main: 0, offHand: 0 };
+    const attackerTb = usingOffHand ? (tbPair.offHand ?? 0) : (tbPair.main ?? 0);
+    const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
     const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
     const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
     const cDefenderTBForDefense = -Math.abs(Number(defender?.tbUsedForDefense) || 0);
@@ -521,8 +574,14 @@ export default function SingleAttack() {
   }
 
   // Dice roll (same behavior)
-  async function handleRoll() {
-    if (rolling || !readyToRoll) return;
+  async function executeRoll({ useOffHand = false }: { useOffHand?: boolean } = {}) {
+    if (rolling) return;
+    if (useOffHand) {
+      setIsOffHandSequence(true);
+    } else if (isOffHandSequence) {
+      return;
+    }
+
     setRolling(true);
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     intervalRef.current = window.setInterval(() => {
@@ -562,6 +621,29 @@ export default function SingleAttack() {
     }
   }
 
+  async function handleRoll() {
+    setUsingOffHandView(false);
+    setOffHandAwaitingRoll(false);
+    await executeRoll();
+  }
+
+  async function handleOffHandRoll() {
+    if (attackerAttack !== 'dualWield') return;
+    if (rolling || resolving || !offHandReady) return;
+    setOffHandReady(false);
+    resetRollSequence();
+    setResolveAttempted(false);
+    setError(null);
+    setAttackRes(null);
+    setBeRoll(null);
+    setIsOffHandSequence(true);
+    setOffHandDone(false);
+    setReadyToRoll(true);
+    setUsingOffHandView(true);
+    setOffHandAwaitingRoll(false);
+    await executeRoll({ useOffHand: true });
+  }
+
   // Auto resolve trigger
   useEffect(() => {
     const openStarted = openTotal != null && openSign !== 0;
@@ -582,8 +664,10 @@ export default function SingleAttack() {
 
       // Compose local breakdown and echo via compute-modified-roll (overrides)
       const atk = { ...attacker, attackType: attackerAttack } as Player;
-      const attackerTb = computeTbPair(atk).main;
-      const cAttackerTBForDefense = -Math.abs(Number(attacker.tbUsedForDefense) || 0);
+      const tbPair = computeTbPair(atk);
+      const usingOffHand = usingOffHandView;
+      const attackerTb = usingOffHand ? tbPair.offHand : tbPair.main;
+      const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker.tbUsedForDefense) || 0);
       const cAttackerPenalty = -Math.abs(Number(attacker.penaltyOfActions) || 0);
       const cDefenderVB = -Math.abs(Number(defender.vb) || 0);
       const cDefenderTBForDefense = -Math.abs(Number(defender.tbUsedForDefense) || 0);
@@ -618,7 +702,8 @@ export default function SingleAttack() {
       if (!r2.ok) throw new Error('resolve-attack failed');
       const ar = await r2.json();
       const resStr = (ar?.result || '').toString().trim();
-      setAttackRes({ ...ar, total: usedTotalLocal ?? ar.total });
+      const usedTotal = usedTotalLocal ?? ar.total;
+      setAttackRes({ ...ar, total: usedTotal });
 
       // Enable crit if letter A-E, fail flow if Fail
       const upper = resStr.toUpperCase();
@@ -632,7 +717,6 @@ export default function SingleAttack() {
       if (resStr && resStr !== 'Fail') {
         const letter = resStr.slice(-1);
         if (letter === 'X') {
-          // Apply immediately using target-specific endpoint with critType=none and critResult=0
           const defenderId = defender.id ?? (players || []).find((pl) => String(pl.characterId) === defenderToken)?.id;
           if (defenderId != null) {
             const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId)}&result=${encodeURIComponent(resStr)}&critResult=${encodeURIComponent(0)}&critType=${encodeURIComponent('none')}`;
@@ -640,9 +724,13 @@ export default function SingleAttack() {
             if (!applyResp.ok) throw new Error('apply-attack failed');
             const dto = await applyResp.json();
             setCritDto(dto);
-            // Immediately refresh defender (and attacker just in case of side effects)
             await Promise.allSettled([refreshDefenderFromServer(), refreshAttackerFromServer()]);
             broadcastAdventureRefresh();
+          }
+          if (usingOffHandView) {
+            markOffHandComplete();
+          } else {
+            markOffHandReadyAfterPrimary();
           }
         }
       } else if (resStr === 'Fail') {
@@ -660,7 +748,7 @@ export default function SingleAttack() {
 
   // Crit roll apply (target-specific endpoint)
   async function handleCritRoll() {
-    if (!attackRes?.result || !critEnabled || critRolling || !defender) return;
+    if (!attackRes?.result || !critEnabled || critRolling || !defender || !attacker) return;
     const resStr = (attackRes.result || '').toString().trim();
     const upper = resStr.toUpperCase();
     const critLetter = upper.slice(-1);
@@ -708,6 +796,11 @@ export default function SingleAttack() {
         setCritEnabled(false);
         await Promise.allSettled([refreshDefenderFromServer(), refreshAttackerFromServer()]);
         broadcastAdventureRefresh();
+        if (usingOffHandView) {
+          markOffHandComplete();
+        } else {
+          markOffHandReadyAfterPrimary();
+        }
       } catch (e: any) {
         setError(e?.message || 'Crit apply failed');
       }
@@ -793,6 +886,8 @@ export default function SingleAttack() {
   const attackWidthCh = maxLen(attackOptions.map((o) => o.label));
   const critWidthCh = maxLen(critOptions.map((o) => o.label));
   const armorWidthCh = maxLen(armorOptions.map((o) => o.label));
+
+  const isDualWield = attackerAttack === 'dualWield';
 
   return (
     <div style={{ padding: 8 }}>
@@ -1017,7 +1112,7 @@ export default function SingleAttack() {
                               critType: nextCrit,
                               isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
                               tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offhand,
+                              tbOffHand: inactive ? 0 : pair.offHand,
                               tbUsedForDefense: 0,
                             } as Player;
                           });
@@ -1057,7 +1152,7 @@ export default function SingleAttack() {
                               attackType: enforcedAtk,
                               critType: nextCrit,
                               tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offhand,
+                              tbOffHand: inactive ? 0 : pair.offHand,
                               tbUsedForDefense: 0,
                             } as Player;
                           });
@@ -1092,7 +1187,7 @@ export default function SingleAttack() {
                               ...prev,
                               critType: nextCrit,
                               tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offhand,
+                              tbOffHand: inactive ? 0 : pair.offHand,
                             } as Player;
                           });
                         }}
@@ -1115,7 +1210,7 @@ export default function SingleAttack() {
                   </select>
                 </td>
                 <td className="right">{(() => computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player).main)()}</td>
-                <td className="right">{(() => computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player).offhand)()}</td>
+                <td className="right">{(() => computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player).offHand)()}</td>
                 <td>
                   {(() => {
                     const pair = computeTbPair({ ...(attacker as any), attackType: attackerAttack } as Player);
@@ -1286,6 +1381,8 @@ export default function SingleAttack() {
         </tbody>
       </table>
       {/* Modifiers and roll/result panels (copied from AdventureFightRound) */}
+      const isDualWield = attackerAttack === 'dualWield';
+
       <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto' }}>
         {(() => {
           const activity = attackerActivity as string | undefined;
@@ -1418,13 +1515,40 @@ export default function SingleAttack() {
               const canRollNow = openTotal == null ? true : openSign === 0 ? false : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96);
               const disabled = rolling || !canRollNow;
               const showGate = !readyToRoll && openTotal == null;
+              const offHandDisabled = showGate || !offHandReady || rolling || resolving || isOffHandSequence;
               return (
-                <div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                   {showGate ? (
                     <button type="button" onClick={() => setReadyToRoll(true)} style={{ background: '#f4a261', color: '#000', width: 75, height: 75, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}>All modifiers set</button>
                   ) : (
                     <button type="button" onClick={handleRoll} disabled={disabled} style={{ background: disabled ? '#888' : '#0a7d2f', color: '#ffffff', width: 75, height: 75, borderRadius: 10, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12, letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}>ROLL</button>
                   )}
+                  {isDualWield ? (
+                    <button
+                      type="button"
+                      onClick={handleOffHandRoll}
+                      disabled={offHandDisabled}
+                      style={{
+                        background: (!offHandDisabled) ? '#0a7d2f' : '#888',
+                        color: '#ffffff',
+                        width: 75,
+                        height: 75,
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: (!offHandDisabled) ? 'pointer' : 'not-allowed',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      ROLL OH
+                    </button>
+                  ) : null}
                 </div>
               );
             })()}
@@ -1435,11 +1559,17 @@ export default function SingleAttack() {
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'center', marginTop: 8 }}>
               <div className="result-col">
                 <span className="result-label">Open roll</span>
-                <div className="result-box"><span className="result-value">{openTotal != null ? `${openTotal}` : ''}</span></div>
+                <div className="result-box"><span className="result-value">{(!offHandAwaitingRoll && openTotal != null) ? `${openTotal}` : ''}</span></div>
               </div>
               <div className="result-col">
                 <span className="result-label">Modified roll</span>
-                <div className="result-box orange"><span className="result-value">{openTotal != null ? `${computeLocalModifiedTotal() ?? ''}` : ''}</span></div>
+                <div className="result-box orange">
+                  {(() => {
+                    if (offHandAwaitingRoll || openTotal == null) return <span className="result-value" />;
+                    const total = computeLocalModifiedTotal();
+                    return <span className="result-value">{total != null ? `${total}` : ''}</span>;
+                  })()}
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span className="result-label">Modifiers</span>
@@ -1470,9 +1600,11 @@ export default function SingleAttack() {
                     if (attackType === 'baseMagic') { if (rm.baseMageType === 'kapcsolat') modSum -= 10; if (rm.mdBonus) modSum += 50; if (rm.agreeingTarget) modSum -= 50; }
                     modSum += Number(rm.gmModifier) || 0;
                   }
+                  const usingOffHand = usingOffHandView;
                   const atk = attacker ? ({ ...attacker, attackType: attackerAttack } as Player) : undefined;
-                  const attackerTb = atk ? (computeTb(atk) || 0) : 0;
-                  const cAttackerTBForDefense = -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
+                  const tbPair = atk ? computeTbPair(atk) : { main: 0, offHand: 0 };
+                  const attackerTb = usingOffHand ? (tbPair.offHand ?? 0) : (tbPair.main ?? 0);
+                  const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
                   const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
                   const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
                   const cDefenderTBForDefense = -Math.abs(Number(defender?.tbUsedForDefense) || 0);
