@@ -19,6 +19,7 @@ export default function AdventureFightRound() {
   // effective players used for UI (prefer refreshed after apply)
   const effAttacker: Player | undefined = attackerRef ?? attacker;
   const effDefender: Player | undefined = defenderRef ?? defender;
+  const isDualWield = ((effAttacker?.attackType as string | undefined) ?? '').toLowerCase() === 'dualwield';
 
   const [rolling, setRolling] = useState(false);
   const [tensFace, setTensFace] = useState<number>(0);
@@ -29,6 +30,9 @@ export default function AdventureFightRound() {
   const intervalRef = useRef<number | null>(null);
   const [readyToRoll, setReadyToRoll] = useState(false);
   const [resolveAttempted, setResolveAttempted] = useState(false);
+  const [offHandReady, setOffHandReady] = useState(false);
+  const [isOffHandSequence, setIsOffHandSequence] = useState(false);
+  const [offHandDone, setOffHandDone] = useState(false);
 
   const [mod, setMod] = useState({
     attackFromWeakSide: false,
@@ -41,6 +45,9 @@ export default function AdventureFightRound() {
     attackerMoreThan3MetersMovement: false,
     modifierByGameMaster: 0,
   });
+
+  const [usingOffHandView, setUsingOffHandView] = useState(false);
+  const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
 
   const [beRoll, setBeRoll] = useState<null | {
     open: number;
@@ -196,6 +203,9 @@ export default function AdventureFightRound() {
       gmModifier: 0,
     });
     setReadyToRoll(false);
+    setOffHandReady(false);
+    setIsOffHandSequence(false);
+    setOffHandDone(false);
   }, [attacker?.id, defender?.id]);
 
   // Auto-skip attackers that cannot act (dead or stunned);
@@ -261,7 +271,7 @@ export default function AdventureFightRound() {
     return () => { mounted = false; };
   }, []);
 
-  function resetRollState() {
+  function resetRollSequence() {
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -289,10 +299,37 @@ export default function AdventureFightRound() {
     setFailOpenSign(0);
     setFailOpenTotal(null);
     setFailDto(null);
-    setAttackerRef(undefined);
-    setDefenderRef(undefined);
+    setReadyToRoll(false);
     setResolveAttempted(false);
     setError(null);
+  }
+
+  function resetRollState() {
+    resetRollSequence();
+    setAttackerRef(undefined);
+    setDefenderRef(undefined);
+    setOffHandReady(false);
+    setIsOffHandSequence(false);
+    setOffHandDone(false);
+    setUsingOffHandView(false);
+    setOffHandAwaitingRoll(false);
+  }
+
+  function markOffHandReadyAfterPrimary() {
+    if (!isDualWield || offHandDone) return;
+    setIsOffHandSequence(false);
+    setOffHandDone(false);
+    setOffHandReady(true);
+    setUsingOffHandView(true);
+    setOffHandAwaitingRoll(true);
+  }
+
+  function markOffHandComplete() {
+    setIsOffHandSequence(false);
+    setOffHandReady(false);
+    setOffHandDone(true);
+    setReadyToRoll(false);
+    setOffHandAwaitingRoll(false);
   }
 
   // When the openTotal changes (new roll sequence), allow resolve again
@@ -435,6 +472,11 @@ export default function AdventureFightRound() {
         setFailDto(dto);
         setFailEnabled(false);
         await refreshPairFromBackend();
+        if (isOffHandSequence) {
+          markOffHandComplete();
+        } else {
+          markOffHandReadyAfterPrimary();
+        }
       }
     } catch (e: any) {
       setError(e?.message || 'Fail roll failed');
@@ -577,9 +619,12 @@ export default function AdventureFightRound() {
       modSum += Number(rm.gmModifier) || 0;
     }
 
-    const attackerTb = effAttacker ? (computeTb(effAttacker) || 0) : 0;
+    const usingOffHand = usingOffHandView;
+    const attackerTb = effAttacker
+      ? (usingOffHand ? (Number(effAttacker?.tbOffHand) || 0) : (computeTb(effAttacker) || 0))
+      : 0;
     const cAttackerTB = attackerTb;
-    const cAttackerTBForDefense = -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
+    const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
     const cAttackerPenalty = -Math.abs(Number(effAttacker?.penaltyOfActions) || 0);
     const cDefenderVB = -Math.abs(Number(effDefender?.vb) || 0);
     const cDefenderTBForDefense = -Math.abs(Number(effDefender?.tbUsedForDefense) || 0);
@@ -592,8 +637,15 @@ export default function AdventureFightRound() {
     return total;
   }
 
-  async function handleRoll() {
+  async function executeRoll({ useOffHand = false }: { useOffHand?: boolean } = {}) {
     if (rolling) return;
+    if (useOffHand) {
+      setIsOffHandSequence(true);
+    } else if (isOffHandSequence) {
+      // Prevent main roll while off-hand sequence is active
+      return;
+    }
+
     setRolling(true);
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     intervalRef.current = window.setInterval(() => {
@@ -634,8 +686,6 @@ export default function AdventureFightRound() {
           if (openSign === -1) return base - value;
           return base;
         });
-        // If the follow-up roll does not continue the open-ended sequence,
-        // close the sequence so Resolve can be used
         if (openSign === 1 && value < 96) setOpenSign(0);
         if (openSign === -1 && value > 4) setOpenSign(0);
       }
@@ -647,6 +697,53 @@ export default function AdventureFightRound() {
       }
       setRolling(false);
     }
+  }
+
+  async function handleRoll() {
+    setUsingOffHandView(false);
+    setOffHandAwaitingRoll(false);
+    await executeRoll();
+  }
+
+  async function handleOffHandRoll() {
+    if (!isDualWield) return;
+    if (rolling || resolving || !offHandReady) return;
+    setOffHandReady(false);
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setRolling(false);
+    setTensFace(0);
+    setOnesFace(0);
+    setOpenSign(0);
+    setOpenTotal(null);
+    setLastRoll(null);
+    setBeRoll(null);
+    setAttackRes(null);
+    setAttackDto(null);
+    setCritEnabled(false);
+    setCritRolling(false);
+    setCritTensFace(0);
+    setCritOnesFace(0);
+    setCritLastRoll(null);
+    setCritDto(null);
+    setFailEnabled(false);
+    setFailRolling(false);
+    setFailTensFace(0);
+    setFailOnesFace(0);
+    setFailLastRoll(null);
+    setFailOpenSign(0);
+    setFailOpenTotal(null);
+    setFailDto(null);
+    setResolveAttempted(false);
+    setError(null);
+    setIsOffHandSequence(true);
+    setOffHandDone(false);
+    setReadyToRoll(true);
+    setUsingOffHandView(true);
+    setOffHandAwaitingRoll(false);
+    await executeRoll({ useOffHand: true });
   }
 
   async function resolveBackend() {
@@ -703,8 +800,11 @@ export default function AdventureFightRound() {
         modSum += Number(rm.gmModifier) || 0;
       }
 
-      const attackerTb = effAttacker ? (computeTb(effAttacker) || 0) : 0;
-      const cAttackerTBForDefense = -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
+      const usingOffHand = usingOffHandView;
+      const attackerTb = effAttacker
+        ? (usingOffHand ? (Number(effAttacker?.tbOffHand) || 0) : (computeTb(effAttacker) || 0))
+        : 0;
+      const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
       const cAttackerPenalty = -Math.abs(Number(effAttacker?.penaltyOfActions) || 0);
       const cDefenderVB = -Math.abs(Number(effDefender?.vb) || 0);
       const cDefenderTBForDefense = -Math.abs(Number(effDefender?.tbUsedForDefense) || 0);
@@ -764,6 +864,11 @@ export default function AdventureFightRound() {
           setCritDto(dto);
           setCritEnabled(false);
           await refreshPairFromBackend();
+          if (isOffHandSequence) {
+            markOffHandComplete();
+          } else {
+            markOffHandReadyAfterPrimary();
+          }
         }
       } else if (resStr === 'Fail') {
         // Reset fail state and enable fail roll box
@@ -817,6 +922,11 @@ export default function AdventureFightRound() {
       setCritDto(dto);
       setCritEnabled(false);
       await refreshPairFromBackend();
+      if (isOffHandSequence) {
+        markOffHandComplete();
+      } else {
+        markOffHandReadyAfterPrimary();
+      }
     } catch (e: any) {
       setError(e?.message || 'Crit roll failed');
     } finally {
@@ -1330,7 +1440,7 @@ export default function AdventureFightRound() {
           const disabled = rolling || !canRollNow;
           const showGate = !readyToRoll && openTotal == null;
           return (
-            <div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               {showGate ? (
                 <button
                   type="button"
@@ -1381,6 +1491,32 @@ export default function AdventureFightRound() {
                   ROLL
                 </button>
               )}
+              {isDualWield ? (
+                <button
+                  type="button"
+                  onClick={handleOffHandRoll}
+                  disabled={showGate || !offHandReady || rolling || resolving || isOffHandSequence}
+                  style={{
+                    background: (!showGate && offHandReady && !rolling && !resolving && !isOffHandSequence) ? '#0a7d2f' : '#888',
+                    color: '#ffffff',
+                    width: 75,
+                    height: 75,
+                    borderRadius: 10,
+                    border: 'none',
+                    cursor: (!showGate && offHandReady && !rolling && !resolving && !isOffHandSequence) ? 'pointer' : 'not-allowed',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  ROLL OH
+                </button>
+              ) : null}
             </div>
           );
         })()}
@@ -1392,13 +1528,17 @@ export default function AdventureFightRound() {
           <div className="result-col">
             <span className="result-label">Open roll</span>
             <div className="result-box">
-              <span className="result-value">{openTotal != null ? `${openTotal}` : ''}</span>
+              <span className="result-value">{(!offHandAwaitingRoll && openTotal != null) ? `${openTotal}` : ''}</span>
             </div>
           </div>
           <div className="result-col">
             <span className="result-label">Modified roll</span>
             <div className="result-box orange">
-              <span className="result-value">{openTotal != null ? `${computeLocalModifiedTotal() ?? ''}` : ''}</span>
+              {(() => {
+                if (offHandAwaitingRoll || openTotal == null) return <span className="result-value" />;
+                const total = computeLocalModifiedTotal();
+                return <span className="result-value">{total != null ? `${total}` : ''}</span>;
+              })()}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1449,9 +1589,12 @@ export default function AdventureFightRound() {
                 modSum += Number(rm.gmModifier) || 0;
               }
 
-              const attackerTb = effAttacker ? (computeTb(effAttacker) || 0) : 0;
+              const usingOffHand = usingOffHandView;
+              const attackerTb = effAttacker
+                ? (usingOffHand ? (Number(effAttacker?.tbOffHand) || 0) : (computeTb(effAttacker) || 0))
+                : 0;
               const cAttackerTB = attackerTb;
-              const cAttackerTBForDefense = -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
+              const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
               const cAttackerPenalty = -Math.abs(Number(effAttacker?.penaltyOfActions) || 0);
               const cDefenderVB = -Math.abs(Number(effDefender?.vb) || 0);
               const cDefenderTBForDefense = -Math.abs(Number(effDefender?.tbUsedForDefense) || 0);

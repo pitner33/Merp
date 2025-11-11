@@ -457,7 +457,7 @@ TODO      */
             rollResult = 150;
         }
 
-        if (attacker.getAttackType().equals(AttackType.slashing)) {
+        if (attacker.getAttackType().equals(AttackType.slashing) || attacker.getAttackType().equals(AttackType.dualWield)) {
             return mapsFromTabs.getMapSlashing().get(rollResult);
         } else if (attacker.getAttackType().equals(AttackType.blunt)) {
             return mapsFromTabs.getMapBlunt().get(rollResult);
@@ -531,6 +531,7 @@ TODO      */
             startIdx = 14; // magic block
         } else if (attacker.getPlayerActivity() == PlayerActivity._3PhisicalAttackOrMovement
                 || attacker.getAttackType() == AttackType.slashing
+                || attacker.getAttackType() == AttackType.dualWield
                 || attacker.getAttackType() == AttackType.blunt
                 || attacker.getAttackType() == AttackType.twoHanded
                 || attacker.getAttackType() == AttackType.clawsAndFangs
