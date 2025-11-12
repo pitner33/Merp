@@ -1,16 +1,16 @@
 package com.sol.merp.attributes;
 
-public enum WeaponType {
+public enum WeaponSpecType {
     none ("None"),
-    melee ("Melee"),
-    oneHanded ("One handed"),
-    twoHanded ("Two handed"),
-    ranged ("Ranged"),
-    magic ("Magic");
+    normal ("Normal"),
+    magic ("Magic"),
+    mithril ("Mithril"),
+    holy ("Holy"),
+    monsterKiller ("Monster Killer");
 
     private final String displayName;
 
-    WeaponType(String displayName) {
+    WeaponSpecType(String displayName) {
         this.displayName = displayName;
     }
 

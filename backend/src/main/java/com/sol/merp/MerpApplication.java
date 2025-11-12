@@ -6,6 +6,8 @@ import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import com.sol.merp.weapons.Weapon;
+import com.sol.merp.weapons.WeaponRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,8 @@ public class MerpApplication implements CommandLineRunner {
     public PlayerRepository playerRepository;
     @Autowired
     public AttackModifierRepository attackModifierRepository;
+    @Autowired
+    public WeaponRepository weaponRepository;
 
 
 
@@ -98,5 +102,40 @@ public class MerpApplication implements CommandLineRunner {
             }
         }
 
+        if (weaponRepository.count() == 0) {
+            //Seed weapons once
+            weaponRepository.save(new Weapon("Do Nothing", PlayerActivity._5DoNothing, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0D));
+            weaponRepository.save(new Weapon("Prepare Magic", PlayerActivity._4PrepareMagic, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0D));
+
+            weaponRepository.save(new Weapon("Target Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.heat, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Target Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.cold, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Target Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.electricity, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Target Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.bigCreatureMagic, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Ball Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.heat, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Ball Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.cold, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Ball Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.electricity, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Ball Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.bigCreatureMagic, WeaponType.magic, "E", "E"));
+
+            weaponRepository.save(new Weapon("Short bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E"));
+            weaponRepository.save(new Weapon("Long bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E"));
+
+            weaponRepository.save(new Weapon("Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.piercing, WeaponType.oneHanded,"C", "E"));
+            weaponRepository.save(new Weapon("One-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("One-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("One-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.blunt, CritType.blunt, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("Two-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E"));
+            weaponRepository.save(new Weapon("Two-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E"));
+            weaponRepository.save(new Weapon("Two-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.blunt, WeaponType.twoHanded, "E", "E"));
+
+            weaponRepository.save(new Weapon("Dagger/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.piercing, WeaponType.oneHanded, "C", "C"));
+            weaponRepository.save(new Weapon("Hatchet/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "C", "C"));
+            weaponRepository.save(new Weapon("Club/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "C", "C"));
+            weaponRepository.save(new Weapon("1H Sword/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C"));
+            weaponRepository.save(new Weapon("1H Axe/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C"));
+            weaponRepository.save(new Weapon("1H Mace/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "C"));
+            weaponRepository.save(new Weapon("1H Sword/1H Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("1H Axe/1H Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("1H Mace/1H Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "E"));
+        }
     }
 }

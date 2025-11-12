@@ -1,28 +1,28 @@
 package com.sol.merp.modifiers;
 
 import com.sol.merp.attributes.BigCreatureSize;
-import com.sol.merp.attributes.WeaponType;
+import com.sol.merp.attributes.WeaponSpecType;
 import org.springframework.stereotype.Component;
 
 @Component
 public class BigCreatureModifier {
 
-    public Integer countBigCreatureModifier(WeaponType weaponType, BigCreatureSize bigCreatureSize) {
+    public Integer countBigCreatureModifier(WeaponSpecType weaponSpecType, BigCreatureSize bigCreatureSize) {
         Integer bigCreatureModifierNum = 0;
 
         if (bigCreatureSize.equals(BigCreatureSize.giant)) {
             bigCreatureModifierNum -= 10;
         }
 
-        if (weaponType.equals(WeaponType.normal)) {
+        if (weaponSpecType.equals(WeaponSpecType.normal)) {
             bigCreatureModifierNum -= 20;
-        } else if (weaponType.equals(WeaponType.magic)) {
+        } else if (weaponSpecType.equals(WeaponSpecType.magic)) {
             bigCreatureModifierNum -= 10;
-        } else if (weaponType.equals(WeaponType.mithril)) {
+        } else if (weaponSpecType.equals(WeaponSpecType.mithril)) {
             bigCreatureModifierNum += 0;
-        } else if (weaponType.equals(WeaponType.holy)) {
+        } else if (weaponSpecType.equals(WeaponSpecType.holy)) {
             bigCreatureModifierNum += 10;
-        } else if (weaponType.equals(WeaponType.monsterKiller)) {
+        } else if (weaponSpecType.equals(WeaponSpecType.monsterKiller)) {
             bigCreatureModifierNum += 20;
         }
 
