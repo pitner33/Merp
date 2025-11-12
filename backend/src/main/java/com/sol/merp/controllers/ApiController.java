@@ -9,9 +9,9 @@ import com.sol.merp.attributes.PlayerClass;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.attributes.Race;
 import com.sol.merp.characters.Player;
+import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.characters.PlayerService;
-import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.fight.FightServiceImpl;
@@ -19,6 +19,8 @@ import com.sol.merp.fight.DualWieldCalculator;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.weapons.Weapon;
+import com.sol.merp.weapons.WeaponRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -59,6 +61,9 @@ public class ApiController {
     @Autowired
     private FightServiceImpl fightServiceImpl;
 
+    @Autowired
+    private WeaponRepository weaponRepository;
+
     // Players
     @GetMapping("/players")
     public List<Player> getAllPlayers() {
@@ -73,6 +78,11 @@ public class ApiController {
     @GetMapping("/players/ordered")
     public List<Player> getOrderedPlayersWhoPlay() {
         return playerService.adventurersOrderedList();
+    }
+
+    @GetMapping("/weapons")
+    public List<Weapon> getWeapons() {
+        return weaponRepository.findAll();
     }
 
     @PostMapping("/players")

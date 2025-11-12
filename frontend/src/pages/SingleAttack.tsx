@@ -1,9 +1,19 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
+
+type WeaponOption = {
+  id: number;
+  name: string;
+  activityType: string | null;
+  attackType: string | null;
+  critType: string | null;
+};
+
+const WEAPON_NONE_VALUE = '__none';
 
 export default function SingleAttack() {
   const navigate = useNavigate();
@@ -28,6 +38,7 @@ export default function SingleAttack() {
   const [attackerCrit, setAttackerCrit] = useState<string | undefined>(undefined);
   const [attackerArmor, setAttackerArmor] = useState<string | undefined>(undefined);
   const [defenderArmor, setDefenderArmor] = useState<string | undefined>(undefined);
+  const [weapons, setWeapons] = useState<WeaponOption[]>([]);
 
   // Rolling state (copied from AdventureFightRound semantics)
   const [rolling, setRolling] = useState(false);
@@ -150,6 +161,66 @@ export default function SingleAttack() {
     })();
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8081/api/weapons');
+        if (!res.ok) return;
+        const data = (await res.json()) as WeaponOption[];
+        if (!cancelled && Array.isArray(data)) {
+          setWeapons(data);
+        }
+      } catch {
+        if (!cancelled) setWeapons([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const weaponSelectOptions = useMemo(
+    () => [
+      { value: WEAPON_NONE_VALUE, label: 'None' },
+      ...weapons
+        .slice()
+        .sort((a, b) => {
+          const aid = typeof a.id === 'number' ? a.id : Number(a.id ?? 0);
+          const bid = typeof b.id === 'number' ? b.id : Number(b.id ?? 0);
+          return aid - bid;
+        })
+        .map((w) => ({ value: String(w.id), label: w.name ?? `Weapon #${w.id}` })),
+    ],
+    [weapons]
+  );
+
+  const weaponById = useMemo(() => {
+    const map = new Map<number, WeaponOption>();
+    weapons.forEach((w) => {
+      if (typeof w.id === 'number') map.set(w.id, w);
+    });
+    return map;
+  }, [weapons]);
+
+  const weaponSelectWidthCh = useMemo(() => {
+    const labels = weaponSelectOptions.map((o) => o.label ?? '');
+    return Math.max(16, maxLen(labels) + 2);
+  }, [weaponSelectOptions]);
+
+  const attackerWeaponValue = useMemo(() => {
+    const activity = (attackerActivity ?? attacker?.playerActivity ?? null) as string | null;
+    const attack = (attackerAttack ?? attacker?.attackType ?? null) as string | null;
+    const crit = (attackerCrit ?? attacker?.critType ?? null) as string | null;
+    const match = weapons.find(
+      (w) =>
+        (w.activityType ?? null) === activity &&
+        (w.attackType ?? null) === attack &&
+        (w.critType ?? null) === crit
+    );
+    return match ? String(match.id) : WEAPON_NONE_VALUE;
+  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, weapons]);
 
   // Helper to refresh the whole players list (used on focus/storage)
   async function refreshPlayersFromServer() {
@@ -359,9 +430,6 @@ export default function SingleAttack() {
         return { main: p.tb ?? 0, offHand: 0 };
     }
   }
-  function computeTb(p?: Player | null): number {
-    return computeTbPair(p).main;
-  }
   function labelActivity(v?: string): string {
     const map: Record<string, string> = { _1PerformMagic: 'Perform Magic', _2RangedAttack: 'Ranged Attack', _3PhisicalAttackOrMovement: 'Attack or Movement', _4PrepareMagic: 'Prepare Magic', _5DoNothing: 'Do Nothing' };
     return v && map[v] ? map[v] : (v || '');
@@ -374,10 +442,6 @@ export default function SingleAttack() {
     const map: Record<string, string> = { none: 'None', slashing: 'Slashing', blunt: 'Blunt', piercing: 'Piercing', heat: 'Heat', cold: 'Cold', electricity: 'Electricity', balance: 'Balance', crushing: 'Crushing', grab: 'Grab', bigCreaturePhisical: 'Big Creature Physical', bigCreatureMagic: 'Big Creature Magic' };
     return v && map[v] ? map[v] : (v || '');
   }
-  function labelArmor(v?: string): string {
-    const map: Record<string, string> = { none: 'None', leather: 'Leather', heavyLeather: 'Heavy Leather', chainmail: 'Chainmail', plate: 'Plate' };
-    return v && map[v] ? map[v] : (v || '');
-  }
   function deriveActive(activity?: string, isAlive?: boolean, stunnedForRounds?: number): boolean {
     const alive = isAlive !== false;
     const stunned = (stunnedForRounds ?? 0) > 0;
@@ -385,6 +449,61 @@ export default function SingleAttack() {
     if (stunned) return false;
     if (activity === '_5DoNothing' || activity === '_4PrepareMagic') return false;
     return true;
+  }
+
+  function applyActivityAttackCrit(enforcedAct: string, enforcedAttack: string, enforcedCrit: string) {
+    setAttackerActivity(enforcedAct);
+    setAttackerAttack(enforcedAttack);
+    setAttackerCrit(enforcedCrit);
+    setAttacker((prev) => {
+      if (!prev) return prev;
+      const pair = computeTbPair({ ...prev, attackType: enforcedAttack } as Player);
+      const inactive = enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing';
+      return {
+        ...prev,
+        playerActivity: enforcedAct,
+        attackType: enforcedAttack,
+        critType: enforcedCrit,
+        isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
+        tb: inactive ? 0 : pair.main,
+        tbOffHand: inactive ? 0 : pair.offHand,
+        tbUsedForDefense: 0,
+      } as Player;
+    });
+    setMod(initialMod());
+    setRm(initialRm());
+  }
+
+  function handleWeaponChange(value: string) {
+    const allowedActs = allowedActivitiesByTarget(defenderToken);
+    const basePlayer = attacker ?? undefined;
+    if (value === WEAPON_NONE_VALUE) {
+      const fallbackAct = allowedActs.includes(attackerActivity || '')
+        ? (attackerActivity as string)
+        : allowedActs[0];
+      const allowedAtks = attacksByActivity(fallbackAct, basePlayer);
+      const fallbackAttack = allowedAtks.includes(attackerAttack || '')
+        ? (attackerAttack as string)
+        : allowedAtks[0];
+      const allowedCrits = (critByAttack as any)[fallbackAttack] ?? ['none'];
+      const fallbackCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
+      applyActivityAttackCrit(fallbackAct, fallbackAttack, fallbackCrit);
+      return;
+    }
+
+    const weaponId = Number(value);
+    const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
+    if (!weapon) return;
+
+    const desiredAct = weapon.activityType ?? allowedActs[0];
+    const enforcedAct = desiredAct && allowedActs.includes(desiredAct) ? desiredAct : allowedActs[0];
+    const allowedAtks = attacksByActivity(enforcedAct, basePlayer);
+    const desiredAttack = weapon.attackType ?? allowedAtks[0];
+    const enforcedAttack = desiredAttack && allowedAtks.includes(desiredAttack) ? desiredAttack : allowedAtks[0];
+    const allowedCrits = (critByAttack as any)[enforcedAttack] ?? ['none'];
+    const desiredCrit = weapon.critType ?? allowedCrits[0];
+    const enforcedCrit = desiredCrit && allowedCrits.includes(desiredCrit) ? desiredCrit : allowedCrits[0];
+    applyActivityAttackCrit(enforcedAct, enforcedAttack, enforcedCrit);
   }
 
   // Helpers to refresh players from backend so UI reflects applied results immediately
@@ -432,40 +551,7 @@ export default function SingleAttack() {
   }, [attackerToken, defenderToken]);
 
   // Option helpers from AdventureMain
-  const activityOptions = [
-    { value: '_1PerformMagic', label: 'Perform Magic' },
-    { value: '_2RangedAttack', label: 'Ranged Attack' },
-    { value: '_3PhisicalAttackOrMovement', label: 'Attack or Movement' },
-    { value: '_4PrepareMagic', label: 'Prepare Magic' },
-    { value: '_5DoNothing', label: 'Do Nothing' },
-  ];
-  const attackOptions = [
-    { value: 'none', label: 'None' },
-    { value: 'slashing', label: 'Slashing' },
-    { value: 'blunt', label: 'Blunt' },
-    { value: 'twoHanded', label: 'Two-handed' },
-    { value: 'dualWield', label: 'Dual Wield' },
-    { value: 'ranged', label: 'Ranged' },
-    { value: 'clawsAndFangs', label: 'Claws and Fangs' },
-    { value: 'grabOrBalance', label: 'Grab or Balance' },
-    { value: 'baseMagic', label: 'Base Magic' },
-    { value: 'magicBall', label: 'Magic Ball' },
-    { value: 'magicProjectile', label: 'Magic Projectile' },
-  ];
-  const critOptions = [
-    { value: 'none', label: 'None' },
-    { value: 'slashing', label: 'Slashing' },
-    { value: 'blunt', label: 'Blunt' },
-    { value: 'piercing', label: 'Piercing' },
-    { value: 'heat', label: 'Heat' },
-    { value: 'cold', label: 'Cold' },
-    { value: 'electricity', label: 'Electricity' },
-    { value: 'balance', label: 'Balance' },
-    { value: 'crushing', label: 'Crushing' },
-    { value: 'grab', label: 'Grab' },
-    { value: 'bigCreaturePhisical', label: 'Big Creature Physical' },
-    { value: 'bigCreatureMagic', label: 'Big Creature Magic' },
-  ];
+  const activityOptions = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'] as const;
   const armorOptions = [
     { value: 'none', label: 'None' },
     { value: 'leather', label: 'Leather' },
@@ -488,7 +574,7 @@ export default function SingleAttack() {
     }
   }
   function allowedActivitiesByTarget(target?: string): string[] {
-    const all = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'];
+    const all = Array.from(activityOptions);
     if (!target || target === 'none') return ['_5DoNothing', '_4PrepareMagic'];
     return all;
   }
@@ -882,9 +968,6 @@ export default function SingleAttack() {
     );
     return maxLen(labels);
   })();
-  const activityWidthCh = maxLen(activityOptions.map((o) => o.label));
-  const attackWidthCh = maxLen(attackOptions.map((o) => o.label));
-  const critWidthCh = maxLen(critOptions.map((o) => o.label));
   const armorWidthCh = maxLen(armorOptions.map((o) => o.label));
 
   const isDualWield = attackerAttack === 'dualWield';
@@ -964,6 +1047,7 @@ export default function SingleAttack() {
             <th rowSpan={2}>Active</th>
             <th rowSpan={2}>Stunned</th>
             <th rowSpan={2}>Target</th>
+            <th rowSpan={2}>Weapon/Activity</th>
             <th rowSpan={2}>Activity</th>
             <th rowSpan={2}>Attack</th>
             <th rowSpan={2}>Crit</th>
@@ -1085,121 +1169,19 @@ export default function SingleAttack() {
                   ) : null}
                 </td>
                 <td>
-                  {(() => {
-                    const allowedActs = allowedActivitiesByTarget(defenderToken);
-                    const curAct = (attackerActivity && allowedActs.includes(attackerActivity)) ? attackerActivity : allowedActs[0];
-                    return (
-                      <select
-                        value={curAct || ''}
-                        onChange={(e) => {
-                          const act = e.target.value as string;
-                          const enforcedAct = allowedActs.includes(act) ? act : allowedActs[0];
-                          const allowedAttacks = attacksByActivity(enforcedAct, attacker ?? undefined);
-                          const nextAttack = allowedAttacks.includes(attackerAttack || '') ? (attackerAttack as string) : allowedAttacks[0];
-                          const allowedCrits = (critByAttack as any)[nextAttack] ?? ['none'];
-                          const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
-                          const inactive = enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing';
-                          setAttackerActivity(enforcedAct);
-                          setAttackerAttack(nextAttack);
-                          setAttackerCrit(nextCrit);
-                          setAttacker((prev) => {
-                            if (!prev) return prev;
-                            const pair = computeTbPair({ ...prev, attackType: nextAttack } as Player);
-                            return {
-                              ...prev,
-                              playerActivity: enforcedAct,
-                              attackType: nextAttack,
-                              critType: nextCrit,
-                              isActive: deriveActive(enforcedAct, prev.isAlive, prev.stunnedForRounds),
-                              tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offHand,
-                              tbUsedForDefense: 0,
-                            } as Player;
-                          });
-                          setMod(initialMod());
-                          setRm(initialRm());
-                        }}
-                        style={{ width: `${activityWidthCh + 2}ch` }}
-                      >
-                        {activityOptions.filter((o) => allowedActs.includes(o.value)).map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
+                  <select
+                    value={attackerWeaponValue}
+                    onChange={(e) => handleWeaponChange(e.target.value)}
+                    style={{ width: `${weaponSelectWidthCh}ch` }}
+                  >
+                    {weaponSelectOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </td>
-                <td>
-                  {(() => {
-                    const curAct = attackerActivity as string | undefined;
-                    const allowedAtks = attacksByActivity(curAct, attacker ?? undefined);
-                    const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
-                    return (
-                      <select
-                        value={curAtk || ''}
-                        onChange={(e) => {
-                          const atk = e.target.value as string;
-                          const enforcedAtk = allowedAtks.includes(atk) ? atk : allowedAtks[0];
-                          const allowedCrits = (critByAttack as any)[enforcedAtk] ?? ['none'];
-                          const nextCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
-                          const inactive = curAct === '_4PrepareMagic' || curAct === '_5DoNothing';
-                          setAttackerAttack(enforcedAtk);
-                          setAttackerCrit(nextCrit);
-                          setAttacker((prev) => {
-                            if (!prev) return prev;
-                            const pair = computeTbPair({ ...prev, attackType: enforcedAtk } as Player);
-                            return {
-                              ...prev,
-                              attackType: enforcedAtk,
-                              critType: nextCrit,
-                              tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offHand,
-                              tbUsedForDefense: 0,
-                            } as Player;
-                          });
-                        }}
-                        style={{ width: `${attackWidthCh + 2}ch` }}
-                      >
-                        {attackOptions.filter((o) => allowedAtks.includes(o.value)).map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </td>
-                <td>
-                  {(() => {
-                    const curAct = attackerActivity as string | undefined;
-                    const allowedAtks = attacksByActivity(curAct, attacker ?? undefined);
-                    const curAtk = (attackerAttack && allowedAtks.includes(attackerAttack)) ? attackerAttack : allowedAtks[0];
-                    const allowedCrits = (critByAttack as any)[curAtk ?? 'none'] ?? ['none'];
-                    const curCrit = (attackerCrit && allowedCrits.includes(attackerCrit)) ? attackerCrit : 'none';
-                    return (
-                      <select
-                        value={curCrit || ''}
-                        onChange={(e) => {
-                          const nextCrit = e.target.value;
-                          setAttackerCrit(nextCrit);
-                          setAttacker((prev) => {
-                            if (!prev) return prev;
-                            const pair = computeTbPair({ ...prev, attackType: curAtk } as Player);
-                            const inactive = (attackerActivity === '_4PrepareMagic' || attackerActivity === '_5DoNothing');
-                            return {
-                              ...prev,
-                              critType: nextCrit,
-                              tb: inactive ? 0 : pair.main,
-                              tbOffHand: inactive ? 0 : pair.offHand,
-                            } as Player;
-                          });
-                        }}
-                        style={{ width: `${critWidthCh + 2}ch` }}
-                      >
-                        {critOptions.filter((o) => allowedCrits.includes(o.value)).map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </td>
+                <td>{labelActivity(attackerActivity || (attacker?.playerActivity as string | undefined))}</td>
+                <td>{labelAttack(attackerAttack || (attacker?.attackType as string | undefined))}</td>
+                <td>{labelCrit(attackerCrit || (attacker?.critType as string | undefined))}</td>
                 <td>
                   <select
                     value={attackerArmor || ''}
@@ -1308,6 +1290,20 @@ export default function SingleAttack() {
                   )}
                 </td>
                 <td>{defender.target == null ? 'none' : String(defender.target)}</td>
+                <td>
+                  {(() => {
+                    const activity = defender.playerActivity ?? null;
+                    const attack = defender.attackType ?? null;
+                    const crit = defender.critType ?? null;
+                    const match = weapons.find(
+                      (w) =>
+                        (w.activityType ?? null) === activity &&
+                        (w.attackType ?? null) === attack &&
+                        (w.critType ?? null) === crit
+                    );
+                    return match?.name ?? '—';
+                  })()}
+                </td>
                 <td>{labelActivity(defender.playerActivity as any)}</td>
                 <td>{labelAttack(defender.attackType as any)}</td>
                 <td>{labelCrit(defender.critType as any)}</td>
@@ -1381,7 +1377,6 @@ export default function SingleAttack() {
         </tbody>
       </table>
       {/* Modifiers and roll/result panels (copied from AdventureFightRound) */}
-      const isDualWield = attackerAttack === 'dualWield';
 
       <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-start', width: '100%', overflowX: 'auto' }}>
         {(() => {
