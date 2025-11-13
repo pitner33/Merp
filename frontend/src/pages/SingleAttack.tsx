@@ -39,6 +39,7 @@ export default function SingleAttack() {
   const [attackerArmor, setAttackerArmor] = useState<string | undefined>(undefined);
   const [defenderArmor, setDefenderArmor] = useState<string | undefined>(undefined);
   const [weapons, setWeapons] = useState<WeaponOption[]>([]);
+  const [attackerWeaponSelection, setAttackerWeaponSelection] = useState<string | undefined>(undefined);
 
   // Rolling state (copied from AdventureFightRound semantics)
   const [rolling, setRolling] = useState(false);
@@ -213,6 +214,21 @@ export default function SingleAttack() {
     const activity = (attackerActivity ?? attacker?.playerActivity ?? null) as string | null;
     const attack = (attackerAttack ?? attacker?.attackType ?? null) as string | null;
     const crit = (attackerCrit ?? attacker?.critType ?? null) as string | null;
+
+    if (attackerWeaponSelection !== undefined) {
+      if (attackerWeaponSelection === WEAPON_NONE_VALUE) return WEAPON_NONE_VALUE;
+      const weaponId = Number(attackerWeaponSelection);
+      const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
+      if (
+        weapon &&
+        (weapon.activityType ?? null) === activity &&
+        (weapon.attackType ?? null) === attack &&
+        (weapon.critType ?? null) === crit
+      ) {
+        return attackerWeaponSelection;
+      }
+    }
+
     const match = weapons.find(
       (w) =>
         (w.activityType ?? null) === activity &&
@@ -220,7 +236,7 @@ export default function SingleAttack() {
         (w.critType ?? null) === crit
     );
     return match ? String(match.id) : WEAPON_NONE_VALUE;
-  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, weapons]);
+  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, weapons, weaponById]);
 
   // Helper to refresh the whole players list (used on focus/storage)
   async function refreshPlayersFromServer() {
@@ -322,6 +338,34 @@ export default function SingleAttack() {
     setMod(initialMod());
     setRm(initialRm());
   }, [defenderToken]);
+
+  useEffect(() => {
+    const activity = (attackerActivity ?? attacker?.playerActivity ?? null) as string | null;
+    const attack = (attackerAttack ?? attacker?.attackType ?? null) as string | null;
+    const crit = (attackerCrit ?? attacker?.critType ?? null) as string | null;
+
+    if (attackerWeaponSelection && attackerWeaponSelection !== WEAPON_NONE_VALUE) {
+      const weaponId = Number(attackerWeaponSelection);
+      const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
+      if (
+        weapon &&
+        (weapon.activityType ?? null) === activity &&
+        (weapon.attackType ?? null) === attack &&
+        (weapon.critType ?? null) === crit
+      ) {
+        return;
+      }
+    }
+
+    const match = weapons.find(
+      (w) =>
+        (w.activityType ?? null) === activity &&
+        (w.attackType ?? null) === attack &&
+        (w.critType ?? null) === crit
+    );
+    const next = match ? String(match.id) : WEAPON_NONE_VALUE;
+    setAttackerWeaponSelection((prev) => (prev === next ? prev : next));
+  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, weaponById, weapons]);
 
   // Reset rolling on key changes
   function resetRollSequence() {
@@ -488,6 +532,7 @@ export default function SingleAttack() {
       const allowedCrits = (critByAttack as any)[fallbackAttack] ?? ['none'];
       const fallbackCrit = attackerCrit && allowedCrits.includes(attackerCrit) ? attackerCrit : 'none';
       applyActivityAttackCrit(fallbackAct, fallbackAttack, fallbackCrit);
+      setAttackerWeaponSelection(WEAPON_NONE_VALUE);
       return;
     }
 
@@ -504,6 +549,7 @@ export default function SingleAttack() {
     const desiredCrit = weapon.critType ?? allowedCrits[0];
     const enforcedCrit = desiredCrit && allowedCrits.includes(desiredCrit) ? desiredCrit : allowedCrits[0];
     applyActivityAttackCrit(enforcedAct, enforcedAttack, enforcedCrit);
+    setAttackerWeaponSelection(String(weapon.id));
   }
 
   // Helpers to refresh players from backend so UI reflects applied results immediately
@@ -580,8 +626,8 @@ export default function SingleAttack() {
   }
   const critByAttack: Record<string, string[]> = {
     none: ['none'],
-    slashing: ['none', 'slashing', 'bigCreaturePhisical'],
-    blunt: ['none', 'blunt', 'bigCreaturePhisial'],
+    slashing: ['none', 'slashing', 'piercing', 'bigCreaturePhisical'],
+    blunt: ['none', 'blunt', 'bigCreaturePhisical'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     ranged: ['none', 'piercing', 'balance', 'crushing', 'bigCreaturePhisical'],

@@ -27,6 +27,7 @@ export default function AdventureFight() {
   const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [weapons, setWeapons] = useState<WeaponOption[]>([]);
+  const [weaponSelections, setWeaponSelections] = useState<Record<number, string>>({});
 
   const weaponSelectOptions = useMemo(
     () => [
@@ -76,6 +77,22 @@ export default function AdventureFight() {
     });
     return map;
   }, [weapons]);
+
+  useEffect(() => {
+    setWeaponSelections((prev) => {
+      const ids = new Set(rows.map((r) => r.id));
+      let changed = false;
+      const next: Record<number, string> = { ...prev };
+      Object.keys(next).forEach((key) => {
+        const id = Number(key);
+        if (!ids.has(id)) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [rows]);
 
   useEffect(() => {
     setDropdownOpen(openTargetRowId != null);
@@ -229,7 +246,7 @@ export default function AdventureFight() {
 
   const critByAttack: Record<string, string[]> = {
     none: ['none'],
-    slashing: ['none', 'slashing', 'bigCreaturePhisical'],
+    slashing: ['none', 'slashing', 'piercing', 'bigCreaturePhisical'],
     blunt: ['none', 'blunt', 'bigCreaturePhisical'],
     twoHanded: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
     dualWield: ['none', 'slashing', 'blunt', 'piercing', 'bigCreaturePhisical'],
@@ -380,6 +397,26 @@ export default function AdventureFight() {
   }
 
   function weaponValueForPlayer(p: Player): string {
+    if (p.id != null) {
+      const stored = weaponSelections[p.id];
+      if (stored !== undefined) {
+        if (stored === WEAPON_NONE_VALUE) return stored;
+        const weaponId = Number(stored);
+        const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
+        if (weapon) {
+          const activity = p.playerActivity ?? null;
+          const attack = p.attackType ?? null;
+          const crit = p.critType ?? null;
+          if (
+            (weapon.activityType ?? null) === activity &&
+            (weapon.attackType ?? null) === attack &&
+            (weapon.critType ?? null) === crit
+          ) {
+            return stored;
+          }
+        }
+      }
+    }
     if (!weapons || weapons.length === 0) return WEAPON_NONE_VALUE;
     const activity = p.playerActivity ?? null;
     const attack = p.attackType ?? null;
@@ -950,7 +987,7 @@ export default function AdventureFight() {
                                   const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
                                   const allowedAttacks = attacksByActivity(enforcedAct, r);
                                   const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                                  const allowedCrits = critByAttack[nextAttack] ?? ['none'];
+                                  const allowedCrits = critByAttack[nextAttack ?? 'none'] ?? ['none'];
                                   const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
                                   const nextShield = canUseShield(nextAttack) ? r.shield : false;
                                   const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
@@ -971,6 +1008,12 @@ export default function AdventureFight() {
                                   };
                                 })
                               );
+                              setWeaponSelections((prev) => {
+                                const next = { ...prev } as Record<number, string>;
+                                if (value === 'none') next[p.id] = WEAPON_NONE_VALUE;
+                                else delete next[p.id];
+                                return next;
+                              });
                               setOpenTargetRowId(null);
                             }}
                           />
@@ -986,18 +1029,18 @@ export default function AdventureFight() {
                         onBlur={() => setDropdownOpen(false)}
                         onChange={(e) => {
                           const value = e.target.value;
-                          setRows((prev) =>
-                            prev.map((r) => {
-                              if (r.id !== p.id) return r;
-                              const normalizeTarget = (target: string | undefined) => {
-                                if (target === 'self') return r.characterId;
-                                if (target === 'none') return undefined;
-                                return target;
-                              };
-                              const targetForActivity = normalizeTarget(r.target as string | undefined);
-                              const allowedActs = allowedActivitiesByTarget(targetForActivity, r.characterId);
+                          const normalizeTarget = (target: string | undefined) => {
+                            if (target === 'self') return p.characterId;
+                            if (target === 'none') return undefined;
+                            return target;
+                          };
+                          const targetForActivity = normalizeTarget(p.target as string | undefined);
+                          const allowedActs = allowedActivitiesByTarget(targetForActivity, p.characterId);
 
-                              if (value === WEAPON_NONE_VALUE) {
+                          if (value === WEAPON_NONE_VALUE) {
+                            setRows((prev) =>
+                              prev.map((r) => {
+                                if (r.id !== p.id) return r;
                                 const fallbackAct = allowedActs.includes('_5DoNothing') ? '_5DoNothing' : allowedActs[0];
                                 const allowedAttacks = attacksByActivity(fallbackAct, r);
                                 const fallbackAttack = allowedAttacks.includes('none') ? 'none' : allowedAttacks[0];
@@ -1019,12 +1062,26 @@ export default function AdventureFight() {
                                   tbOffHand: nextTbOff,
                                   tbUsedForDefense: 0,
                                 };
-                              }
+                              })
+                            );
+                            setWeaponSelections((prev) => ({ ...prev, [p.id]: WEAPON_NONE_VALUE }));
+                            return;
+                          }
 
-                              const weaponId = Number(value);
-                              const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
-                              if (!weapon) return r;
+                          const weaponId = Number(value);
+                          const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
+                          if (!weapon) {
+                            setWeaponSelections((prev) => {
+                              const next = { ...prev } as Record<number, string>;
+                              delete next[p.id];
+                              return next;
+                            });
+                            return;
+                          }
 
+                          setRows((prev) =>
+                            prev.map((r) => {
+                              if (r.id !== p.id) return r;
                               const desiredAct = weapon.activityType ?? allowedActs[0];
                               const enforcedAct = desiredAct && allowedActs.includes(desiredAct) ? desiredAct : allowedActs[0];
                               const allowedAttacks = attacksByActivity(enforcedAct, r);
@@ -1052,6 +1109,7 @@ export default function AdventureFight() {
                               };
                             })
                           );
+                          setWeaponSelections((prev) => ({ ...prev, [p.id]: String(weapon.id) }));
                         }}
                       >
                         {weaponSelectOptions.map((opt) => (
