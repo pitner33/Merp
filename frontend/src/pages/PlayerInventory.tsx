@@ -7,6 +7,67 @@ import type { Player, PlayerInventoryItem, Weapon } from '../types';
 const DEFAULT_WEAPON_NAMES = new Set(['Do Nothing', 'Prepare Magic']);
 const STORAGE_REFRESH_KEY = 'merp:player-updated';
 
+const ACTIVITY_LABELS: Record<string, string> = {
+  _1PerformMagic: 'Perform Magic',
+  _2RangedAttack: 'Ranged Attack',
+  _3PhisicalAttackOrMovement: 'Attack or Movement',
+  _4PrepareMagic: 'Prepare Magic',
+  _5DoNothing: 'Do Nothing'
+};
+
+const ATTACK_LABELS: Record<string, string> = {
+  slashing: 'Slashing',
+  blunt: 'Blunt',
+  twoHanded: 'Two-handed',
+  dualWield: 'Dual Wield',
+  ranged: 'Ranged',
+  clawsAndFangs: 'Claws and Fangs',
+  grabOrBalance: 'Grab or Balance',
+  baseMagic: 'Base Magic',
+  magicBall: 'Magic Ball',
+  magicProjectile: 'Magic Projectile',
+  none: 'None'
+};
+
+const CRIT_LABELS: Record<string, string> = {
+  slashing: 'Slashing',
+  blunt: 'Blunt',
+  piercing: 'Piercing',
+  heat: 'Heat',
+  cold: 'Cold',
+  electricity: 'Electricity',
+  balance: 'Balance',
+  crushing: 'Crushing',
+  grab: 'Grab',
+  bigCreaturePhisical: 'Big Creature Physical',
+  bigCreatureMagic: 'Big Creature Magic',
+  none: 'None'
+};
+
+const WEAPON_TYPE_LABELS: Record<string, string> = {
+  none: 'None',
+  melee: 'Melee',
+  oneHanded: 'One handed',
+  twoHanded: 'Two handed',
+  ranged: 'Ranged',
+  magic: 'Magic'
+};
+
+const WEAPON_SPEC_LABELS: Record<string, string> = {
+  none: 'None',
+  normal: 'Normal',
+  magic: 'Magic',
+  mithril: 'Mithril',
+  holy: 'Holy',
+  monsterKiller: 'Monster Killer'
+};
+
+function displayValue(source?: string | null, labels?: Record<string, string>): string {
+  if (!source) return '—';
+  if (!labels) return source;
+  return labels[source] ?? source;
+}
+
 function formatNumber(value: number | undefined | null): string {
   if (value == null || Number.isNaN(Number(value))) return '—';
   return String(value);
@@ -211,12 +272,12 @@ export default function PlayerInventory() {
               return (
                 <tr key={item.id} style={{ borderBottom: '1px solid #ddd' }}>
                   <td style={tdStyle}>{weapon.name}</td>
-                  <td style={tdStyle}>{weapon.activityType}</td>
-                  <td style={tdStyle}>{weapon.attackType}</td>
-                  <td style={tdStyle}>{weapon.critType}</td>
-                  <td style={tdStyle}>{weapon.secondaryCritType ?? '—'}</td>
-                  <td style={tdStyle}>{weapon.weaponType}</td>
-                  <td style={tdStyle}>{weapon.weaponSpecType}</td>
+                  <td style={tdStyle}>{displayValue(weapon.activityType, ACTIVITY_LABELS)}</td>
+                  <td style={tdStyle}>{displayValue(weapon.attackType, ATTACK_LABELS)}</td>
+                  <td style={tdStyle}>{displayValue(weapon.critType, CRIT_LABELS)}</td>
+                  <td style={tdStyle}>{displayValue(weapon.secondaryCritType, CRIT_LABELS)}</td>
+                  <td style={tdStyle}>{displayValue(weapon.weaponType, WEAPON_TYPE_LABELS)}</td>
+                  <td style={tdStyle}>{displayValue(weapon.weaponSpecType, WEAPON_SPEC_LABELS)}</td>
                   <td style={tdStyle}>{formatNumber(weapon.extraTBMH)}</td>
                   <td style={tdStyle}>{formatNumber(weapon.extraTBOH)}</td>
                   <td style={tdStyle}>{formatNumber(weapon.rollCapMH)}</td>
@@ -293,10 +354,10 @@ export default function PlayerInventory() {
                           />
                         </td>
                         <td style={{ ...tdStyle, color: '#123066' }}>{weapon.name}</td>
-                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.activityType}</td>
-                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.attackType}</td>
-                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.critType}</td>
-                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.weaponSpecType}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.activityType, ACTIVITY_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.attackType, ATTACK_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.critType, CRIT_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.weaponSpecType, WEAPON_SPEC_LABELS)}</td>
                       </tr>
                     ))}
                   </tbody>
