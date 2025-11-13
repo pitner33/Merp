@@ -319,6 +319,7 @@ export default function Landing() {
       <table className="table">
         <thead>
           <tr>
+            <th rowSpan={2}>Actions</th>
             <th rowSpan={2} className="center">Play</th>
             <th rowSpan={2}><button onClick={() => toggleSort('characterId')}>ID {sortKey==='characterId' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('name')}>Name {sortKey==='name' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -349,7 +350,6 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('runes' as keyof Player)}>Runes usage {sortKey==='runes' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('influence' as keyof Player)}>Influence {sortKey==='influence' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('stealth' as keyof Player)}>Stealth {sortKey==='stealth' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th rowSpan={2}>Actions</th>
           </tr>
           <tr>
             <th><button onClick={() => toggleSort('tbOneHanded' as keyof Player)}>1H {sortKey==='tbOneHanded' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -364,6 +364,73 @@ export default function Landing() {
         <tbody>
           {sorted.map((p) => (
             <tr key={p.id}>
+              <td className="actions-cell">
+                <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    aria-label="Inventory"
+                    title="Inventory"
+                    onClick={() => {
+                      try {
+                        const url = new URL(`/players/${p.id}/inventory`, window.location.origin).toString();
+                        window.open(url, `InventoryWindow_${p.id}`);
+                      } catch {
+                        window.open(`/players/${p.id}/inventory`, '_blank');
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M6 7l1.5-3h9L18 7" />
+                      <path d="M6 7h12l-1 12H7L6 7z" />
+                      <path d="M9 11h6" />
+                    </svg>
+                  </button>
+                  <Link to={`/players/${p.id}/edit`}>
+                    <button
+                      aria-label="Edit"
+                      title="Edit"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      </svg>
+                    </button>
+                  </Link>
+                  <button
+                    aria-label="Revive"
+                    title="Revive"
+                    onClick={() => {
+                      if (isRevived(p)) return;
+                      setClosing(false);
+                      setReviveError(null);
+                      setReviving(false);
+                      setConfirmReviveFor(p);
+                    }}
+                    disabled={isRevived(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
+                      <path d="M9 12h6" />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="Delete"
+                    title="Delete"
+                    onClick={() => { setDeleting(false); setClosingDelete(false); setDeleteError(null); setConfirmDeleteFor(p); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
               <td className="center">
                 <input
                   type="checkbox"
@@ -442,73 +509,6 @@ export default function Landing() {
               <td className="right">{p.runes}</td>
               <td className="right">{p.influence}</td>
               <td className="right">{p.stealth}</td>
-              <td className="actions-cell">
-                <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-                  <button
-                    aria-label="Inventory"
-                    title="Inventory"
-                    onClick={() => {
-                      try {
-                        const url = new URL(`/players/${p.id}/inventory`, window.location.origin).toString();
-                        window.open(url, `InventoryWindow_${p.id}`);
-                      } catch {
-                        window.open(`/players/${p.id}/inventory`, '_blank');
-                      }
-                    }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M6 7l1.5-3h9L18 7" />
-                      <path d="M6 7h12l-1 12H7L6 7z" />
-                      <path d="M9 11h6" />
-                    </svg>
-                  </button>
-                  <Link to={`/players/${p.id}/edit`}>
-                    <button
-                      aria-label="Edit"
-                      title="Edit"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                      </svg>
-                    </button>
-                  </Link>
-                  <button
-                    aria-label="Revive"
-                    title="Revive"
-                    onClick={() => {
-                      if (isRevived(p)) return;
-                      setClosing(false);
-                      setReviveError(null);
-                      setReviving(false);
-                      setConfirmReviveFor(p);
-                    }}
-                    disabled={isRevived(p)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-.96-.96a5.5 5.5 0 0 0-7.78 7.78l.96.96L12 21.23l7.78-7.78.96-.96a5.5 5.5 0 0 0 0-7.78z" />
-                      <path d="M9 12h6" />
-                    </svg>
-                  </button>
-                  <button
-                    aria-label="Delete"
-                    title="Delete"
-                    onClick={() => { setDeleting(false); setClosingDelete(false); setDeleteError(null); setConfirmDeleteFor(p); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6" />
-                      <path d="M14 11v6" />
-                      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>
