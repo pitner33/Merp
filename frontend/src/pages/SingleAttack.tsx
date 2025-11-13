@@ -12,7 +12,6 @@ import {
   weaponOptionsForPlayer,
   WEAPON_NONE_VALUE,
   type WeaponOption,
-  type WeaponSelectOption,
 } from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
@@ -1231,7 +1230,7 @@ export default function SingleAttack() {
                     onChange={(e) => handleWeaponChange(e.target.value)}
                     style={{ width: `${weaponSelectWidthCh}ch` }}
                   >
-                    {weaponOptionsForPlayer(attacker?.id).map((opt) => (
+                    {weaponOptionsForPlayer(weaponOptionsByPlayer, attacker?.id).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
