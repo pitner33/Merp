@@ -41,12 +41,21 @@ export default function Crit() {
   const [selectedId, setSelectedId] = useState<string>('none');
   const [critLetter, setCritLetter] = useState<string>('none');
   const [critType, setCritType] = useState<string>('none');
+  const [manualDamage, setManualDamage] = useState<string>('0');
   const [critRolling, setCritRolling] = useState(false);
   const [critTensFace, setCritTensFace] = useState<number>(0);
   const [critOnesFace, setCritOnesFace] = useState<number>(0);
   const [critLastRoll, setCritLastRoll] = useState<number | null>(null);
   const [critResult, setCritResult] = useState<any | null>(null);
   const [critError, setCritError] = useState<string | null>(null);
+
+  const parseManualDamageValue = (value: string): number => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.floor(parsed));
+  };
+
+  const clampManualDamageString = (value: string): string => String(parseManualDamageValue(value));
 
   // Reset roll/dice when any selector is set to None
   useEffect(() => {
@@ -218,6 +227,23 @@ export default function Crit() {
     return maxLen(labels);
   })();
 
+  const critFieldBackground = (() => {
+    const raw = (critLetter || '').toString().toUpperCase();
+    if (!raw || raw === 'NONE') return '#ffffff';
+    const letter = (raw.match(/[A-ET]/) || [null])[0];
+    switch (letter) {
+      case 'T': return '#FFF5EB';
+      case 'A': return '#FFE8D5';
+      case 'B': return '#FFD8B0';
+      case 'C': return '#FFC285';
+      case 'D': return '#FFAA5E';
+      case 'E': return '#FF8A3D';
+      default: return '#e8eef9';
+    }
+  })();
+
+  const critFieldTextColor = '#2f5597';
+
   return (
     <div style={{ padding: 8 }}>
       <h1 style={{ marginTop: 0, textAlign: 'center' }}>CRIT</h1>
@@ -245,6 +271,28 @@ export default function Crit() {
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontWeight: 700 }}>Base Damage</div>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={manualDamage}
+            onChange={(e) => setManualDamage(e.target.value)}
+            onBlur={() => setManualDamage((prev) => clampManualDamageString(prev))}
+            aria-label="Base damage"
+            style={{
+              fontSize: 18,
+              padding: '8px 12px',
+              width: 180,
+              borderRadius: 8,
+              border: '1px solid #ccc',
+              textAlign: 'right',
+              background: critFieldBackground,
+              color: critFieldTextColor,
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
           <div style={{ fontWeight: 700 }}>Crit</div>
           <select
             className="mapped-select"
@@ -252,21 +300,8 @@ export default function Crit() {
             onChange={(e) => setCritLetter(e.target.value)}
             aria-label="Crit"
             style={{ fontSize: 18, padding: '8px 12px', minWidth: 180, borderRadius: 8, border: '1px solid #ccc',
-              background: (() => {
-                const raw = (critLetter || '').toString().toUpperCase();
-                if (!raw || raw === 'NONE') return '#ffffff';
-                const letter = (raw.match(/[A-ET]/) || [null])[0];
-                switch (letter) {
-                  case 'T': return '#FFF5EB';
-                  case 'A': return '#FFE8D5';
-                  case 'B': return '#FFD8B0';
-                  case 'C': return '#FFC285';
-                  case 'D': return '#FFAA5E';
-                  case 'E': return '#FF8A3D';
-                  default: return '#e8eef9';
-                }
-              })(),
-              color: '#2f5597'
+              background: critFieldBackground,
+              color: critFieldTextColor
             }}
           >
             <option value="none">None</option>
@@ -286,21 +321,8 @@ export default function Crit() {
             onChange={(e) => setCritType(e.target.value)}
             aria-label="Crit Type"
             style={{ fontSize: 18, padding: '8px 12px', minWidth: 220, borderRadius: 8, border: '1px solid #ccc',
-              background: (() => {
-                const raw = (critLetter || '').toString().toUpperCase();
-                if (!raw || raw === 'NONE') return '#ffffff';
-                const letter = (raw.match(/[A-ET]/) || [null])[0];
-                switch (letter) {
-                  case 'T': return '#FFF5EB';
-                  case 'A': return '#FFE8D5';
-                  case 'B': return '#FFD8B0';
-                  case 'C': return '#FFC285';
-                  case 'D': return '#FFAA5E';
-                  case 'E': return '#FF8A3D';
-                  default: return '#e8eef9';
-                }
-              })(),
-              color: '#2f5597'
+              background: critFieldBackground,
+              color: critFieldTextColor
             }}
           >
             <option value="none">None</option>
@@ -552,8 +574,10 @@ export default function Crit() {
                   const sel = (players || []).find((pl) => String(pl.characterId) === selectedId);
 
                   // Apply crit to backend using new endpoint that targets selected defender
-                  const letterOnly = (critLetter || '').toString().toUpperCase();
-                  const resultParam = `0${letterOnly}`;
+                  const letterRaw = (critLetter || '').toString().trim().toUpperCase();
+                  const letterOnly = letterRaw ? letterRaw[0] : '';
+                  const manualDamageBase = parseManualDamageValue(manualDamage);
+                  const resultParam = `${manualDamageBase}${letterOnly}`;
                   const modifiedCritResult = (() => {
                     const base = value;
                     switch (letterOnly) {
@@ -648,6 +672,7 @@ export default function Crit() {
         // Always-visible crit result box. Use backend critResult when present; otherwise a placeholder built from current selections.
         const usePlaceholder = !critResult;
         const letter = usePlaceholder ? (critLetter === 'none' ? '' : critLetter) : String(critResult.crit || '').toUpperCase();
+        const manualDamageValue = parseManualDamageValue(manualDamage);
         const dto = usePlaceholder
           ? {
               crit: letter,
@@ -657,8 +682,9 @@ export default function Crit() {
               critResultStunnedForRounds: 0,
               critResultPenaltyOfActions: 0,
               critResultsInstantDeath: false,
-              baseDamage: 0,
-              fullDamage: 0,
+              baseDamage: manualDamageValue,
+              fullDamage: manualDamageValue,
+              fullDamageWithoutBleeding: 0,
             }
           : critResult;
 
