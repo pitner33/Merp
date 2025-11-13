@@ -1,20 +1,23 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import type { Player } from '../types';
+import type { Player, PlayerInventoryItem } from '../types';
+import { fetchInventory } from '../api/inventory';
+import {
+  computeWeaponDropdownWidth,
+  createWeaponByIdMap,
+  createWeaponSelectOptionsMap,
+  pruneWeaponSelections,
+  toWeaponOptions,
+  weaponOptionsForPlayer,
+  weaponValueFromSelections,
+  WEAPON_NONE_VALUE,
+  type WeaponOption,
+  type WeaponSelectOption,
+} from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { sortPlayersByCharacterId } from '../utils/characterId';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
-
-type WeaponOption = {
-  id: number;
-  name: string;
-  activityType: string | null;
-  attackType: string | null;
-  critType: string | null;
-};
-
-const WEAPON_NONE_VALUE = '__none';
 
 export default function AdventureMain() {
   const location = useLocation();
@@ -34,8 +37,51 @@ export default function AdventureMain() {
   const [hoverTargetId, setHoverTargetId] = useState<string | null>(null);
   const [openTargetRowId, setOpenTargetRowId] = useState<string | number | null>(null);
   const [toast, setToast] = useState<{ message: string; x?: number; y?: number } | null>(null);
-  const [weapons, setWeapons] = useState<WeaponOption[]>([]);
+  const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
   const [weaponSelections, setWeaponSelections] = useState<Record<number, string>>({});
+
+  const playerIds = useMemo(() => {
+    const ids = rows
+      .map((r) => (typeof r.id === 'number' ? r.id : null))
+      .filter((id): id is number => id != null && Number.isFinite(id));
+    return Array.from(new Set(ids)).sort((a, b) => a - b);
+  }, [rows]);
+
+  useEffect(() => {
+    if (playerIds.length === 0) return;
+    let cancelled = false;
+    const missingIds = playerIds.filter((id) => inventoryByPlayerId[id] === undefined);
+    if (missingIds.length === 0) return;
+
+    (async () => {
+      const entries = await Promise.all(
+        missingIds.map(async (playerId) => {
+          try {
+            const inventory = await fetchInventory(playerId);
+            return { playerId, inventory };
+          } catch {
+            return { playerId, inventory: [] as PlayerInventoryItem[] };
+          }
+        })
+      );
+      if (cancelled) return;
+      setInventoryByPlayerId((prev) => {
+        const next: Record<number, WeaponOption[]> = { ...prev };
+        entries.forEach(({ playerId, inventory }) => {
+          next[playerId] = toWeaponOptions(inventory);
+        });
+        return next;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playerIds, inventoryByPlayerId]);
+
+  useEffect(() => {
+    setWeaponSelections((prev) => pruneWeaponSelections(prev, inventoryByPlayerId));
+  }, [inventoryByPlayerId]);
 
   function activityLabel(value?: string): string {
     if (!value) return '—';
@@ -55,44 +101,29 @@ export default function AdventureMain() {
     return opt?.label ?? value;
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('http://localhost:8081/api/weapons');
-        if (!res.ok) return;
-        const data = (await res.json()) as WeaponOption[];
-        if (!cancelled && Array.isArray(data)) {
-          setWeapons(data);
-        }
-      } catch {
-        if (!cancelled) setWeapons([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const weaponOptionsByPlayer = useMemo(
+    () => createWeaponSelectOptionsMap(inventoryByPlayerId),
+    [inventoryByPlayerId]
+  );
 
-  const weaponById = useMemo(() => {
-    const map = new Map<number, WeaponOption>();
-    weapons.forEach((w) => {
-      if (typeof w.id === 'number') {
-        map.set(w.id, w);
-      }
-    });
-    return map;
-  }, [weapons]);
+  const weaponById = useMemo(
+    () => createWeaponByIdMap(inventoryByPlayerId),
+    [inventoryByPlayerId]
+  );
 
   useEffect(() => {
+    const validIds = new Set(
+      rows
+        .map((r) => (typeof r.id === 'number' ? r.id : null))
+        .filter((id): id is number => id != null)
+    );
     setWeaponSelections((prev) => {
-      const ids = new Set(rows.map((r) => r.id));
       let changed = false;
       const next: Record<number, string> = { ...prev };
       Object.keys(next).forEach((key) => {
-        const id = Number(key);
-        if (!ids.has(id)) {
-          delete next[id];
+        const playerId = Number(key);
+        if (!validIds.has(playerId)) {
+          delete next[playerId];
           changed = true;
         }
       });
@@ -100,19 +131,9 @@ export default function AdventureMain() {
     });
   }, [rows]);
 
-  const weaponSelectOptions = useMemo(
-    () => [
-      { value: WEAPON_NONE_VALUE, label: 'None' },
-      ...weapons
-        .slice()
-        .sort((a, b) => {
-          const aid = typeof a.id === 'number' ? a.id : Number(a.id ?? 0);
-          const bid = typeof b.id === 'number' ? b.id : Number(b.id ?? 0);
-          return aid - bid;
-        })
-        .map((w) => ({ value: String(w.id), label: w.name ?? `Weapon #${w.id}` })),
-    ],
-    [weapons]
+  const weaponDropdownWidthCh = useMemo(
+    () => computeWeaponDropdownWidth(weaponOptionsByPlayer),
+    [weaponOptionsByPlayer]
   );
 
   useEffect(() => {
@@ -125,12 +146,25 @@ export default function AdventureMain() {
         const raw = localStorage.getItem(storageKey);
         const saved = raw ? (JSON.parse(raw) as Player[]) : [];
         if (!Array.isArray(saved) || saved.length === 0) return;
+        const guards = new Map(saved.map((p) => [p.characterId, p.playerActivity] as const));
+        const targets = new Map(saved.map((p) => [p.characterId, p.target] as const));
         const ids = saved.map((p) => p.characterId);
         const res = await fetch('http://localhost:8081/api/players/ordered');
         if (!res.ok) { setRows(sortPlayersByCharacterId(saved)); return; }
         const data = (await res.json()) as Player[];
         const byId = new Map(data.map((p) => [p.characterId, p] as const));
-        const selected = ids.map((id) => byId.get(id)).filter(Boolean) as Player[];
+        const selected = ids
+          .map((id) => {
+            const fresh = byId.get(id);
+            if (!fresh) return undefined;
+            const prevActivity = guards.get(id) as string | undefined;
+            const prevTarget = targets.get(id) as string | undefined;
+            if (prevActivity === '_4PrepareMagic' && typeof prevTarget !== 'undefined') {
+              return { ...fresh, playerActivity: prevActivity, target: prevTarget } as Player;
+            }
+            return fresh;
+          })
+          .filter(Boolean) as Player[];
         if (selected.length > 0) setRows(sortPlayersByCharacterId(selected));
       } catch {}
     })();
@@ -381,37 +415,7 @@ export default function AdventureMain() {
   }
 
   function weaponValueForPlayer(p: Player): string {
-    if (p.id != null) {
-      const stored = weaponSelections[p.id];
-      if (stored !== undefined) {
-        if (stored === WEAPON_NONE_VALUE) return stored;
-        const weaponId = Number(stored);
-        const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
-        if (weapon) {
-          const activity = p.playerActivity ?? null;
-          const attack = p.attackType ?? null;
-          const crit = p.critType ?? null;
-          if (
-            (weapon.activityType ?? null) === activity &&
-            (weapon.attackType ?? null) === attack &&
-            (weapon.critType ?? null) === crit
-          ) {
-            return stored;
-          }
-        }
-      }
-    }
-    if (!weapons || weapons.length === 0) return WEAPON_NONE_VALUE;
-    const activity = p.playerActivity ?? null;
-    const attack = p.attackType ?? null;
-    const crit = p.critType ?? null;
-    const match = weapons.find(
-      (w) =>
-        (w.activityType ?? null) === activity &&
-        (w.attackType ?? null) === attack &&
-        (w.critType ?? null) === crit
-    );
-    return match ? String(match.id) : WEAPON_NONE_VALUE;
+    return weaponValueFromSelections(p, weaponSelections, inventoryByPlayerId, weaponById);
   }
 
   function maxLen(arr: string[]): number {
@@ -972,7 +976,7 @@ export default function AdventureMain() {
                   </td>
                   <td>
                     <select
-                      style={{ width: `${Math.max(16, maxLen(weaponSelectOptions.map((o) => o.label)) + 2)}ch` }}
+                      style={{ width: `${weaponDropdownWidthCh}ch` }}
                       value={weaponValueForPlayer(p)}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -1053,7 +1057,7 @@ export default function AdventureMain() {
                         setWeaponSelections((prev) => ({ ...prev, [p.id]: String(weapon.id) }));
                       }}
                     >
-                      {weaponSelectOptions.map((opt) => (
+                      {weaponOptionsForPlayer(weaponOptionsByPlayer, p.id).map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>

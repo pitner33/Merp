@@ -1,19 +1,21 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import type { Player } from '../types';
+import type { Player, PlayerInventoryItem } from '../types';
+import { fetchInventory } from '../api/inventory';
+import {
+  computeWeaponDropdownWidth,
+  createWeaponByIdMap,
+  createWeaponSelectOptionsMap,
+  inventoryWeaponsForPlayer,
+  toWeaponOptions,
+  weaponOptionsForPlayer,
+  WEAPON_NONE_VALUE,
+  type WeaponOption,
+  type WeaponSelectOption,
+} from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
-
-type WeaponOption = {
-  id: number;
-  name: string;
-  activityType: string | null;
-  attackType: string | null;
-  critType: string | null;
-};
-
-const WEAPON_NONE_VALUE = '__none';
 
 export default function SingleAttack() {
   const navigate = useNavigate();
@@ -38,7 +40,7 @@ export default function SingleAttack() {
   const [attackerCrit, setAttackerCrit] = useState<string | undefined>(undefined);
   const [attackerArmor, setAttackerArmor] = useState<string | undefined>(undefined);
   const [defenderArmor, setDefenderArmor] = useState<string | undefined>(undefined);
-  const [weapons, setWeapons] = useState<WeaponOption[]>([]);
+  const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
   const [attackerWeaponSelection, setAttackerWeaponSelection] = useState<string | undefined>(undefined);
 
   // Rolling state (copied from AdventureFightRound semantics)
@@ -164,51 +166,54 @@ export default function SingleAttack() {
   }, []);
 
   useEffect(() => {
+    if (!players || players.length === 0) return;
     let cancelled = false;
+    const playerIds = players
+      .map((p) => (typeof p.id === 'number' ? p.id : null))
+      .filter((id): id is number => id != null && Number.isFinite(id));
+    const missingIds = playerIds.filter((id) => inventoryByPlayerId[id] === undefined);
+    if (missingIds.length === 0) return;
+
     (async () => {
-      try {
-        const res = await fetch('http://localhost:8081/api/weapons');
-        if (!res.ok) return;
-        const data = (await res.json()) as WeaponOption[];
-        if (!cancelled && Array.isArray(data)) {
-          setWeapons(data);
-        }
-      } catch {
-        if (!cancelled) setWeapons([]);
-      }
+      const entries = await Promise.all(
+        missingIds.map(async (playerId) => {
+          try {
+            const inventory = await fetchInventory(playerId);
+            return { playerId, inventory };
+          } catch {
+            return { playerId, inventory: [] as PlayerInventoryItem[] };
+          }
+        })
+      );
+      if (cancelled) return;
+      setInventoryByPlayerId((prev) => {
+        const next: Record<number, WeaponOption[]> = { ...prev };
+        entries.forEach(({ playerId, inventory }) => {
+          next[playerId] = toWeaponOptions(inventory);
+        });
+        return next;
+      });
     })();
+
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [players, inventoryByPlayerId]);
 
-  const weaponSelectOptions = useMemo(
-    () => [
-      { value: WEAPON_NONE_VALUE, label: 'None' },
-      ...weapons
-        .slice()
-        .sort((a, b) => {
-          const aid = typeof a.id === 'number' ? a.id : Number(a.id ?? 0);
-          const bid = typeof b.id === 'number' ? b.id : Number(b.id ?? 0);
-          return aid - bid;
-        })
-        .map((w) => ({ value: String(w.id), label: w.name ?? `Weapon #${w.id}` })),
-    ],
-    [weapons]
+  const weaponOptionsByPlayer = useMemo(
+    () => createWeaponSelectOptionsMap(inventoryByPlayerId),
+    [inventoryByPlayerId]
   );
 
-  const weaponById = useMemo(() => {
-    const map = new Map<number, WeaponOption>();
-    weapons.forEach((w) => {
-      if (typeof w.id === 'number') map.set(w.id, w);
-    });
-    return map;
-  }, [weapons]);
+  const weaponById = useMemo(
+    () => createWeaponByIdMap(inventoryByPlayerId),
+    [inventoryByPlayerId]
+  );
 
-  const weaponSelectWidthCh = useMemo(() => {
-    const labels = weaponSelectOptions.map((o) => o.label ?? '');
-    return Math.max(16, maxLen(labels) + 2);
-  }, [weaponSelectOptions]);
+  const weaponSelectWidthCh = useMemo(
+    () => computeWeaponDropdownWidth(weaponOptionsByPlayer),
+    [weaponOptionsByPlayer]
+  );
 
   const attackerWeaponValue = useMemo(() => {
     const activity = (attackerActivity ?? attacker?.playerActivity ?? null) as string | null;
@@ -229,14 +234,18 @@ export default function SingleAttack() {
       }
     }
 
-    const match = weapons.find(
+    const playerId = attacker?.id;
+    const inventoryWeapons = Number.isFinite(playerId)
+      ? inventoryWeaponsForPlayer(inventoryByPlayerId, playerId)
+      : [];
+    const match = inventoryWeapons.find(
       (w) =>
         (w.activityType ?? null) === activity &&
         (w.attackType ?? null) === attack &&
         (w.critType ?? null) === crit
     );
     return match ? String(match.id) : WEAPON_NONE_VALUE;
-  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, weapons, weaponById]);
+  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, attacker?.id, inventoryByPlayerId, weaponById]);
 
   // Helper to refresh the whole players list (used on focus/storage)
   async function refreshPlayersFromServer() {
@@ -357,7 +366,9 @@ export default function SingleAttack() {
       }
     }
 
-    const match = weapons.find(
+    const playerId = attacker?.id;
+    const inventoryWeapons = inventoryWeaponsForPlayer(inventoryByPlayerId, playerId);
+    const match = inventoryWeapons.find(
       (w) =>
         (w.activityType ?? null) === activity &&
         (w.attackType ?? null) === attack &&
@@ -365,7 +376,7 @@ export default function SingleAttack() {
     );
     const next = match ? String(match.id) : WEAPON_NONE_VALUE;
     setAttackerWeaponSelection((prev) => (prev === next ? prev : next));
-  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, weaponById, weapons]);
+  }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, attacker?.id, inventoryByPlayerId, weaponById]);
 
   // Reset rolling on key changes
   function resetRollSequence() {
@@ -1220,7 +1231,7 @@ export default function SingleAttack() {
                     onChange={(e) => handleWeaponChange(e.target.value)}
                     style={{ width: `${weaponSelectWidthCh}ch` }}
                   >
-                    {weaponSelectOptions.map((opt) => (
+                    {weaponOptionsForPlayer(attacker?.id).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
@@ -1341,7 +1352,9 @@ export default function SingleAttack() {
                     const activity = defender.playerActivity ?? null;
                     const attack = defender.attackType ?? null;
                     const crit = defender.critType ?? null;
-                    const match = weapons.find(
+                    const defenderId = defender.id;
+                    const inventoryWeapons = Number.isFinite(defenderId) ? inventoryByPlayerId[defenderId!] ?? [] : [];
+                    const match = inventoryWeapons.find(
                       (w) =>
                         (w.activityType ?? null) === activity &&
                         (w.attackType ?? null) === attack &&
