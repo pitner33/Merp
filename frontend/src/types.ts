@@ -45,3 +45,29 @@ export type Player = {
   influence?: number;
   stealth?: number;
 };
+
+export type Weapon = {
+  id: number;
+  name: string;
+  activityType: string;
+  attackType: string;
+  critType: string;
+  secondaryCritType?: string;
+  weaponType: string;
+  weaponSpecType: string;
+  extraTBMH?: number;
+  extraTBOH?: number;
+  rollCapMH?: number;
+  rollCapOH?: number;
+  critCapMH?: string;
+  critCapOH?: string;
+  specialModofierTB?: number;
+  weight?: number;
+};
+
+export type PlayerInventoryItem = {
+  id: number;
+  player: Player;
+  weapon: Weapon;
+  defaultWeapon: boolean;
+};

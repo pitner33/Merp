@@ -5,5 +5,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface WeaponRepository extends JpaRepository<Weapon, Long> {
-    
+    java.util.Optional<Weapon> findByName(String name);
 }

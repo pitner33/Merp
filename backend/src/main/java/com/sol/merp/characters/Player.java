@@ -1,6 +1,9 @@
 package com.sol.merp.characters;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.sol.merp.attributes.*;
+import com.sol.merp.inventory.PlayerInventoryItem;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -70,7 +73,9 @@ public class Player {
     @CollectionTable(name = "player_active_penalty_effects", joinColumns = @JoinColumn(name = "player_id"))
     private List<PenaltyEffect> activePenaltyEffects = new ArrayList<>();
 
-
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerInventoryItem> inventoryItems = new ArrayList<>();
 
     // XP level caps (index = level). Level 1..20 supported.
     private static final int[] LEVEL_CAPS = new int[] {
@@ -338,4 +343,23 @@ public class Player {
         recomputePenaltyOfActions();
     }
 
+    public List<PlayerInventoryItem> getInventoryItems() {
+        return inventoryItems;
+    }
+
+    public void setInventoryItems(List<PlayerInventoryItem> inventoryItems) {
+        this.inventoryItems = inventoryItems != null ? inventoryItems : new ArrayList<>();
+    }
+
+    public void addInventoryItem(PlayerInventoryItem item) {
+        if (item == null) return;
+        item.setPlayer(this);
+        this.inventoryItems.add(item);
+    }
+
+    public void removeInventoryItem(PlayerInventoryItem item) {
+        if (item == null) return;
+        this.inventoryItems.remove(item);
+        item.setPlayer(null);
+    }
 }

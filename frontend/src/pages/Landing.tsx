@@ -444,6 +444,25 @@ export default function Landing() {
               <td className="right">{p.stealth}</td>
               <td className="actions-cell">
                 <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    aria-label="Inventory"
+                    title="Inventory"
+                    onClick={() => {
+                      try {
+                        const url = new URL(`/players/${p.id}/inventory`, window.location.origin).toString();
+                        window.open(url, `InventoryWindow_${p.id}`);
+                      } catch {
+                        window.open(`/players/${p.id}/inventory`, '_blank');
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M6 7l1.5-3h9L18 7" />
+                      <path d="M6 7h12l-1 12H7L6 7z" />
+                      <path d="M9 11h6" />
+                    </svg>
+                  </button>
                   <Link to={`/players/${p.id}/edit`}>
                     <button
                       aria-label="Edit"

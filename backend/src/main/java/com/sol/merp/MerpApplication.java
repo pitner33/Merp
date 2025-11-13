@@ -4,6 +4,7 @@ import com.sol.merp.attributes.*;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerRepository;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.inventory.InventoryService;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.weapons.Weapon;
@@ -23,6 +24,8 @@ public class MerpApplication implements CommandLineRunner {
     public AttackModifierRepository attackModifierRepository;
     @Autowired
     public WeaponRepository weaponRepository;
+    @Autowired
+    public InventoryService inventoryService;
 
 
 
@@ -137,5 +140,7 @@ public class MerpApplication implements CommandLineRunner {
             weaponRepository.save(new Weapon("1H Axe/1H Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E"));
             weaponRepository.save(new Weapon("1H Mace/1H Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "E"));
         }
+
+        inventoryService.ensureDefaultWeaponsForAllPlayers();
     }
 }

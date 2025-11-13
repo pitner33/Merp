@@ -19,6 +19,8 @@ import com.sol.merp.fight.DualWieldCalculator;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
+import com.sol.merp.inventory.InventoryService;
+import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,10 +66,25 @@ public class ApiController {
     @Autowired
     private WeaponRepository weaponRepository;
 
+    @Autowired
+    private InventoryService inventoryService;
+
     // Players
     @GetMapping("/players")
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    public static class InventoryRequest {
+        private List<Long> weaponIds;
+
+        public List<Long> getWeaponIds() {
+            return weaponIds;
+        }
+
+        public void setWeaponIds(List<Long> weaponIds) {
+            this.weaponIds = weaponIds;
+        }
     }
 
     @GetMapping("/players/playing")
@@ -83,6 +100,45 @@ public class ApiController {
     @GetMapping("/weapons")
     public List<Weapon> getWeapons() {
         return weaponRepository.findAll();
+    }
+
+    @GetMapping("/players/{id}/inventory")
+    public ResponseEntity<List<PlayerInventoryItem>> getPlayerInventory(@PathVariable Long id) {
+        if (!playerRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        inventoryService.ensureDefaultWeaponsForPlayer(id);
+        List<PlayerInventoryItem> inventory = inventoryService.getInventoryForPlayer(id);
+        return ResponseEntity.ok(inventory);
+    }
+
+    @PostMapping("/players/{id}/inventory")
+    public ResponseEntity<List<PlayerInventoryItem>> addWeaponsToInventory(
+            @PathVariable Long id,
+            @RequestBody InventoryRequest request) {
+        if (request == null || request.getWeaponIds() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            List<PlayerInventoryItem> updated = inventoryService.addWeaponsToPlayer(id, request.getWeaponIds());
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    @DeleteMapping("/players/{id}/inventory/{weaponId}")
+    public ResponseEntity<Void> removeWeaponFromInventory(@PathVariable Long id, @PathVariable Long weaponId) {
+        try {
+            inventoryService.removeWeaponFromPlayer(id, weaponId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
     }
 
     @PostMapping("/players")
@@ -175,6 +231,7 @@ public class ApiController {
             Player saved = playerRepository.save(incoming);
             playerService.checkAndSetStats(saved);
             Player normalized = playerRepository.findById(saved.getId()).orElse(saved);
+            inventoryService.ensureDefaultWeaponsForPlayer(normalized.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(normalized);
         } catch (Exception ex) {
             log.warn("Failed to create player charId={} name={} -> {}", incoming.getCharacterId(), incoming.getName(), ex.toString());
