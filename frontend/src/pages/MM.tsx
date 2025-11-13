@@ -144,7 +144,7 @@ export default function MM() {
       case 'twoHanded': return p.tbTwoHanded;
       case 'ranged': return p.tbRanged;
       case 'baseMagic': return p.tbBaseMagic;
-      case 'magicBall':
+      case 'magicBall': return p.tbBaseMagic;
       case 'magicProjectile': return p.tbTargetMagic;
       default: return p.tb;
     }

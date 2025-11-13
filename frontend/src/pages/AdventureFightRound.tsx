@@ -406,6 +406,7 @@ export default function AdventureFightRound() {
       case 'baseMagic':
         return p.tbBaseMagic;
       case 'magicBall':
+        return p.tbBaseMagic;
       case 'magicProjectile':
         return p.tbTargetMagic;
       default:

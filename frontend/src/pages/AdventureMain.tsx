@@ -359,6 +359,7 @@ export default function AdventureMain() {
       case 'baseMagic':
         return { main: p.tbBaseMagic ?? 0, offhand: 0 };
       case 'magicBall':
+        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
       case 'magicProjectile':
         return { main: p.tbTargetMagic ?? 0, offhand: 0 };
       default:

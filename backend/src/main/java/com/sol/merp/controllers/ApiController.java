@@ -864,6 +864,8 @@ public class ApiController {
                 p.setTbOffHand(0);
                 return p.getTbBaseMagic();
             case magicBall:
+                p.setTbOffHand(0);
+                return p.getTbBaseMagic();
             case magicProjectile:
                 p.setTbOffHand(0);
                 return p.getTbTargetMagic();

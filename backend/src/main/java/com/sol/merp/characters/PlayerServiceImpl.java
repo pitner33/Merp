@@ -474,6 +474,9 @@ public class PlayerServiceImpl implements PlayerService {
                 player.setTbOffHand(0);
                 break;
             case magicBall:
+                player.setTb(player.getTbBaseMagic());
+                player.setTbOffHand(0);
+                break;
             case magicProjectile:
                 player.setTb(player.getTbTargetMagic());
                 player.setTbOffHand(0);

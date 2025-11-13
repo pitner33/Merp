@@ -478,6 +478,7 @@ export default function SingleAttack() {
       case 'baseMagic':
         return { main: p.tbBaseMagic ?? 0, offHand: 0 };
       case 'magicBall':
+        return { main: p.tbBaseMagic ?? 0, offHand: 0 };
       case 'magicProjectile':
         return { main: p.tbTargetMagic ?? 0, offHand: 0 };
       default:

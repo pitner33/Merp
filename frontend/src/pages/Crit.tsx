@@ -853,6 +853,7 @@ function computeTb(p: any): number | undefined {
     case 'baseMagic':
       return p.tbBaseMagic;
     case 'magicBall':
+      return p.tbBaseMagic;
     case 'magicProjectile':
       return p.tbTargetMagic;
     default:
