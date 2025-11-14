@@ -300,6 +300,26 @@ export default function Landing() {
         >
           GM ADD CHARACTER
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/gm/addweapon', window.location.origin).toString();
+              window.open(url, 'GMAddWeaponWindow');
+            } catch {}
+          }}
+          style={{
+            padding: '6px 10px',
+            borderRadius: 4,
+            border: '1px solid #2f5597',
+            background: '#2f5597',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          GM ADD WEAPON
+        </button>
       </div>
       <style>
         {`

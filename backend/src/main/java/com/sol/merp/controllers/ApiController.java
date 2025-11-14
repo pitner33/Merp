@@ -8,6 +8,8 @@ import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerClass;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.attributes.Race;
+import com.sol.merp.attributes.WeaponSpecType;
+import com.sol.merp.attributes.WeaponType;
 import com.sol.merp.characters.Player;
 import com.sol.merp.characters.PlayerListObject;
 import com.sol.merp.characters.PlayerRepository;
@@ -84,6 +86,49 @@ public class ApiController {
 
         public void setWeaponIds(List<Long> weaponIds) {
             this.weaponIds = weaponIds;
+        }
+    }
+
+    @PostMapping("/weapons")
+    public ResponseEntity<Weapon> createWeapon(@RequestBody Weapon incoming) {
+        if (incoming == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String name = incoming.getName();
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String normalizedName = name.trim();
+        if (weaponRepository.findByName(normalizedName).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        incoming.setId(null);
+        incoming.setName(normalizedName);
+
+        if (incoming.getActivityType() == null) incoming.setActivityType(PlayerActivity._5DoNothing);
+        if (incoming.getAttackType() == null) incoming.setAttackType(AttackType.none);
+        if (incoming.getCritType() == null) incoming.setCritType(CritType.none);
+        if (incoming.getSecondaryCritType() == null) incoming.setSecondaryCritType(CritType.none);
+        if (incoming.getWeaponType() == null) incoming.setWeaponType(WeaponType.none);
+        if (incoming.getWeaponSpecType() == null) incoming.setWeaponSpecType(WeaponSpecType.none);
+        if (incoming.getExtraTBMH() == null) incoming.setExtraTBMH(0);
+        if (incoming.getExtraTBOH() == null) incoming.setExtraTBOH(0);
+        if (incoming.getRollCapMH() == null) incoming.setRollCapMH(150);
+        if (incoming.getRollCapOH() == null) incoming.setRollCapOH(150);
+        if (incoming.getCritCapMH() == null) incoming.setCritCapMH("");
+        if (incoming.getCritCapOH() == null) incoming.setCritCapOH("");
+        if (incoming.getSpecialModofierTB() == null) incoming.setSpecialModofierTB(0);
+        if (incoming.getWeight() == null) incoming.setWeight(0D);
+
+        try {
+            Weapon saved = weaponRepository.save(incoming);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (Exception ex) {
+            log.warn("Failed to create weapon name={} -> {}", normalizedName, ex.toString());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -613,6 +658,16 @@ public class ApiController {
     @GetMapping("/meta/armor-types")
     public List<ArmorType> armorTypes() {
         return Arrays.asList(ArmorType.values());
+    }
+
+    @GetMapping("/meta/weapon-types")
+    public List<WeaponType> weaponTypes() {
+        return Arrays.asList(WeaponType.values());
+    }
+
+    @GetMapping("/meta/weapon-spec-types")
+    public List<WeaponSpecType> weaponSpecTypes() {
+        return Arrays.asList(WeaponSpecType.values());
     }
 
     @GetMapping("/meta/player-targets")
