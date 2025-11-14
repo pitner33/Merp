@@ -49,6 +49,7 @@ export default function SingleAttack() {
   const [openSign, setOpenSign] = useState<0 | 1 | -1>(0);
   const [openTotal, setOpenTotal] = useState<number | null>(null);
   const [lastRoll, setLastRoll] = useState<number | null>(null);
+  const [manualOpenInput, setManualOpenInput] = useState<string>('0');
   const [readyToRoll, setReadyToRoll] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolveAttempted, setResolveAttempted] = useState(false);
@@ -413,6 +414,7 @@ export default function SingleAttack() {
     setOffHandDone(false);
     setUsingOffHandView(false);
     setOffHandAwaitingRoll(false);
+    setManualOpenInput('0');
   }
 
   useEffect(() => { resetRollState(); }, []);
@@ -725,6 +727,23 @@ export default function SingleAttack() {
       return;
     }
 
+    const parsedManual = Number(manualOpenInput);
+    const manualIsNumber = !Number.isNaN(parsedManual);
+    const manualOverrideActive = manualIsNumber && parsedManual !== 0;
+
+    if (manualOverrideActive) {
+      if (intervalRef.current) { window.clearInterval(intervalRef.current); intervalRef.current = null; }
+      setRolling(false);
+      const value = parsedManual;
+      const absValue = Math.abs(value);
+      const normalized = absValue % 100;
+      const tens = normalized === 0 && absValue !== 0 ? 0 : Math.floor(normalized / 10);
+      const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
+      setTensFace(tens); setOnesFace(ones); setLastRoll(value);
+      setOpenSign(0); setOpenTotal(value);
+      return;
+    }
+
     setRolling(true);
     if (intervalRef.current) window.clearInterval(intervalRef.current);
     intervalRef.current = window.setInterval(() => {
@@ -740,8 +759,10 @@ export default function SingleAttack() {
       const waitPromise = new Promise<void>((res) => setTimeout(res, 2000));
       const [rolled] = await Promise.all([fetchPromise, waitPromise]);
       const value = typeof rolled === 'number' ? rolled : 1;
-      const tens = value === 100 ? 0 : Math.floor(value / 10);
-      const ones = value === 100 ? 0 : value % 10;
+      const absValue = Math.abs(value);
+      const normalized = absValue % 100;
+      const tens = normalized === 0 && absValue !== 0 ? 0 : Math.floor(normalized / 10);
+      const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
       setTensFace(tens); setOnesFace(ones); setLastRoll(value);
 
       if (openSign === 0 || openTotal == null) {
@@ -1571,7 +1592,27 @@ export default function SingleAttack() {
               const showGate = !readyToRoll && openTotal == null;
               const offHandDisabled = showGate || !offHandReady || rolling || resolving || isOffHandSequence;
               return (
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: 11, fontWeight: 600, color: '#2f5597' }}>
+                    Manual open
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={manualOpenInput}
+                      onChange={(e) => setManualOpenInput(e.target.value)}
+                      style={{
+                        width: 80,
+                        height: 40,
+                        borderRadius: 8,
+                        border: '1px solid #bbb',
+                        padding: '0 8px',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        textAlign: 'center',
+                      }}
+                      title="Enter a non-zero value to use instead of the d100 roll"
+                    />
+                  </label>
                   {showGate ? (
                     <button type="button" onClick={() => setReadyToRoll(true)} style={{ background: '#f4a261', color: '#000', width: 75, height: 75, borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 12, letterSpacing: 0.5, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}>All modifiers set</button>
                   ) : (
