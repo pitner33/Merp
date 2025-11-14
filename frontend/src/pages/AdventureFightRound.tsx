@@ -736,42 +736,51 @@ export default function AdventureFightRound() {
 
   async function handleOffHandRoll() {
     if (!isDualWield) return;
-    if (rolling || resolving || !offHandReady) return;
-    setOffHandReady(false);
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (rolling || resolving) return;
+
+    const continuingOpenSequence = isOffHandSequence && openTotal != null && openSign !== 0;
+    if (!offHandReady && !continuingOpenSequence) return;
+
+    if (!continuingOpenSequence) {
+      setOffHandReady(false);
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setRolling(false);
+      setTensFace(0);
+      setOnesFace(0);
+      setOpenSign(0);
+      setOpenTotal(null);
+      setLastRoll(null);
+      setBeRoll(null);
+      setAttackRes(null);
+      setAttackDto(null);
+      setCritEnabled(false);
+      setCritRolling(false);
+      setCritTensFace(0);
+      setCritOnesFace(0);
+      setCritLastRoll(null);
+      setCritDto(null);
+      setFailEnabled(false);
+      setFailRolling(false);
+      setFailTensFace(0);
+      setFailOnesFace(0);
+      setFailLastRoll(null);
+      setFailOpenSign(0);
+      setFailOpenTotal(null);
+      setFailDto(null);
+      setResolveAttempted(false);
+      setError(null);
+      setOffHandDone(false);
+      setOffHandAwaitingRoll(false);
+    } else {
+      setOffHandAwaitingRoll(false);
     }
-    setRolling(false);
-    setTensFace(0);
-    setOnesFace(0);
-    setOpenSign(0);
-    setOpenTotal(null);
-    setLastRoll(null);
-    setBeRoll(null);
-    setAttackRes(null);
-    setAttackDto(null);
-    setCritEnabled(false);
-    setCritRolling(false);
-    setCritTensFace(0);
-    setCritOnesFace(0);
-    setCritLastRoll(null);
-    setCritDto(null);
-    setFailEnabled(false);
-    setFailRolling(false);
-    setFailTensFace(0);
-    setFailOnesFace(0);
-    setFailLastRoll(null);
-    setFailOpenSign(0);
-    setFailOpenTotal(null);
-    setFailDto(null);
-    setResolveAttempted(false);
-    setError(null);
-    setIsOffHandSequence(true);
-    setOffHandDone(false);
+
     setReadyToRoll(true);
     setUsingOffHandView(true);
-    setOffHandAwaitingRoll(false);
+    setIsOffHandSequence(true);
     await executeRoll({ useOffHand: true });
   }
 
@@ -1466,7 +1475,7 @@ export default function AdventureFightRound() {
               : openSign === 0
               ? false
               : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96);
-          const disabled = rolling || !canRollNow;
+          const disabled = rolling || !canRollNow || isOffHandSequence;
           const showGate = !readyToRoll && openTotal == null;
           return (
             <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1541,30 +1550,37 @@ export default function AdventureFightRound() {
                 </button>
               )}
               {isDualWield ? (
-                <button
-                  type="button"
-                  onClick={handleOffHandRoll}
-                  disabled={showGate || !offHandReady || rolling || resolving || isOffHandSequence}
-                  style={{
-                    background: (!showGate && offHandReady && !rolling && !resolving && !isOffHandSequence) ? '#0a7d2f' : '#888',
-                    color: '#ffffff',
-                    width: 75,
-                    height: 75,
-                    borderRadius: 10,
-                    border: 'none',
-                    cursor: (!showGate && offHandReady && !rolling && !resolving && !isOffHandSequence) ? 'pointer' : 'not-allowed',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    letterSpacing: 0.5,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    lineHeight: 1.1,
-                  }}
-                >
-                  ROLL OH
-                </button>
+                (() => {
+                  const continuingOffHandOpen = isOffHandSequence && openTotal != null && openSign !== 0;
+                  const offHandDisabled = showGate || rolling || resolving || (!offHandReady && !continuingOffHandOpen);
+                  const offHandActive = !offHandDisabled;
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleOffHandRoll}
+                      disabled={offHandDisabled}
+                      style={{
+                        background: offHandActive ? '#0a7d2f' : '#888',
+                        color: '#ffffff',
+                        width: 75,
+                        height: 75,
+                        borderRadius: 10,
+                        border: 'none',
+                        cursor: offHandActive ? 'pointer' : 'not-allowed',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      ROLL OH
+                    </button>
+                  );
+                })()
               ) : null}
             </div>
           );

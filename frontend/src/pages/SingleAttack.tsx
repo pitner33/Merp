@@ -793,18 +793,27 @@ export default function SingleAttack() {
 
   async function handleOffHandRoll() {
     if (attackerAttack !== 'dualWield') return;
-    if (rolling || resolving || !offHandReady) return;
-    setOffHandReady(false);
-    resetRollSequence();
-    setResolveAttempted(false);
-    setError(null);
-    setAttackRes(null);
-    setBeRoll(null);
-    setIsOffHandSequence(true);
-    setOffHandDone(false);
+    if (rolling || resolving) return;
+
+    const continuingOpenSequence = isOffHandSequence && openTotal != null && openSign !== 0;
+    if (!offHandReady && !continuingOpenSequence) return;
+
+    if (!continuingOpenSequence) {
+      setOffHandReady(false);
+      resetRollSequence();
+      setResolveAttempted(false);
+      setError(null);
+      setAttackRes(null);
+      setBeRoll(null);
+      setOffHandDone(false);
+      setOffHandAwaitingRoll(false);
+    } else {
+      setOffHandAwaitingRoll(false);
+    }
+
     setReadyToRoll(true);
     setUsingOffHandView(true);
-    setOffHandAwaitingRoll(false);
+    setIsOffHandSequence(true);
     await executeRoll({ useOffHand: true });
   }
 
@@ -1587,8 +1596,13 @@ export default function SingleAttack() {
             {(() => {
               const openStarted = openTotal != null && openSign !== 0;
               const firstOpenAwaitingReroll = openStarted && (lastRoll == null || lastRoll === openTotal);
-              const canRollNow = openTotal == null ? true : openSign === 0 ? false : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96);
-              const disabled = rolling || !canRollNow;
+              const canRollNow =
+            openTotal == null
+              ? true
+              : openSign === 0
+              ? false
+              : firstOpenAwaitingReroll || (lastRoll != null && lastRoll >= 96);
+          const disabled = rolling || !canRollNow || isOffHandSequence;
               const showGate = !readyToRoll && openTotal == null;
               const offHandDisabled = showGate || !offHandReady || rolling || resolving || isOffHandSequence;
               return (
