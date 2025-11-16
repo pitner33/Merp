@@ -19,8 +19,47 @@ function createEmptyAssignments(): Record<AttributeKey, string | null> {
   }, {} as Record<AttributeKey, string | null>);
 }
 
+function createZeroBonuses(): Record<AttributeKey, number> {
+  return ATTRIBUTE_KEYS.reduce<Record<AttributeKey, number>>((acc, key) => {
+    acc[key] = 0;
+    return acc;
+  }, {} as Record<AttributeKey, number>);
+}
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
-const D100_ENDPOINT = `${API_BASE.replace(/\/$/, '')}/dice/d100`;
+const API_ROOT = API_BASE.replace(/\/$/, '');
+const D100_ENDPOINT = `${API_ROOT}/dice/d100`;
+const NORMAL_BONUS_BY_VALUE_ENDPOINT = (value: number) => `${API_ROOT}/attributes/normal-bonuses/${value}`;
+
+const CHARACTER_ID_OPTIONS = [
+  { value: '', label: 'Select…' },
+  { value: 'JK', label: 'JK' },
+  { value: 'NJK', label: 'NJK' }
+] as const;
+
+type CharacterDetailsState = {
+  characterId: string;
+  name: string;
+  gender: string;
+  race: string;
+  playerClass: string;
+};
+
+type MetaOptions = {
+  genders: string[];
+  races: string[];
+  playerClasses: string[];
+};
+
+function formatOptionLabel(value: string): string {
+  if (!value) return '';
+  const spaced = value
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 const COLORS = {
   primary: '#2f5597',
@@ -42,11 +81,67 @@ export default function CreateCharacter() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [rolledValues, setRolledValues] = useState<RolledValue[]>([]);
   const [assignments, setAssignments] = useState<Record<AttributeKey, string | null>>(createEmptyAssignments);
+  const [attributeBonuses, setAttributeBonuses] = useState<Record<AttributeKey, number>>(createZeroBonuses);
+  const [details, setDetails] = useState<CharacterDetailsState>({
+    characterId: '',
+    name: '',
+    gender: '',
+    race: '',
+    playerClass: ''
+  });
+  const [meta, setMeta] = useState<MetaOptions>({
+    genders: [],
+    races: [],
+    playerClasses: []
+  });
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [bonusFetchError, setBonusFetchError] = useState<string | null>(null);
 
   const animationIntervalRef = useRef<number | null>(null);
+  const normalBonusCacheRef = useRef<Map<number, number>>(new Map());
+  const pendingBonusRequestRef = useRef<Map<AttributeKey, string | null>>(new Map());
 
   useEffect(() => {
     document.title = 'Character Creation – Base Attributes';
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadMeta() {
+      try {
+        setMetaLoading(true);
+        setMetaError(null);
+        const [genders, races, playerClasses] = await Promise.all([
+          fetch(`${API_ROOT}/meta/genders`).then(async (res) => {
+            if (!res.ok) throw new Error('Failed to load genders');
+            return res.json() as Promise<string[]>;
+          }),
+          fetch(`${API_ROOT}/meta/races`).then(async (res) => {
+            if (!res.ok) throw new Error('Failed to load races');
+            return res.json() as Promise<string[]>;
+          }),
+          fetch(`${API_ROOT}/meta/player-classes`).then(async (res) => {
+            if (!res.ok) throw new Error('Failed to load classes');
+            return res.json() as Promise<string[]>;
+          })
+        ]);
+        if (ignore) return;
+        setMeta({ genders, races, playerClasses });
+      } catch (error) {
+        if (!ignore) {
+          setMetaError(error instanceof Error ? error.message : 'Metadata load failed.');
+        }
+      } finally {
+        if (!ignore) {
+          setMetaLoading(false);
+        }
+      }
+    }
+    loadMeta();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -69,8 +164,44 @@ export default function CreateCharacter() {
     return rolledValues.filter((entry) => !assignedValueIds.has(entry.id));
   }, [rolledValues, assignedValueIds]);
 
+  const attributeSummaries = useMemo(() => {
+    return ATTRIBUTE_KEYS.map((attr) => {
+      const assignedId = assignments[attr];
+      const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
+      const value = assignedEntry?.value ?? 0;
+      const normalBonus = attributeBonuses[attr] ?? 0;
+      const raceBonus = 0;
+      return {
+        attribute: attr,
+        value,
+        normalBonus,
+        raceBonus,
+        sum: value + normalBonus + raceBonus
+      };
+    });
+  }, [assignments, rolledValues, attributeBonuses]);
+
+  const genderOptions = useMemo(() => [
+    { value: '', label: 'Select…' },
+    ...meta.genders.map((value) => ({ value, label: formatOptionLabel(value) }))
+  ], [meta.genders]);
+
+  const raceOptions = useMemo(() => [
+    { value: '', label: 'Select…' },
+    ...meta.races.map((value) => ({ value, label: formatOptionLabel(value) }))
+  ], [meta.races]);
+
+  const classOptions = useMemo(() => [
+    { value: '', label: 'Select…' },
+    ...meta.playerClasses.map((value) => ({ value, label: formatOptionLabel(value) }))
+  ], [meta.playerClasses]);
+
   const isComplete = ATTRIBUTE_KEYS.every((key) => assignments[key] != null);
   const rollsRemaining = MAX_ROLL_COUNT - rolledValues.length;
+
+  function handleDetailChange<Key extends keyof CharacterDetailsState>(key: Key, value: CharacterDetailsState[Key]) {
+    setDetails((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function fetchD100(): Promise<number> {
     const response = await fetch(D100_ENDPOINT);
@@ -145,21 +276,89 @@ export default function CreateCharacter() {
     }
   }
 
-  function handleAssignmentChange(attr: AttributeKey, valueId: string) {
-    setAssignments((prev) => {
-      const next: Record<AttributeKey, string | null> = { ...prev };
-      if (valueId) {
-        for (const key of ATTRIBUTE_KEYS) {
-          if (key !== attr && next[key] === valueId) {
-            next[key] = null;
-          }
+  async function handleAssignmentChange(attr: AttributeKey, valueId: string) {
+    setBonusFetchError(null);
+
+    const nextAssignments: Record<AttributeKey, string | null> = { ...assignments };
+    if (valueId) {
+      for (const key of ATTRIBUTE_KEYS) {
+        if (key !== attr && nextAssignments[key] === valueId) {
+          nextAssignments[key] = null;
+          pendingBonusRequestRef.current.delete(key);
         }
-        next[attr] = valueId;
-      } else {
-        next[attr] = null;
+      }
+      nextAssignments[attr] = valueId;
+    } else {
+      nextAssignments[attr] = null;
+    }
+
+    setAssignments(nextAssignments);
+    setAttributeBonuses((prev) => {
+      const next = { ...prev };
+      for (const key of ATTRIBUTE_KEYS) {
+        if (nextAssignments[key] == null) {
+          next[key] = 0;
+        }
       }
       return next;
     });
+
+    if (valueId) {
+      setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+    }
+
+    if (!valueId) {
+      pendingBonusRequestRef.current.delete(attr);
+      return;
+    }
+
+    const assignedEntry = rolledValues.find((entry) => entry.id === valueId);
+    if (!assignedEntry) {
+      pendingBonusRequestRef.current.delete(attr);
+      setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+      return;
+    }
+
+    const assignedValue = assignedEntry.value;
+    pendingBonusRequestRef.current.set(attr, valueId);
+
+    const cachedBonus = normalBonusCacheRef.current.get(assignedValue);
+    if (cachedBonus != null) {
+      setAttributeBonuses((prev) => ({ ...prev, [attr]: cachedBonus }));
+      return;
+    }
+
+    try {
+      const response = await fetch(NORMAL_BONUS_BY_VALUE_ENDPOINT(assignedValue));
+      if (pendingBonusRequestRef.current.get(attr) !== valueId) {
+        return;
+      }
+
+      if (response.status === 404) {
+        normalBonusCacheRef.current.set(assignedValue, 0);
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to load normal bonus for value ${assignedValue}`);
+      }
+
+      const data = await response.json();
+      if (typeof data !== 'number' || !Number.isFinite(data)) {
+        throw new Error('Unexpected normal bonus response');
+      }
+
+      normalBonusCacheRef.current.set(assignedValue, data);
+      if (pendingBonusRequestRef.current.get(attr) === valueId) {
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: data }));
+      }
+    } catch (error) {
+      if (pendingBonusRequestRef.current.get(attr) === valueId) {
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+        setBonusFetchError(error instanceof Error ? error.message : 'Failed to fetch normal bonus.');
+      }
+    }
   }
 
   function resetAll() {
@@ -175,6 +374,10 @@ export default function CreateCharacter() {
     setErrorMessage(null);
     setRolledValues([]);
     setAssignments(createEmptyAssignments());
+    setAttributeBonuses(createZeroBonuses());
+    normalBonusCacheRef.current.clear();
+    pendingBonusRequestRef.current.clear();
+    setBonusFetchError(null);
   }
 
   return (
@@ -221,6 +424,97 @@ export default function CreateCharacter() {
         Roll six base attribute scores using a D100. Any roll below {MIN_ACCEPTED_ROLL} is automatically rerolled. Once all six values
         are generated, assign them freely to STR, DEX, CON, IQ, IT, and CH.
       </p>
+
+      <div style={{ background: '#fff', borderRadius: 8, padding: 16, border: `1px solid ${COLORS.border}`, boxShadow: '0 2px 8px rgba(47,85,151,0.1)', maxWidth: 960, margin: '0 auto', width: '100%' }}>
+        <h2 style={{ marginTop: 0, marginBottom: 12, color: COLORS.primary }}>Character Details</h2>
+        {metaError && (
+          <p style={{ margin: '0 0 12px 0', color: COLORS.danger, fontWeight: 600 }}>{metaError}</p>
+        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <thead>
+              <tr>
+                <th style={{ border: '1px solid #ddd', padding: '6px 8px', background: COLORS.primary, color: '#fff', textTransform: 'uppercase', fontSize: 12 }}>Character ID</th>
+                <th style={{ border: '1px solid #ddd', padding: '6px 8px', background: COLORS.primary, color: '#fff', textTransform: 'uppercase', fontSize: 12 }}>Name</th>
+                <th style={{ border: '1px solid #ddd', padding: '6px 8px', background: COLORS.primary, color: '#fff', textTransform: 'uppercase', fontSize: 12 }}>Gender</th>
+                <th style={{ border: '1px solid #ddd', padding: '6px 8px', background: COLORS.primary, color: '#fff', textTransform: 'uppercase', fontSize: 12 }}>Race</th>
+                <th style={{ border: '1px solid #ddd', padding: '6px 8px', background: COLORS.primary, color: '#fff', textTransform: 'uppercase', fontSize: 12 }}>Class</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <select
+                    value={details.characterId}
+                    onChange={(event) => handleDetailChange('characterId', event.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  >
+                    {CHARACTER_ID_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <input
+                    type="text"
+                    value={details.name}
+                    onChange={(event) => handleDetailChange('name', event.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    placeholder="Character name"
+                  />
+                </td>
+                <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <select
+                    value={details.gender}
+                    onChange={(event) => handleDetailChange('gender', event.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    disabled={metaLoading}
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <select
+                    value={details.race}
+                    onChange={(event) => handleDetailChange('race', event.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    disabled={metaLoading}
+                  >
+                    {raceOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td style={{ border: '1px solid #ddd', padding: '6px 8px' }}>
+                  <select
+                    value={details.playerClass}
+                    onChange={(event) => handleDetailChange('playerClass', event.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    disabled={metaLoading}
+                  >
+                    {classOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {metaLoading && (
+          <p style={{ margin: '12px 0 0 0', color: COLORS.warning, fontWeight: 600 }}>Loading character metadata…</p>
+        )}
+      </div>
 
       <style>
         {`
@@ -283,20 +577,23 @@ export default function CreateCharacter() {
               <tr>
                 <th style={{ textAlign: 'left', paddingBottom: 8, borderBottom: `2px solid ${COLORS.primary}`, color: COLORS.primary }}>Attribute</th>
                 <th style={{ textAlign: 'left', paddingBottom: 8, borderBottom: `2px solid ${COLORS.primary}`, color: COLORS.primary }}>Value</th>
+                <th style={{ textAlign: 'left', paddingBottom: 8, borderBottom: `2px solid ${COLORS.primary}`, color: COLORS.primary }}>Normal Bonus</th>
+                <th style={{ textAlign: 'left', paddingBottom: 8, borderBottom: `2px solid ${COLORS.primary}`, color: COLORS.primary }}>Race Bonus</th>
+                <th style={{ textAlign: 'left', paddingBottom: 8, borderBottom: `2px solid ${COLORS.primary}`, color: COLORS.primary }}>Sum Bonus</th>
               </tr>
             </thead>
             <tbody>
-              {ATTRIBUTE_KEYS.map((attr) => {
-                const assignedId = assignments[attr];
-                const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
+              {attributeSummaries.map((summary) => {
+                const assignedId = assignments[summary.attribute];
                 const availableOptions = rolledValues.filter((entry) => entry.id === assignedId || !assignedValueIds.has(entry.id));
+                const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
                 return (
-                  <tr key={attr}>
-                    <td style={{ padding: '10px 8px', fontWeight: 700, color: COLORS.primary }}>{attr}</td>
+                  <tr key={summary.attribute}>
+                    <td style={{ padding: '10px 8px', fontWeight: 700, color: COLORS.primary }}>{summary.attribute}</td>
                     <td style={{ padding: '10px 8px' }}>
                       <select
                         value={assignedId ?? ''}
-                        onChange={(event) => handleAssignmentChange(attr, event.target.value)}
+                        onChange={(event) => handleAssignmentChange(summary.attribute, event.target.value)}
                         disabled={rolledValues.length === 0}
                         style={{
                           width: '100%',
@@ -321,6 +618,9 @@ export default function CreateCharacter() {
                         </small>
                       )}
                     </td>
+                    <td style={{ padding: '10px 8px', color: COLORS.textPrimary }}>{summary.normalBonus}</td>
+                    <td style={{ padding: '10px 8px', color: COLORS.textPrimary }}>{summary.raceBonus}</td>
+                    <td style={{ padding: '10px 8px', fontWeight: 600, color: COLORS.textPrimary }}>{summary.sum}</td>
                   </tr>
                 );
               })}
@@ -339,6 +639,9 @@ export default function CreateCharacter() {
               <p style={{ margin: 0, color: COLORS.warning, fontWeight: 600 }}>
                 Assign each attribute once all rolls are completed.
               </p>
+            )}
+            {bonusFetchError && (
+              <p style={{ margin: '8px 0 0 0', color: COLORS.danger, fontWeight: 600 }}>{bonusFetchError}</p>
             )}
           </div>
         </div>

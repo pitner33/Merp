@@ -25,6 +25,7 @@ import com.sol.merp.inventory.InventoryService;
 import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
+import com.sol.merp.storage.NormalBonusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"})
@@ -71,10 +74,30 @@ public class ApiController {
     @Autowired
     private InventoryService inventoryService;
 
+    @Autowired
+    private NormalBonusService normalBonusService;
+
     // Players
     @GetMapping("/players")
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    @GetMapping("/attributes/normal-bonuses")
+    public Map<String, Integer> getNormalBonuses() {
+        return normalBonusService.getNormalBonuses();
+    }
+
+    @GetMapping("/attributes/normal-bonuses/{value}")
+    public ResponseEntity<Integer> getNormalBonusByValue(@PathVariable("value") int attributeValue) {
+        if (attributeValue <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+        OptionalInt result = normalBonusService.findNormalBonusForValue(attributeValue);
+        if (result.isPresent()) {
+            return ResponseEntity.ok(result.getAsInt());
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
     public static class InventoryRequest {
