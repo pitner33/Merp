@@ -3,6 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 
+type RaceOption = {
+  code: string;
+  displayName?: string | null;
+};
+
 type RolledValue = {
   id: string;
   value: number;
@@ -30,6 +35,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/
 const API_ROOT = API_BASE.replace(/\/$/, '');
 const D100_ENDPOINT = `${API_ROOT}/dice/d100`;
 const NORMAL_BONUS_BY_VALUE_ENDPOINT = (value: number) => `${API_ROOT}/attributes/normal-bonuses/${value}`;
+const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bonuses/${encodeURIComponent(raceKey)}`;
 
 const CHARACTER_ID_OPTIONS = [
   { value: '', label: 'Select…' },
@@ -47,7 +53,7 @@ type CharacterDetailsState = {
 
 type MetaOptions = {
   genders: string[];
-  races: string[];
+  races: RaceOption[];
   playerClasses: string[];
 };
 
@@ -82,6 +88,7 @@ export default function CreateCharacter() {
   const [rolledValues, setRolledValues] = useState<RolledValue[]>([]);
   const [assignments, setAssignments] = useState<Record<AttributeKey, string | null>>(createEmptyAssignments);
   const [attributeBonuses, setAttributeBonuses] = useState<Record<AttributeKey, number>>(createZeroBonuses);
+  const [raceBonuses, setRaceBonuses] = useState<Record<AttributeKey, number>>(createZeroBonuses);
   const [details, setDetails] = useState<CharacterDetailsState>({
     characterId: '',
     name: '',
@@ -97,10 +104,13 @@ export default function CreateCharacter() {
   const [metaError, setMetaError] = useState<string | null>(null);
   const [metaLoading, setMetaLoading] = useState(false);
   const [bonusFetchError, setBonusFetchError] = useState<string | null>(null);
+  const [raceBonusError, setRaceBonusError] = useState<string | null>(null);
 
   const animationIntervalRef = useRef<number | null>(null);
   const normalBonusCacheRef = useRef<Map<number, number>>(new Map());
   const pendingBonusRequestRef = useRef<Map<AttributeKey, string | null>>(new Map());
+  const raceBonusCacheRef = useRef<Map<string, Record<AttributeKey, number>>>(new Map());
+  const raceBonusRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
     document.title = 'Character Creation – Base Attributes';
@@ -119,7 +129,7 @@ export default function CreateCharacter() {
           }),
           fetch(`${API_ROOT}/meta/races`).then(async (res) => {
             if (!res.ok) throw new Error('Failed to load races');
-            return res.json() as Promise<string[]>;
+            return res.json() as Promise<RaceOption[]>;
           }),
           fetch(`${API_ROOT}/meta/player-classes`).then(async (res) => {
             if (!res.ok) throw new Error('Failed to load classes');
@@ -152,6 +162,80 @@ export default function CreateCharacter() {
     };
   }, []);
 
+  useEffect(() => {
+    let ignore = false;
+    const raceKeyRaw = details.race?.trim();
+    if (!raceKeyRaw) {
+      setRaceBonuses(createZeroBonuses());
+      setRaceBonusError(null);
+      raceBonusRequestRef.current = null;
+      return;
+    }
+
+    const cacheKey = raceKeyRaw.toUpperCase();
+    if (raceBonusCacheRef.current.has(cacheKey)) {
+      setRaceBonuses(raceBonusCacheRef.current.get(cacheKey)!);
+      setRaceBonusError(null);
+      raceBonusRequestRef.current = cacheKey;
+      return;
+    }
+
+    raceBonusRequestRef.current = cacheKey;
+    setRaceBonusError(null);
+    setRaceBonuses(createZeroBonuses());
+
+    async function loadRaceBonuses() {
+      try {
+        const response = await fetch(RACE_BONUS_ENDPOINT(raceKeyRaw));
+        if (ignore || raceBonusRequestRef.current !== cacheKey) {
+          return;
+        }
+
+        if (response.status === 404) {
+          const zeros = createZeroBonuses();
+          raceBonusCacheRef.current.set(cacheKey, zeros);
+          setRaceBonuses(zeros);
+          setRaceBonusError(`Race bonus data not found for ${raceKeyRaw}.`);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to load race bonuses for ${raceKeyRaw}`);
+        }
+
+        const data = await response.json();
+        const normalized = createZeroBonuses();
+        if (data && typeof data === 'object') {
+          for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+            const upperKey = key.trim().toUpperCase();
+            if (ATTRIBUTE_KEYS.includes(upperKey as AttributeKey) && typeof value === 'number' && Number.isFinite(value)) {
+              normalized[upperKey as AttributeKey] = value;
+            }
+          }
+        } else {
+          throw new Error('Unexpected race bonus response');
+        }
+
+        raceBonusCacheRef.current.set(cacheKey, normalized);
+        if (!ignore && raceBonusRequestRef.current === cacheKey) {
+          setRaceBonuses(normalized);
+          setRaceBonusError(null);
+        }
+      } catch (error) {
+        if (ignore || raceBonusRequestRef.current !== cacheKey) {
+          return;
+        }
+        setRaceBonuses(createZeroBonuses());
+        setRaceBonusError(error instanceof Error ? error.message : 'Failed to fetch race bonuses.');
+      }
+    }
+
+    loadRaceBonuses();
+    return () => {
+      ignore = true;
+    };
+  }, [details.race]);
+
   const assignedValueIds = useMemo(() => {
     const ids = new Set<string>();
     for (const value of Object.values(assignments)) {
@@ -170,16 +254,16 @@ export default function CreateCharacter() {
       const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
       const value = assignedEntry?.value ?? 0;
       const normalBonus = attributeBonuses[attr] ?? 0;
-      const raceBonus = 0;
+      const raceBonus = raceBonuses[attr] ?? 0;
       return {
         attribute: attr,
         value,
         normalBonus,
         raceBonus,
-        sum: value + normalBonus + raceBonus
+        sum: normalBonus + raceBonus
       };
     });
-  }, [assignments, rolledValues, attributeBonuses]);
+  }, [assignments, rolledValues, attributeBonuses, raceBonuses]);
 
   const genderOptions = useMemo(() => [
     { value: '', label: 'Select…' },
@@ -188,7 +272,12 @@ export default function CreateCharacter() {
 
   const raceOptions = useMemo(() => [
     { value: '', label: 'Select…' },
-    ...meta.races.map((value) => ({ value, label: formatOptionLabel(value) }))
+    ...meta.races.map((option) => ({
+      value: option.code,
+      label: option.displayName && option.displayName.trim().length > 0
+        ? option.displayName
+        : formatOptionLabel(option.code)
+    }))
   ], [meta.races]);
 
   const classOptions = useMemo(() => [
@@ -375,9 +464,13 @@ export default function CreateCharacter() {
     setRolledValues([]);
     setAssignments(createEmptyAssignments());
     setAttributeBonuses(createZeroBonuses());
+    setRaceBonuses(createZeroBonuses());
     normalBonusCacheRef.current.clear();
     pendingBonusRequestRef.current.clear();
+    raceBonusCacheRef.current.clear();
+    raceBonusRequestRef.current = null;
     setBonusFetchError(null);
+    setRaceBonusError(null);
   }
 
   return (
@@ -642,6 +735,9 @@ export default function CreateCharacter() {
             )}
             {bonusFetchError && (
               <p style={{ margin: '8px 0 0 0', color: COLORS.danger, fontWeight: 600 }}>{bonusFetchError}</p>
+            )}
+            {raceBonusError && (
+              <p style={{ margin: '8px 0 0 0', color: COLORS.danger, fontWeight: 600 }}>{raceBonusError}</p>
             )}
           </div>
         </div>

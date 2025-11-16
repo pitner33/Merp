@@ -26,6 +26,7 @@ import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.storage.NormalBonusService;
+import com.sol.merp.storage.RaceBonusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +78,9 @@ public class ApiController {
     @Autowired
     private NormalBonusService normalBonusService;
 
+    @Autowired
+    private RaceBonusService raceBonusService;
+
     // Players
     @GetMapping("/players")
     public List<Player> getAllPlayers() {
@@ -100,6 +104,43 @@ public class ApiController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
+    @GetMapping("/attributes/race-bonuses/{raceKey}")
+    public ResponseEntity<Map<String, Integer>> getRaceBonuses(@PathVariable("raceKey") String raceKey) {
+        if (raceKey == null || raceKey.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Map<String, Integer>> byEnum = resolveRace(raceKey)
+                .flatMap(raceBonusService::findRaceBonuses);
+        if (byEnum.isPresent()) {
+            return ResponseEntity.ok(byEnum.get());
+        }
+
+        Optional<Map<String, Integer>> byKey = raceBonusService.findRaceBonusesByKey(raceKey);
+        return byKey.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    private Optional<Race> resolveRace(String raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        String normalized = raw.trim();
+        if (normalized.isEmpty()) {
+            return Optional.empty();
+        }
+        for (Race candidate : Race.values()) {
+            if (candidate.name().equalsIgnoreCase(normalized)) {
+                return Optional.of(candidate);
+            }
+            String display = candidate.getDisplayName();
+            if (display != null && display.equalsIgnoreCase(normalized)) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
     public static class InventoryRequest {
         private List<Long> weaponIds;
 
@@ -109,6 +150,34 @@ public class ApiController {
 
         public void setWeaponIds(List<Long> weaponIds) {
             this.weaponIds = weaponIds;
+        }
+    }
+
+    public static class RaceOption {
+        private String code;
+        private String displayName;
+
+        public RaceOption() {}
+
+        public RaceOption(String code, String displayName) {
+            this.code = code;
+            this.displayName = displayName;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public void setDisplayName(String displayName) {
+            this.displayName = displayName;
         }
     }
 
@@ -681,8 +750,12 @@ public class ApiController {
     }
 
     @GetMapping("/meta/races")
-    public List<Race> races() {
-        return Arrays.asList(Race.values());
+    public List<RaceOption> races() {
+        List<RaceOption> result = new ArrayList<>();
+        for (Race race : Race.values()) {
+            result.add(new RaceOption(race.name(), race.getDisplayName()));
+        }
+        return result;
     }
 
     @GetMapping("/meta/player-classes")
