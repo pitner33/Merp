@@ -8,6 +8,8 @@ export type WeaponOption = {
   critType: string | null;
   extraTBMH: number;
   extraTBOH: number;
+  critCapMH?: string | null;
+  critCapOH?: string | null;
 };
 
 export type WeaponSelectOption = {
@@ -32,6 +34,8 @@ export function toWeaponOptions(inventory: PlayerInventoryItem[]): WeaponOption[
       critType: weapon.critType ?? null,
       extraTBMH: typeof weapon.extraTBMH === 'number' ? weapon.extraTBMH : 0,
       extraTBOH: typeof weapon.extraTBOH === 'number' ? weapon.extraTBOH : 0,
+      critCapMH: weapon.critCapMH ?? null,
+      critCapOH: weapon.critCapOH ?? null,
     }));
 }
 
