@@ -2,6 +2,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
+import { fetchInventory } from '../api/inventory';
+import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
+import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 import { isXpOverCap, formatXp } from '../utils/xp';
 
 export default function AdventureFightRound() {
@@ -34,6 +37,9 @@ export default function AdventureFightRound() {
   const [offHandReady, setOffHandReady] = useState(false);
   const [isOffHandSequence, setIsOffHandSequence] = useState(false);
   const [offHandDone, setOffHandDone] = useState(false);
+  const [usingOffHandView, setUsingOffHandView] = useState(false);
+  const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
+  const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
 
   const [mod, setMod] = useState({
     attackFromWeakSide: false,
@@ -46,9 +52,6 @@ export default function AdventureFightRound() {
     attackerMoreThan3MetersMovement: false,
     modifierByGameMaster: 0,
   });
-
-  const [usingOffHandView, setUsingOffHandView] = useState(false);
-  const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
 
   const [beRoll, setBeRoll] = useState<null | {
     open: number;
@@ -207,6 +210,58 @@ export default function AdventureFightRound() {
     setOffHandReady(false);
     setIsOffHandSequence(false);
     setOffHandDone(false);
+  }, [attacker?.id, defender?.id]);
+
+  useEffect(() => {
+    const ids = [attacker?.id, defender?.id]
+      .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+    if (ids.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        ids.map(async (playerId) => {
+          try {
+            const inventory = await fetchInventory(playerId);
+            return { playerId, options: toWeaponOptions(inventory) };
+          } catch {
+            return { playerId, options: [] as WeaponOption[] };
+          }
+        })
+      );
+      if (cancelled) return;
+      setInventoryByPlayerId((prev) => {
+        const next: Record<number, WeaponOption[]> = { ...prev };
+        let dirty = false;
+        entries.forEach(({ playerId, options }) => {
+          const prevOptions = prev[playerId];
+          const sameLength = prevOptions?.length === options.length;
+          const sameItems = sameLength
+            ? prevOptions?.every((opt, idx) => {
+                const other = options[idx];
+                return (
+                  other !== undefined &&
+                  opt.id === other.id &&
+                  opt.name === other.name &&
+                  (opt.activityType ?? null) === (other.activityType ?? null) &&
+                  (opt.attackType ?? null) === (other.attackType ?? null) &&
+                  (opt.critType ?? null) === (other.critType ?? null) &&
+                  opt.extraTBMH === other.extraTBMH &&
+                  opt.extraTBOH === other.extraTBOH
+                );
+              })
+            : false;
+          if (sameItems) return;
+          next[playerId] = options;
+          dirty = true;
+        });
+        return dirty ? next : prev;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [attacker?.id, defender?.id]);
 
   // Auto-skip attackers that cannot act (dead or stunned);
@@ -393,27 +448,59 @@ export default function AdventureFightRound() {
     return `${pct}%`;
   }
 
-  function computeTb(p: Player): number | undefined {
-    const a = p.attackType ?? 'slashing';
-    switch (a) {
+  function computeTbPair(p?: Player | null): { main: number; offhand: number } {
+    if (!p) return { main: 0, offhand: 0 };
+
+    const weapon = findEquippedWeapon(p);
+    const bonusMain = weapon?.extraTBMH ?? 0;
+    const bonusOff = weapon?.extraTBOH ?? 0;
+
+    const attackType = (p.attackType ?? 'slashing') as string;
+    let main = 0;
+    let offhand = 0;
+    switch (attackType) {
+      case 'none':
+        main = 0;
+        offhand = 0;
+        break;
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
       case 'grabOrBalance':
-        return p.tbOneHanded;
+        main = p.tbOneHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield':
+        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        break;
       case 'twoHanded':
-        return p.tbTwoHanded;
+        main = p.tbTwoHanded ?? 0;
+        offhand = 0;
+        break;
       case 'ranged':
-        return p.tbRanged;
+        main = p.tbRanged ?? 0;
+        offhand = 0;
+        break;
       case 'baseMagic':
-        return p.tbBaseMagic;
       case 'magicBall':
-        return p.tbBaseMagic;
+        main = p.tbBaseMagic ?? 0;
+        offhand = 0;
+        break;
       case 'magicProjectile':
-        return p.tbTargetMagic;
+        main = p.tbTargetMagic ?? 0;
+        offhand = 0;
+        break;
       default:
-        return p.tb;
+        main = p.tb ?? 0;
+        offhand = 0;
+        break;
     }
+    return { main: main + bonusMain, offhand: offhand + bonusOff };
+  }
+
+  function computeTb(p: Player): number {
+    return computeTbPair(p).main;
   }
 
   async function handleFailRoll() {
@@ -575,6 +662,17 @@ export default function AdventureFightRound() {
     return v && map[v] ? map[v] : (v || '');
   }
 
+  function findEquippedWeapon(p?: Player): WeaponOption | undefined {
+    if (!p) return undefined;
+    const playerId = typeof p.id === 'number' ? p.id : undefined;
+    if (playerId == null) return undefined;
+    const equippedWeaponId = typeof p.equippedWeaponId === 'number' ? p.equippedWeaponId : undefined;
+    if (equippedWeaponId == null) return undefined;
+    const options = inventoryByPlayerId[playerId];
+    if (!options) return undefined;
+    return options.find((w) => w.id === equippedWeaponId);
+  }
+
   function computeLocalModifiedTotal(): number | undefined {
     if (openTotal == null) return undefined;
     const activity = effAttacker?.playerActivity as string | undefined;
@@ -624,7 +722,7 @@ export default function AdventureFightRound() {
 
     const usingOffHand = usingOffHandView;
     const attackerTb = effAttacker
-      ? (usingOffHand ? (Number(effAttacker?.tbOffHand) || 0) : (computeTb(effAttacker) || 0))
+      ? (usingOffHand ? computeTbPair(effAttacker).offhand : computeTb(effAttacker))
       : 0;
     const cAttackerTB = attackerTb;
     const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(effAttacker?.tbUsedForDefense) || 0);
@@ -1085,6 +1183,7 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>Active</th>
               <th rowSpan={2}>Stunned</th>
               <th rowSpan={2}>Target</th>
+              <th rowSpan={2}>Weapon/Activity</th>
               <th rowSpan={2}>Activity</th>
               <th rowSpan={2}>Attack</th>
               <th rowSpan={2}>Crit</th>
@@ -1193,12 +1292,18 @@ export default function AdventureFightRound() {
                   )}
                 </td>
                 <td>{p?.target}</td>
+                <td>{(() => {
+                  if (!p) return '—';
+                  const weapon = findEquippedWeapon(p);
+                  if (weapon) return weapon.name;
+                  return 'None';
+                })()}</td>
                 <td>{labelActivity(p?.playerActivity as any)}</td>
                 <td>{labelAttack(p?.attackType as any)}</td>
                 <td>{labelCrit(p?.critType as any)}</td>
                 <td>{labelArmor(p?.armorType as any)}</td>
                 <td className="right">{p ? computeTb(p) : ''}</td>
-                <td className="right">{p?.tbOffHand ?? 0}</td>
+                <td className="right">{p ? computeTbPair(p).offhand : ''}</td>
                 <td className="right">{p?.tbUsedForDefense}</td>
                 <td className="right">{p?.vb}</td>
                 <td>

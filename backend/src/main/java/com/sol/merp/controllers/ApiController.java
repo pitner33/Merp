@@ -261,7 +261,19 @@ public class ApiController {
         if (hpMax != null && hpAct > hpMax) hpAct = hpMax;
         incoming.setHpActual(hpAct);
 
-        Integer computedTb = computeTb(incoming);
+        Weapon equippedWeapon = null;
+        Long equippedWeaponId = incoming.getEquippedWeaponId();
+        if (equippedWeaponId != null) {
+            Optional<Weapon> weaponOpt = weaponRepository.findById(equippedWeaponId);
+            if (weaponOpt.isPresent()) {
+                equippedWeapon = weaponOpt.get();
+            } else {
+                log.warn("Equipped weapon id={} not found during creation for characterId={}; clearing reference", equippedWeaponId, incoming.getCharacterId());
+                incoming.setEquippedWeaponId(null);
+            }
+        }
+
+        Integer computedTb = computeTb(incoming, equippedWeapon);
         incoming.setTb(computedTb);
 
         Integer tbUsed = incoming.getTbUsedForDefense();
@@ -703,8 +715,21 @@ public class ApiController {
             // Ensure we update the existing entity (avoid accidental create)
             incoming.setId(existing.getId());
 
-            // Compute and set main TB column based on current attack type and detailed TB fields
-            Integer computedTb = computeTb(incoming);
+            // Resolve equipped weapon (optional) so we can include its bonuses in TB computation
+            Weapon equippedWeapon = null;
+            Long equippedWeaponId = incoming.getEquippedWeaponId();
+            if (equippedWeaponId != null) {
+                Optional<Weapon> weaponOpt = weaponRepository.findById(equippedWeaponId);
+                if (weaponOpt.isPresent()) {
+                    equippedWeapon = weaponOpt.get();
+                } else {
+                    log.warn("Equipped weapon id={} not found for player id={}; clearing reference", equippedWeaponId, incoming.getId());
+                    incoming.setEquippedWeaponId(null);
+                }
+            }
+
+            // Compute and set main/off-hand TB columns based on current attack type, detailed TB fields, and weapon bonuses
+            Integer computedTb = computeTb(incoming, equippedWeapon);
             incoming.setTb(computedTb);
 
             // Normalize fields to satisfy DB CHECK constraints before persisting
@@ -736,6 +761,7 @@ public class ApiController {
                 incoming.setIsStunned(false);
                 incoming.setStunnedForRounds(0);
                 incoming.setPlayerActivity(PlayerActivity._5DoNothing);
+                incoming.setTbOffHand(0);
             }
 
             // 3) Non-negative counters (penaltyOfActions is derived server-side; do not override it here)
@@ -762,6 +788,7 @@ public class ApiController {
                     incoming.setAttackType(AttackType.none);
                     incoming.setTarget(PlayerTarget.none);
                     incoming.setTb(0);
+                    incoming.setTbOffHand(0);
                 } else {
                     incoming.setIsActive(true);
                 }
@@ -771,6 +798,7 @@ public class ApiController {
                 incoming.setTarget(PlayerTarget.none);
                 incoming.setTb(0);
                 incoming.setTbUsedForDefense(0);
+                incoming.setTbOffHand(0);
             }
             // Coerce null enums to 'none' to satisfy NOT NULL/CHECKs
             if (incoming.getAttackType() == null) incoming.setAttackType(AttackType.none);
@@ -792,6 +820,8 @@ public class ApiController {
                 existing.setShield(incoming.getShield());
                 existing.setTb(incoming.getTb());
                 existing.setTbUsedForDefense(incoming.getTbUsedForDefense());
+                existing.setTbOffHand(incoming.getTbOffHand());
+                existing.setEquippedWeaponId(incoming.getEquippedWeaponId());
                 // HP may change alive state; set here and let service derive status safely
                 if (incoming.getHpActual() != null) existing.setHpActual(incoming.getHpActual());
 
@@ -896,38 +926,57 @@ public class ApiController {
         return ResponseEntity.ok(result);
     }
 
-    private Integer computeTb(Player p) {
-        if (p == null || p.getAttackType() == null) return p != null ? p.getTb() : null;
-        switch (p.getAttackType()) {
+    private Integer computeTb(Player p, Weapon weapon) {
+        if (p == null) {
+            return null;
+        }
+        AttackType attackType = p.getAttackType();
+        if (attackType == null) {
+            int bonusMainOnly = weapon != null && weapon.getExtraTBMH() != null ? weapon.getExtraTBMH() : 0;
+            int bonusOffOnly = weapon != null && weapon.getExtraTBOH() != null ? weapon.getExtraTBOH() : 0;
+            int base = p.getTb() != null ? p.getTb() : 0;
+            int result = base + bonusMainOnly;
+            p.setTbOffHand(bonusOffOnly);
+            return result;
+        }
+
+        int main = 0;
+        int off = 0;
+        switch (attackType) {
             case slashing:
             case blunt:
             case clawsAndFangs:
             case grabOrBalance:
-                p.setTbOffHand(0);
-                return p.getTbOneHanded();
+                main = p.getTbOneHanded() != null ? p.getTbOneHanded() : 0;
+                break;
             case dualWield:
-                int mainTb = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
-                p.setTbOffHand(DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield()));
-                return mainTb;
+                main = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
+                off = DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield());
+                break;
             case twoHanded:
-                p.setTbOffHand(0);
-                return p.getTbTwoHanded();
+                main = p.getTbTwoHanded() != null ? p.getTbTwoHanded() : 0;
+                break;
             case ranged:
-                p.setTbOffHand(0);
-                return p.getTbRanged();
+                main = p.getTbRanged() != null ? p.getTbRanged() : 0;
+                break;
             case baseMagic:
-                p.setTbOffHand(0);
-                return p.getTbBaseMagic();
             case magicBall:
-                p.setTbOffHand(0);
-                return p.getTbBaseMagic();
+                main = p.getTbBaseMagic() != null ? p.getTbBaseMagic() : 0;
+                break;
             case magicProjectile:
-                p.setTbOffHand(0);
-                return p.getTbTargetMagic();
+                main = p.getTbTargetMagic() != null ? p.getTbTargetMagic() : 0;
+                break;
             default:
-                p.setTbOffHand(0);
-                return p.getTb();
+                main = p.getTb() != null ? p.getTb() : 0;
+                break;
         }
+
+        int bonusMain = weapon != null && weapon.getExtraTBMH() != null ? weapon.getExtraTBMH() : 0;
+        int bonusOff = weapon != null && weapon.getExtraTBOH() != null ? weapon.getExtraTBOH() : 0;
+        int finalMain = main + bonusMain;
+        int finalOff = off + bonusOff;
+        p.setTbOffHand(finalOff);
+        return finalMain;
     }
 
     public static class BulkUpdateResult {

@@ -6,6 +6,8 @@ export type WeaponOption = {
   activityType: string | null;
   attackType: string | null;
   critType: string | null;
+  extraTBMH: number;
+  extraTBOH: number;
 };
 
 export type WeaponSelectOption = {
@@ -28,6 +30,8 @@ export function toWeaponOptions(inventory: PlayerInventoryItem[]): WeaponOption[
       activityType: weapon.activityType ?? null,
       attackType: weapon.attackType ?? null,
       critType: weapon.critType ?? null,
+      extraTBMH: typeof weapon.extraTBMH === 'number' ? weapon.extraTBMH : 0,
+      extraTBOH: typeof weapon.extraTBOH === 'number' ? weapon.extraTBOH : 0,
     }));
 }
 
@@ -118,6 +122,7 @@ export function weaponValueFromSelections(
   weaponById: Map<number, WeaponOption>
 ): string {
   const playerId = typeof player.id === 'number' ? player.id : undefined;
+  const inventoryWeapons = inventoryWeaponsForPlayer(inventoryByPlayerId, playerId);
   if (playerId != null) {
     const stored = weaponSelections[playerId];
     if (stored !== undefined) {
@@ -138,7 +143,15 @@ export function weaponValueFromSelections(
       }
     }
   }
-  const inventoryWeapons = inventoryWeaponsForPlayer(inventoryByPlayerId, playerId);
+  const equippedWeaponId = typeof (player as Player & { equippedWeaponId?: number | null }).equippedWeaponId === 'number'
+    ? player.equippedWeaponId
+    : null;
+  if (equippedWeaponId != null) {
+    const weapon = inventoryWeapons.find((w) => w.id === equippedWeaponId);
+    if (weapon) {
+      return String(weapon.id);
+    }
+  }
   if (inventoryWeapons.length === 0) return WEAPON_NONE_VALUE;
   const activity = player.playerActivity ?? null;
   const attack = player.attackType ?? null;

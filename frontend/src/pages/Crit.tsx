@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import type { Player } from '../types';
+import { fetchInventory } from '../api/inventory';
+import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
+import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 
 export default function Crit() {
   const navigate = useNavigate();
@@ -37,7 +41,7 @@ export default function Crit() {
 
   
 
-  const [players, setPlayers] = useState<any[] | null>(null);
+  const [players, setPlayers] = useState<Player[] | null>(null);
   const [selectedId, setSelectedId] = useState<string>('none');
   const [critLetter, setCritLetter] = useState<string>('none');
   const [critType, setCritType] = useState<string>('none');
@@ -48,6 +52,7 @@ export default function Crit() {
   const [critLastRoll, setCritLastRoll] = useState<number | null>(null);
   const [critResult, setCritResult] = useState<any | null>(null);
   const [critError, setCritError] = useState<string | null>(null);
+  const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
 
   const parseManualDamageValue = (value: string): number => {
     const parsed = Number(value);
@@ -113,7 +118,7 @@ export default function Crit() {
     influence: '',
     stealth: '',
   } as const;
-  const [p, setP] = useState<any>(pNone);
+  const [p, setP] = useState<Player | typeof pNone>(pNone);
 
   // Auto-refresh when the Crit window gains focus, becomes visible again, or receives cross-window updates
   useEffect(() => {
@@ -180,9 +185,52 @@ export default function Crit() {
       try {
         const res = await fetch('http://localhost:8081/api/players?isPlay=true');
         if (!res.ok) return;
-        const list = await res.json();
+        const list = (await res.json()) as Player[];
         if (!mounted || !Array.isArray(list)) return;
         setPlayers(list);
+        const ids = list
+          .map((pl) => (typeof pl.id === 'number' ? pl.id : null))
+          .filter((id): id is number => id != null && Number.isFinite(id));
+        const missing = ids.filter((id) => inventoryByPlayerId[id] === undefined);
+        if (missing.length > 0) {
+          const entries = await Promise.all(
+            missing.map(async (playerId) => {
+              try {
+                const inventory = await fetchInventory(playerId);
+                return { playerId, options: toWeaponOptions(inventory) };
+              } catch {
+                return { playerId, options: [] as WeaponOption[] };
+              }
+            })
+          );
+          setInventoryByPlayerId((prev) => {
+            const next: Record<number, WeaponOption[]> = { ...prev };
+            let dirty = false;
+            entries.forEach(({ playerId, options }) => {
+              const prevOptions = prev[playerId];
+              const sameLength = prevOptions?.length === options.length;
+              const sameItems = sameLength
+                ? prevOptions?.every((opt, idx) => {
+                    const other = options[idx];
+                    return (
+                      other !== undefined &&
+                      opt.id === other.id &&
+                      opt.name === other.name &&
+                      (opt.activityType ?? null) === (other.activityType ?? null) &&
+                      (opt.attackType ?? null) === (other.attackType ?? null) &&
+                      (opt.critType ?? null) === (other.critType ?? null) &&
+                      opt.extraTBMH === other.extraTBMH &&
+                      opt.extraTBOH === other.extraTBOH
+                    );
+                  })
+                : false;
+              if (sameItems) return;
+              next[playerId] = options;
+              dirty = true;
+            });
+            return dirty ? next : prev;
+          });
+        }
         // default remains 'none' until user selects
       } catch {}
     })();
@@ -243,6 +291,67 @@ export default function Crit() {
   })();
 
   const critFieldTextColor = '#2f5597';
+
+  function findEquippedWeapon(player?: Player | typeof pNone): WeaponOption | undefined {
+    if (!player) return undefined;
+    const pid = typeof (player as Player).id === 'number' ? (player as Player).id : undefined;
+    if (pid == null) return undefined;
+    const equippedWeaponId = typeof (player as Player).equippedWeaponId === 'number' ? (player as Player).equippedWeaponId : undefined;
+    if (equippedWeaponId == null) return undefined;
+    const options = inventoryByPlayerId[pid];
+    if (!options) return undefined;
+    return options.find((w) => w.id === equippedWeaponId);
+  }
+
+  function computeTbPair(player?: Player | typeof pNone): { main: number; offhand: number } {
+    if (!player || !player.attackType) return { main: 0, offhand: 0 };
+    const weapon = findEquippedWeapon(player);
+    const bonusMain = weapon?.extraTBMH ?? 0;
+    const bonusOff = weapon?.extraTBOH ?? 0;
+
+    const attackType = (player.attackType ?? 'slashing') as string;
+    let main = 0;
+    let offhand = 0;
+    switch (attackType) {
+      case 'none':
+        main = 0;
+        offhand = 0;
+        break;
+      case 'slashing':
+      case 'blunt':
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = (player as Player).tbOneHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield':
+        main = computeDualWieldMainTb((player as Player).tbOneHanded, (player as Player).dualWield);
+        offhand = computeDualWieldOffHandTb((player as Player).tbOneHanded, (player as Player).dualWield);
+        break;
+      case 'twoHanded':
+        main = (player as Player).tbTwoHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'ranged':
+        main = (player as Player).tbRanged ?? 0;
+        offhand = 0;
+        break;
+      case 'baseMagic':
+      case 'magicBall':
+        main = (player as Player).tbBaseMagic ?? 0;
+        offhand = 0;
+        break;
+      case 'magicProjectile':
+        main = (player as Player).tbTargetMagic ?? 0;
+        offhand = 0;
+        break;
+      default:
+        main = (player as Player).tb ?? 0;
+        offhand = 0;
+        break;
+    }
+    return { main: main + bonusMain, offhand: offhand + bonusOff };
+  }
 
   return (
     <div style={{ padding: 8 }}>
@@ -380,6 +489,7 @@ export default function Crit() {
             <th rowSpan={2}>Active</th>
             <th rowSpan={2}>Stunned</th>
             <th rowSpan={2}>Target</th>
+            <th rowSpan={2}>Weapon/Activity</th>
             <th rowSpan={2}>Activity</th>
             <th rowSpan={2}>Attack</th>
             <th rowSpan={2}>Crit</th>
@@ -502,12 +612,19 @@ export default function Crit() {
               )}
             </td>
             <td>{p.target}</td>
+            <td>
+              {(() => {
+                const weapon = findEquippedWeapon(p as Player);
+                if (weapon) return weapon.name;
+                return 'None';
+              })()}
+            </td>
             <td>{labelActivity(p.playerActivity as any)}</td>
             <td>{labelAttack(p.attackType as any)}</td>
             <td>{labelCrit(p.critType as any)}</td>
             <td>{labelArmor(p.armorType as any)}</td>
-            <td className="right">{computeTb(p)}</td>
-            <td className="right">{p.tbOffHand ?? 0}</td>
+            <td className="right">{computeTbPair(p).main}</td>
+            <td className="right">{computeTbPair(p).offhand}</td>
             <td className="right">{p.tbUsedForDefense}</td>
             <td className="right">{p.vb}</td>
             <td>
@@ -527,7 +644,7 @@ export default function Crit() {
                 </span>
               )}
             </td>
-            <td className="right">{p.dualWield ?? 0}</td>
+            <td className="right">{typeof (p as Player).dualWield === 'number' ? (p as Player).dualWield : 0}</td>
             <td className="right">{p.stunnedForRounds}</td>
             <td className="right">{p.penaltyOfActions}</td>
             <td className="right">{p.hpLossPerRound}</td>

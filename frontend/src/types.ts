@@ -36,6 +36,7 @@ export type Player = {
   tracking?: number;
   lockPicking?: number;
   disarmTraps?: number;
+  equippedWeaponId?: number | null;
   isAlive?: boolean;
   stunnedForRounds?: number;
   penaltyOfActions?: number;

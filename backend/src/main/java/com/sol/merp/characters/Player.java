@@ -49,6 +49,7 @@ public class Player {
     private Integer tbUsedForDefense;
     private Integer tbOffHand = 0; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
     private Integer dualWield = 0;
+    private Long equippedWeaponId;
 //    private Integer baseMagicTB;
 //    private Integer targetMagicTB;
     private Integer vb;

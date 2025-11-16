@@ -457,35 +457,63 @@ export default function SingleAttack() {
   }
   function computeTbPair(p?: Player | null): { main: number; offHand: number } {
     if (!p) return { main: 0, offHand: 0 };
+
+    const weaponToken = attackerWeaponSelection ?? attackerWeaponValue;
+    let bonusMain = 0;
+    let bonusOff = 0;
+    if (weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none') {
+      const weaponId = Number(weaponToken);
+      if (Number.isFinite(weaponId)) {
+        const weapon = weaponById.get(weaponId);
+        if (weapon) {
+          bonusMain = weapon.extraTBMH ?? 0;
+          bonusOff = weapon.extraTBOH ?? 0;
+        }
+      }
+    }
+
     const attackType = (p.attackType ?? 'slashing') as string;
+    let main = 0;
+    let offHand = 0;
     switch (attackType) {
       case 'none':
-        return { main: 0, offHand: 0 };
+        main = 0;
+        offHand = 0;
+        break;
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
-      case 'grabOrBalance': {
-        const base = p.tbOneHanded ?? 0;
-        return { main: base, offHand: 0 };
-      }
-      case 'dualWield': {
-        const main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        const offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
-        return { main, offHand: offhand };
-      }
+      case 'grabOrBalance':
+        main = p.tbOneHanded ?? 0;
+        offHand = 0;
+        break;
+      case 'dualWield':
+        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        offHand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        break;
       case 'twoHanded':
-        return { main: p.tbTwoHanded ?? 0, offHand: 0 };
+        main = p.tbTwoHanded ?? 0;
+        offHand = 0;
+        break;
       case 'ranged':
-        return { main: p.tbRanged ?? 0, offHand: 0 };
+        main = p.tbRanged ?? 0;
+        offHand = 0;
+        break;
       case 'baseMagic':
-        return { main: p.tbBaseMagic ?? 0, offHand: 0 };
       case 'magicBall':
-        return { main: p.tbBaseMagic ?? 0, offHand: 0 };
+        main = p.tbBaseMagic ?? 0;
+        offHand = 0;
+        break;
       case 'magicProjectile':
-        return { main: p.tbTargetMagic ?? 0, offHand: 0 };
+        main = p.tbTargetMagic ?? 0;
+        offHand = 0;
+        break;
       default:
-        return { main: p.tb ?? 0, offHand: 0 };
+        main = p.tb ?? 0;
+        offHand = 0;
+        break;
     }
+    return { main: main + bonusMain, offHand: offHand + bonusOff };
   }
   function labelActivity(v?: string): string {
     const map: Record<string, string> = { _1PerformMagic: 'Perform Magic', _2RangedAttack: 'Ranged Attack', _3PhisicalAttackOrMovement: 'Attack or Movement', _4PrepareMagic: 'Prepare Magic', _5DoNothing: 'Do Nothing' };

@@ -1,6 +1,9 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { get, patch, del } from '../api/client';
 import type { Player } from '../types';
+import { fetchInventory } from '../api/inventory';
+import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
+import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 import { Link } from 'react-router-dom';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { sortPlayersByCharacterId } from '../utils/characterId';
@@ -24,6 +27,7 @@ export default function Landing() {
   const [revivingAll, setRevivingAll] = useState(false);
   const [reviveAllError, setReviveAllError] = useState<string | null>(null);
   const [reviveAllHover, setReviveAllHover] = useState(false);
+  const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
 
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
@@ -58,7 +62,52 @@ export default function Landing() {
     try {
       setLoading(true);
       const data = await get<Player[]>('/players');
-      setPlayers(sortPlayersByCharacterId(data));
+      const sortedPlayers = sortPlayersByCharacterId(data);
+      setPlayers(sortedPlayers);
+
+      const ids = sortedPlayers
+        .map((p) => (typeof p.id === 'number' ? p.id : null))
+        .filter((id): id is number => id != null && Number.isFinite(id));
+      const missing = ids.filter((id) => inventoryByPlayerId[id] === undefined);
+      if (missing.length > 0) {
+        const entries = await Promise.all(
+          missing.map(async (playerId) => {
+            try {
+              const inventory = await fetchInventory(playerId);
+              return { playerId, options: toWeaponOptions(inventory) };
+            } catch {
+              return { playerId, options: [] as WeaponOption[] };
+            }
+          })
+        );
+        setInventoryByPlayerId((prev) => {
+          const next: Record<number, WeaponOption[]> = { ...prev };
+          let dirty = false;
+          entries.forEach(({ playerId, options }) => {
+            const prevOptions = prev[playerId];
+            const sameLength = prevOptions?.length === options.length;
+            const sameItems = sameLength
+              ? prevOptions?.every((opt, idx) => {
+                  const other = options[idx];
+                  return (
+                    other !== undefined &&
+                    opt.id === other.id &&
+                    opt.name === other.name &&
+                    (opt.activityType ?? null) === (other.activityType ?? null) &&
+                    (opt.attackType ?? null) === (other.attackType ?? null) &&
+                    (opt.critType ?? null) === (other.critType ?? null) &&
+                    opt.extraTBMH === other.extraTBMH &&
+                    opt.extraTBOH === other.extraTBOH
+                  );
+                })
+              : false;
+            if (sameItems) return;
+            next[playerId] = options;
+            dirty = true;
+          });
+          return dirty ? next : prev;
+        });
+      }
     } catch (e) {
       setError('Failed to load players');
     } finally {
@@ -160,6 +209,68 @@ export default function Landing() {
       setSortKey(key);
       setSortDir('asc');
     }
+  }
+
+  function findEquippedWeapon(p?: Player): WeaponOption | undefined {
+    if (!p) return undefined;
+    const playerId = typeof p.id === 'number' ? p.id : undefined;
+    if (playerId == null) return undefined;
+    const equippedWeaponId = typeof p.equippedWeaponId === 'number' ? p.equippedWeaponId : undefined;
+    if (equippedWeaponId == null) return undefined;
+    const options = inventoryByPlayerId[playerId];
+    if (!options) return undefined;
+    return options.find((w) => w.id === equippedWeaponId);
+  }
+
+  function computeTbPair(p?: Player | null): { main: number; offhand: number } {
+    if (!p) return { main: 0, offhand: 0 };
+
+    const weapon = findEquippedWeapon(p);
+    const bonusMain = weapon?.extraTBMH ?? 0;
+    const bonusOff = weapon?.extraTBOH ?? 0;
+
+    const attackType = (p.attackType ?? 'slashing') as string;
+    let main = 0;
+    let offhand = 0;
+    switch (attackType) {
+      case 'none':
+        main = 0;
+        offhand = 0;
+        break;
+      case 'slashing':
+      case 'blunt':
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = p.tbOneHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield':
+        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        break;
+      case 'twoHanded':
+        main = p.tbTwoHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'ranged':
+        main = p.tbRanged ?? 0;
+        offhand = 0;
+        break;
+      case 'baseMagic':
+      case 'magicBall':
+        main = p.tbBaseMagic ?? 0;
+        offhand = 0;
+        break;
+      case 'magicProjectile':
+        main = p.tbTargetMagic ?? 0;
+        offhand = 0;
+        break;
+      default:
+        main = p.tb ?? 0;
+        offhand = 0;
+        break;
+    }
+    return { main: main + bonusMain, offhand: offhand + bonusOff };
   }
 
   const sorted = (() => {
@@ -350,6 +461,7 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('xp')}>XP {sortKey==='xp' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('hpMax' as keyof Player)}>max HP {sortKey==='hpMax' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}>HP</th>
+            <th rowSpan={2}>Weapon/Activity</th>
             <th rowSpan={2}><button onClick={() => toggleSort('attackType' as keyof Player)}>Attack {sortKey==='attackType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('critType' as keyof Player)}>Crit {sortKey==='critType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('armorType' as keyof Player)}>Armor {sortKey==='armorType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -488,11 +600,18 @@ export default function Landing() {
                 <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
                 <div>{p.hpActual}</div>
               </td>
+              <td>
+                {(() => {
+                  const weapon = findEquippedWeapon(p);
+                  if (weapon) return weapon.name;
+                  return 'None';
+                })()}
+              </td>
               <td>{p.attackType}</td>
               <td>{p.critType}</td>
               <td>{p.armorType}</td>
-              <td className="right">{p.tb}</td>
-              <td className="right">{p.tbOffHand ?? 0}</td>
+              <td className="right">{computeTbPair(p).main}</td>
+              <td className="right">{computeTbPair(p).offhand}</td>
               <td className="right">{p.tbOneHanded}</td>
               <td className="right">{p.tbTwoHanded}</td>
               <td className="right">{p.tbRanged}</td>

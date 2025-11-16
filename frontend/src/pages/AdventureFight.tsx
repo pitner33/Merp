@@ -328,35 +328,62 @@ export default function AdventureFight() {
   }
 
   function computeTbPair(p: Player): { main: number; offhand: number } {
+    const weaponToken = weaponValueForPlayer(p);
+    let bonusMain = 0;
+    let bonusOff = 0;
+    if (weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none') {
+      const weaponId = Number(weaponToken);
+      if (Number.isFinite(weaponId)) {
+        const weapon = weaponById.get(weaponId);
+        if (weapon) {
+          bonusMain = weapon.extraTBMH ?? 0;
+          bonusOff = weapon.extraTBOH ?? 0;
+        }
+      }
+    }
+
     const attackType = p.attackType ?? 'slashing';
+    let main = 0;
+    let offhand = 0;
     switch (attackType) {
       case 'none':
-        return { main: 0, offhand: 0 };
+        main = 0;
+        offhand = 0;
+        break;
       case 'slashing':
       case 'blunt':
       case 'clawsAndFangs':
-      case 'grabOrBalance': {
-        const base = p.tbOneHanded ?? 0;
-        return { main: base, offhand: 0 };
-      }
-      case 'dualWield': {
-        const main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        const offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
-        return { main, offhand };
-      }
+      case 'grabOrBalance':
+        main = p.tbOneHanded ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield':
+        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
+        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+        break;
       case 'twoHanded':
-        return { main: p.tbTwoHanded ?? 0, offhand: 0 };
+        main = p.tbTwoHanded ?? 0;
+        offhand = 0;
+        break;
       case 'ranged':
-        return { main: p.tbRanged ?? 0, offhand: 0 };
+        main = p.tbRanged ?? 0;
+        offhand = 0;
+        break;
       case 'baseMagic':
-        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
       case 'magicBall':
-        return { main: p.tbBaseMagic ?? 0, offhand: 0 };
+        main = p.tbBaseMagic ?? 0;
+        offhand = 0;
+        break;
       case 'magicProjectile':
-        return { main: p.tbTargetMagic ?? 0, offhand: 0 };
+        main = p.tbTargetMagic ?? 0;
+        offhand = 0;
+        break;
       default:
-        return { main: p.tb ?? 0, offhand: 0 };
+        main = p.tb ?? 0;
+        offhand = 0;
+        break;
     }
+    return { main: main + bonusMain, offhand: offhand + bonusOff };
   }
 
   function computeTb(p: Player): number {
@@ -580,6 +607,15 @@ export default function AdventureFight() {
       const isActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
       const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
       const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+      const originalEquippedId = typeof (r as Player & { equippedWeaponId?: number | null }).equippedWeaponId === 'number'
+        ? r.equippedWeaponId
+        : null;
+      const weaponToken = weaponValueForPlayer(r);
+      const parsedWeaponId = Number(weaponToken);
+      let equippedWeaponId = weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
+        ? parsedWeaponId
+        : null;
+      if (equippedWeaponId == null && originalEquippedId != null) equippedWeaponId = originalEquippedId;
       return {
         ...r,
         playerActivity: enforcedAct,
@@ -590,6 +626,7 @@ export default function AdventureFight() {
         tbUsedForDefense: nextDef,
         target: targetToken,
         isActive,
+        equippedWeaponId,
       } as Player;
     });
   }
@@ -620,7 +657,12 @@ export default function AdventureFight() {
                 const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
                 const maxDef = Math.floor(Math.max(0, tbVal ?? 0) / 2);
                 const nextDef = (tbVal ?? 0) < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
-                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive } as Player;
+                const weaponToken = weaponValueForPlayer(r);
+                const parsedWeaponId = Number(weaponToken);
+                const equippedWeaponId = weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
+                  ? parsedWeaponId
+                  : null;
+                return { ...r, playerActivity: act, attackType: atk, critType: crit, tb: tbVal, tbUsedForDefense: nextDef, target: targetToken, isActive, equippedWeaponId } as Player;
               });
               const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
                 method: 'POST',
@@ -691,6 +733,11 @@ export default function AdventureFight() {
                 const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
                 const maxDef = Math.floor(Math.max(0, tbVal) / 2);
                 const nextDef = tbVal < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                const weaponToken = weaponValueForPlayer(r);
+                const parsedWeaponId = Number(weaponToken);
+                const equippedWeaponId = weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
+                  ? parsedWeaponId
+                  : null;
                 return {
                   ...r,
                   playerActivity: act,
@@ -701,6 +748,7 @@ export default function AdventureFight() {
                   tbUsedForDefense: nextDef,
                   target: targetToken,
                   isActive,
+                  equippedWeaponId,
                 } as Player;
               });
               const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
@@ -972,6 +1020,7 @@ export default function AdventureFight() {
                                     tb: nextTb,
                                     tbOffHand: nextTbOff,
                                     tbUsedForDefense: 0,
+                                    equippedWeaponId: null,
                                   };
                                 })
                               );
@@ -1028,6 +1077,7 @@ export default function AdventureFight() {
                                   tb: nextTb,
                                   tbOffHand: nextTbOff,
                                   tbUsedForDefense: 0,
+                                  equippedWeaponId: null,
                                 };
                               })
                             );
@@ -1073,6 +1123,7 @@ export default function AdventureFight() {
                                 tb: nextTb,
                                 tbOffHand: nextTbOff,
                                 tbUsedForDefense: 0,
+                                equippedWeaponId: weapon.id,
                               };
                             })
                           );
