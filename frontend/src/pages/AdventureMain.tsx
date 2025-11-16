@@ -18,6 +18,7 @@ import {
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { sortPlayersByCharacterId } from '../utils/characterId';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
+import { formatRaceDisplayName } from '../utils/race';
 
 export default function AdventureMain() {
   const location = useLocation();
@@ -875,7 +876,7 @@ export default function AdventureMain() {
                   <td>{p.characterId}</td>
                   <td>{p.name}</td>
                   <td>{p.gender}</td>
-                  <td>{p.race}</td>
+                  <td>{formatRaceDisplayName(p.race)}</td>
                   <td>{p.playerClass}</td>
                   <td className="right">{p.lvl}</td>
                   <td

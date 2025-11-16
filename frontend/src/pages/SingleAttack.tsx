@@ -15,6 +15,7 @@ import {
 } from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
+import { formatRaceDisplayName } from '../utils/race';
 
 type CritResultDto = (
   {
@@ -1334,7 +1335,7 @@ export default function SingleAttack() {
                 <td>{attacker.characterId}</td>
                 <td>{attacker.name}</td>
                 <td>{attacker.gender}</td>
-                <td>{attacker.race}</td>
+                <td>{formatRaceDisplayName(attacker.race)}</td>
                 <td>{attacker.playerClass}</td>
                 <td className="right">{attacker.lvl}</td>
                 <td
@@ -1486,7 +1487,7 @@ export default function SingleAttack() {
                 <td>{defender.characterId}</td>
                 <td>{defender.name}</td>
                 <td>{defender.gender}</td>
-                <td>{defender.race}</td>
+                <td>{formatRaceDisplayName(defender.race)}</td>
                 <td>{defender.playerClass}</td>
                 <td className="right">{defender.lvl}</td>
                 <td className="right">{formatXp(Number(defender.xp || 0))}</td>

@@ -5,6 +5,7 @@ import type { Player } from '../types';
 import { fetchInventory } from '../api/inventory';
 import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
+import { formatRaceDisplayName } from '../utils/race';
 
 export default function Crit() {
   const navigate = useNavigate();
@@ -554,7 +555,7 @@ export default function Crit() {
             </td>
             <td>{p.name}</td>
             <td>{p.gender}</td>
-            <td>{p.race}</td>
+            <td>{formatRaceDisplayName(p.race)}</td>
             <td>{p.playerClass}</td>
             <td className="right">{p.lvl}</td>
             <td className="right">{p.xp}</td>

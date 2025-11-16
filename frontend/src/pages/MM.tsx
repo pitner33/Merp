@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { isXpOverCap, formatXp } from '../utils/xp';
+import { formatRaceDisplayName } from '../utils/race';
 
 type MMFailResponse = {
   failResultText?: string;
@@ -772,7 +773,7 @@ export default function MM() {
                   <td>{attacker.characterId}</td>
                   <td>{attacker.name}</td>
                   <td>{attacker.gender}</td>
-                  <td>{attacker.race}</td>
+                  <td>{formatRaceDisplayName(attacker.race)}</td>
                   <td>{attacker.playerClass}</td>
                   <td className="right">{attacker.lvl}</td>
                   <td

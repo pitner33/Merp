@@ -16,6 +16,7 @@ import {
 } from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
+import { formatRaceDisplayName } from '../utils/race';
 
 export default function AdventureFight() {
   const location = useLocation();
@@ -896,7 +897,7 @@ export default function AdventureFight() {
                     <td>{p.characterId}</td>
                     <td>{p.name}</td>
                     <td>{p.gender}</td>
-                    <td>{p.race}</td>
+                    <td>{formatRaceDisplayName(p.race)}</td>
                     <td>{p.playerClass}</td>
                     <td className="right">{p.lvl}</td>
                     <td

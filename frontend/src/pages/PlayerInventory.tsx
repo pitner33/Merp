@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { get } from '../api/client';
 import { addWeapons, fetchInventory, removeWeapon } from '../api/inventory';
 import type { Player, PlayerInventoryItem, Weapon } from '../types';
+import { formatRaceDisplayName } from '../utils/race';
 
 const DEFAULT_WEAPON_NAMES = new Set(['Do Nothing', 'Prepare Magic']);
 const STORAGE_REFRESH_KEY = 'merp:player-updated';
@@ -218,7 +219,7 @@ export default function PlayerInventory() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px,1fr))', gap: 12 }}>
           <InfoField label="Char ID" value={player.characterId} />
           <InfoField label="Name" value={player.name} />
-          <InfoField label="Race" value={player.race} />
+          <InfoField label="Race" value={formatRaceDisplayName(player.race)} />
           <InfoField label="Class" value={player.playerClass} />
           <InfoField label="Level" value={formatNumber(player.lvl)} />
           <InfoField label="XP" value={formatNumber(player.xp)} />
