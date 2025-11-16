@@ -2,6 +2,8 @@ package com.sol.merp.storage;
 
 import com.google.api.services.sheets.v4.model.ValueRange;
 import com.sol.merp.googlesheetloader.ExcelSheetLoader;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +11,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.*;
 
 @Component
@@ -33,7 +37,9 @@ public class ExcelToDbImporter {
         boolean alreadyImported = alreadyImported();
         try {
             Map<String,Integer> maxCols = new LinkedHashMap<>();
-            List<String> allTabs = Arrays.asList(
+            Map<String,Boolean> stringKeyModes = new LinkedHashMap<>();
+
+            List<String> baseTabs = Arrays.asList(
                     "Slashing","Blunt","Twohanded","Ranged","ClawsAndFangs","GrabOrBalance",
                     "MagicProjectile","MagicBall","BaseMagic","BaseMagicMD",
                     "Critical_Slashing","Critical_Blunt","Critical_Piercing","Critical_Heat","Critical_Cold",
@@ -41,6 +47,17 @@ public class ExcelToDbImporter {
                     "Critical_BigCreaturePhisical","Critical_BigCreatureMagic",
                     "Fail","MM","OtherManeuver"
             );
+
+            List<String> charTabs = discoverCharTabs();
+            if (!charTabs.isEmpty()) {
+                logger.info("Discovered CHAR_ tabs in workbook: {}", charTabs);
+            }
+
+            LinkedHashSet<String> allTabSet = new LinkedHashSet<>();
+            allTabSet.addAll(baseTabs);
+            allTabSet.addAll(charTabs);
+            List<String> allTabs = new ArrayList<>(allTabSet);
+
             List<String> tabs = alreadyImported ? findMissingTabs(allTabs) : allTabs;
             if (tabs.isEmpty()) {
                 logger.info("Excel data already present for all tabs, skipping import.");
@@ -54,14 +71,17 @@ public class ExcelToDbImporter {
             for (String tab : tabs) {
                 ValueRange vr = loader.loadValuesFromXlsxTab(xlsxPath, tab);
                 data.put(tab, vr);
-                maxCols.put(tab, detectMaxCols(vr));
+                boolean stringKeyMode = shouldUseStringKey(vr);
+                stringKeyModes.put(tab, stringKeyMode);
+                maxCols.put(tab, detectMaxCols(vr, stringKeyMode));
             }
             // create tables and insert
             for (String tab : tabs) {
                 String table = tablePrefix + tab;
                 int cols = maxCols.get(tab);
-                createTableIfNotExists(table, cols);
-                insertAll(table, data.get(tab), cols);
+                ensureTableStructure(table, cols);
+                boolean stringKeyMode = stringKeyModes.getOrDefault(tab, Boolean.FALSE);
+                insertAll(table, data.get(tab), cols, stringKeyMode);
             }
             if (!alreadyImported) {
                 markImported();
@@ -71,6 +91,23 @@ public class ExcelToDbImporter {
             logger.error("Excel import failed", e);
             throw new RuntimeException(e);
         }
+    }
+
+    private List<String> discoverCharTabs() {
+        List<String> tabs = new ArrayList<>();
+        try (FileInputStream fis = new FileInputStream(xlsxPath);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+                String name = workbook.getSheetName(i);
+                if (name != null && name.toUpperCase(Locale.ROOT).startsWith("CHAR_")) {
+                    tabs.add(name);
+                }
+            }
+            Collections.sort(tabs);
+        } catch (IOException e) {
+            logger.warn("Failed to inspect Excel workbook for CHAR_ tabs: {}", e.getMessage());
+        }
+        return tabs;
     }
 
     private void ensureStatusTable() {
@@ -89,19 +126,60 @@ public class ExcelToDbImporter {
         jdbc.update("INSERT INTO import_status(status_key) VALUES (?)", "excel_merp_tables_imported");
     }
 
-    private int detectMaxCols(ValueRange vr) {
+    private int detectMaxCols(ValueRange vr, boolean stringKeyMode) {
         int max = 0;
+        int headerCols = 0;
         List<List<Object>> rows = vr.getValues();
         if (rows == null) return 0;
+        if (!rows.isEmpty() && rows.get(0) != null) {
+            headerCols = rows.get(0).stream()
+                    .map(obj -> obj == null ? "" : String.valueOf(obj).trim())
+                    .collect(java.util.stream.Collectors.collectingAndThen(
+                            java.util.stream.Collectors.toList(), list -> {
+                                int result = list.size();
+                                while (result > 0 && list.get(result - 1).isEmpty()) {
+                                    result--;
+                                }
+                                return result;
+                            }));
+        }
         for (List<Object> row : rows) {
             if (row == null) continue;
-            max = Math.max(max, row.size());
+            int trimmed = row.stream()
+                    .map(obj -> obj == null ? "" : String.valueOf(obj).trim())
+                    .collect(java.util.stream.Collectors.collectingAndThen(
+                            java.util.stream.Collectors.toList(), list -> {
+                                int res = list.size();
+                                while (res > 0 && list.get(res - 1).isEmpty()) {
+                                    res--;
+                                }
+                                return res;
+                            }));
+            max = Math.max(max, trimmed);
+        }
+        int effectiveMax = Math.max(max, headerCols);
+        if (stringKeyMode) {
+            return effectiveMax;
         }
         // first column is row_key, so number of value columns is max-1 (can be zero)
-        return Math.max(0, max - 1);
+        return Math.max(0, effectiveMax - 1);
     }
 
-    private void createTableIfNotExists(String table, int cols) {
+    private void ensureTableStructure(String table, int cols) {
+        if (!tableExists(table)) {
+            createTable(table, cols);
+            return;
+        }
+        int existingCols = existingValueColumnCount(table);
+        if (existingCols >= cols) {
+            return;
+        }
+        for (int i = existingCols + 1; i <= cols; i++) {
+            jdbc.execute("ALTER TABLE " + table + " ADD COLUMN col" + i + " TEXT");
+        }
+    }
+
+    private void createTable(String table, int cols) {
         StringBuilder sb = new StringBuilder();
         sb.append("CREATE TABLE IF NOT EXISTS ").append(table).append(" (")
           .append("row_key INT NOT NULL,");
@@ -114,15 +192,32 @@ public class ExcelToDbImporter {
         jdbc.execute(sb.toString());
     }
 
-    private void insertAll(String table, ValueRange vr, int cols) {
+    private int existingValueColumnCount(String table) {
+        String schema = currentSchema();
+        List<String> cols = jdbc.query(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE UPPER(TABLE_SCHEMA)=UPPER(?) AND UPPER(TABLE_NAME)=UPPER(?) " +
+                        "AND UPPER(COLUMN_NAME) LIKE 'COL%' ORDER BY ORDINAL_POSITION",
+                new Object[]{schema, table},
+                (rs, i) -> rs.getString(1)
+        );
+        return cols.size();
+    }
+
+    private void insertAll(String table, ValueRange vr, int cols, boolean stringKeyMode) {
         List<List<Object>> rows = vr.getValues();
         if (rows == null || rows.isEmpty()) return;
         // assume first row is header, start at index 1
         for (int r = 1; r < rows.size(); r++) {
             List<Object> row = rows.get(r);
             if (row == null || row.isEmpty()) continue;
-            Integer rowKey = parseRowKey(row.get(0));
-            if (rowKey == null) continue;
+            Integer rowKey;
+            if (stringKeyMode) {
+                rowKey = r;
+            } else {
+                rowKey = parseRowKey(row.get(0));
+                if (rowKey == null) continue;
+            }
             StringBuilder sql = new StringBuilder();
             sql.append("MERGE INTO ").append(table).append(" (row_key");
             for (int i = 1; i <= cols; i++) sql.append(", col").append(i);
@@ -132,11 +227,31 @@ public class ExcelToDbImporter {
             Object[] params = new Object[1 + cols];
             params[0] = rowKey;
             for (int i = 1; i <= cols; i++) {
-                Object cell = (row.size() > i) ? row.get(i) : "";
+                Object cell;
+                if (stringKeyMode) {
+                    int sourceIdx = i - 1;
+                    cell = (row.size() > sourceIdx) ? row.get(sourceIdx) : "";
+                } else {
+                    cell = (row.size() > i) ? row.get(i) : "";
+                }
                 params[i] = (cell == null) ? "" : String.valueOf(cell);
             }
             jdbc.update(sql.toString(), params);
         }
+    }
+
+    private boolean shouldUseStringKey(ValueRange vr) {
+        List<List<Object>> rows = vr.getValues();
+        if (rows == null || rows.size() <= 1) return false;
+        for (int r = 1; r < rows.size(); r++) {
+            List<Object> row = rows.get(r);
+            if (row == null || row.isEmpty()) continue;
+            Object keyObj = row.get(0);
+            if (keyObj == null) continue;
+            Integer numericKey = parseRowKey(keyObj);
+            return numericKey == null;
+        }
+        return false;
     }
 
     private Integer parseRowKey(Object keyObj) {

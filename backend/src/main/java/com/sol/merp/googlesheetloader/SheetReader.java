@@ -4,11 +4,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import com.sol.merp.storage.DbSheetLoader;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Component
 public class SheetReader {
@@ -25,6 +30,9 @@ public class SheetReader {
 
     @Autowired
     MapsFromTabs mapsFromTabs;
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     @PostConstruct
     public void read() throws IOException {
@@ -53,6 +61,44 @@ public class SheetReader {
         mapsFromTabs.setMapFail(dbSheetLoader.loadTable(tablePrefix + "Fail"));
         mapsFromTabs.setMapMM(dbSheetLoader.loadTable(tablePrefix + "MM"));
         mapsFromTabs.setMapOtherManeuver(dbSheetLoader.loadTable(tablePrefix + "OtherManeuver"));
+
+        Map<String, Map<Integer, List<String>>> charTables = loadCharTables();
+        mapsFromTabs.setMapCharTables(charTables);
+    }
+
+    private Map<String, Map<Integer, List<String>>> loadCharTables() {
+        Map<String, Map<Integer, List<String>>> result = new LinkedHashMap<>();
+        List<String> tables = findCharTableNames();
+        for (String tableName : tables) {
+            Map<Integer, List<String>> data = dbSheetLoader.loadTable(tableName);
+            String logicalName = tableName.substring(Math.min(tablePrefix.length(), tableName.length()));
+            result.put(logicalName, data);
+        }
+        return result;
+    }
+
+    private List<String> findCharTableNames() {
+        String schema = currentSchema();
+        String prefixUpper = tablePrefix.toUpperCase(Locale.ROOT);
+        String pattern = prefixUpper + "CHAR\\_%";
+        return jdbcTemplate.query(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE UPPER(TABLE_SCHEMA)=? AND UPPER(TABLE_NAME) LIKE ? ORDER BY TABLE_NAME",
+                new Object[]{schema, pattern},
+                (rs, i) -> rs.getString(1)
+        );
+    }
+
+    private String currentSchema() {
+        try {
+            String schema = jdbcTemplate.queryForObject("SELECT SCHEMA()", String.class);
+            if (schema == null || schema.isBlank()) {
+                return "PUBLIC";
+            }
+            return schema.toUpperCase(Locale.ROOT);
+        } catch (Exception e) {
+            logger.warn("Failed to determine current schema, defaulting to PUBLIC. Cause: {}", e.getMessage());
+            return "PUBLIC";
+        }
     }
 
 

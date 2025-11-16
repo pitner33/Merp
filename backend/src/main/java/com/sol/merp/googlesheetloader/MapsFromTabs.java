@@ -35,4 +35,5 @@ public class MapsFromTabs {
     private Map<Integer, List<String>> mapFail;
     private Map<Integer, List<String>> mapMM;
     private Map<Integer, List<String>> mapOtherManeuver;
+    private Map<String, Map<Integer, List<String>>> mapCharTables;
 }

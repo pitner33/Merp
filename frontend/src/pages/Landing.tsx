@@ -319,9 +319,19 @@ export default function Landing() {
         >
           START AN ADVENTURE
         </button>
-        <Link to="/create-character">
-          <button>CHARACTER CREATION</button>
-        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              const url = new URL('/create-character', window.location.origin).toString();
+              window.open(url, 'CreateCharacterWindow');
+            } catch {
+              window.open('/create-character', 'CreateCharacterWindow');
+            }
+          }}
+        >
+          CHARACTER CREATION
+        </button>
         <button
           type="button"
           onClick={() => {
