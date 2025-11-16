@@ -16,6 +16,25 @@ import {
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 
+type CritResultDto = (
+  {
+    crit: string | null;
+    critResultText: string | null;
+    critResultAdditionalDamage: number | null;
+    critResultHPLossPerRound: number | null;
+    critResultStunnedForRounds: number | null;
+    critResultPenaltyOfActions: number | null;
+    critResultPenaltyDurationRounds?: number | null;
+    critResultsInstantDeath: boolean | null;
+    baseDamage?: number | null;
+    fullDamageWithoutBleeding?: number | null;
+    fullDamage?: number | null;
+    critCapAppliedRoll?: number | null;
+    critCapAppliedLetter?: string | null;
+    critCapSource?: 'MH' | 'OH' | null;
+  }
+) & Record<string, unknown>;
+
 export default function SingleAttack() {
   const navigate = useNavigate();
 
@@ -72,7 +91,7 @@ export default function SingleAttack() {
   const [critTensFace, setCritTensFace] = useState<number>(0);
   const [critOnesFace, setCritOnesFace] = useState<number>(0);
   const [critLastRoll, setCritLastRoll] = useState<number | null>(null);
-  const [critDto, setCritDto] = useState<any>(null);
+  const [critDto, setCritDto] = useState<CritResultDto | null>(null);
   const [failEnabled, setFailEnabled] = useState(false);
   const [failRolling, setFailRolling] = useState(false);
   const [failTensFace, setFailTensFace] = useState<number>(0);
@@ -514,6 +533,83 @@ export default function SingleAttack() {
         break;
     }
     return { main: main + bonusMain, offHand: offHand + bonusOff };
+  }
+
+  const CRIT_LETTER_ORDER = ['X', 'T', 'A', 'B', 'C', 'D', 'E'] as const;
+
+  type CritCapParsed = { rollCap?: number; letterCap?: string };
+
+  function findCurrentWeapon(): WeaponOption | undefined {
+    const token = attackerWeaponSelection ?? attackerWeaponValue;
+    if (token && token !== WEAPON_NONE_VALUE && token !== 'none') {
+      const weaponId = Number(token);
+      if (Number.isFinite(weaponId)) {
+        const fromMap = weaponById.get(weaponId);
+        if (fromMap) return fromMap;
+      }
+    }
+
+    const equippedWeaponId = typeof attacker?.equippedWeaponId === 'number' ? attacker.equippedWeaponId : undefined;
+    if (equippedWeaponId != null) {
+      const fromMap = weaponById.get(equippedWeaponId);
+      if (fromMap) return fromMap;
+      const inv = attacker?.id != null ? inventoryByPlayerId[attacker.id] : undefined;
+      return inv?.find((w) => w.id === equippedWeaponId);
+    }
+
+    return undefined;
+  }
+
+  function parseCritCap(cap?: string | null): CritCapParsed | undefined {
+    if (cap == null) return undefined;
+    const trimmed = `${cap}`.trim();
+    if (!trimmed) return undefined;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return { rollCap: numeric };
+    }
+    const upper = trimmed.toUpperCase();
+    if (upper === 'NONE') return undefined;
+    const letterCandidate = upper.charAt(0);
+    if (CRIT_LETTER_ORDER.includes(letterCandidate as typeof CRIT_LETTER_ORDER[number])) {
+      return { letterCap: letterCandidate };
+    }
+    return undefined;
+  }
+
+  function resolveCritCap(useOffHand: boolean): { rollCap?: number; letterCap?: string; source: 'MH' | 'OH' | null } {
+    const weapon = findCurrentWeapon();
+    if (!weapon) return { rollCap: undefined, letterCap: undefined, source: null };
+    const source: 'MH' | 'OH' = useOffHand ? 'OH' : 'MH';
+    const raw = useOffHand ? weapon.critCapOH : weapon.critCapMH;
+    const parsed = parseCritCap(raw ?? undefined);
+    if (!parsed) return { rollCap: undefined, letterCap: undefined, source: null };
+    return { rollCap: parsed.rollCap, letterCap: parsed.letterCap, source };
+  }
+
+  function applyRollCap(critRoll: number, rollCap?: number): { value: number; capAppliedRoll?: number | null } {
+    if (rollCap == null || !Number.isFinite(rollCap)) {
+      return { value: critRoll, capAppliedRoll: null };
+    }
+    if (critRoll > rollCap) {
+      return { value: rollCap, capAppliedRoll: rollCap };
+    }
+    return { value: critRoll, capAppliedRoll: null };
+  }
+
+  function clampCritLetter(letter: string, letterCap?: string): { letter: string; capAppliedLetter?: string | null } {
+    const normalizedLetter = (letter || '').toString().trim().toUpperCase();
+    if (!letterCap) return { letter: normalizedLetter };
+    const normalizedCap = letterCap.toString().trim().toUpperCase();
+    const letterIdx = CRIT_LETTER_ORDER.indexOf(normalizedLetter as typeof CRIT_LETTER_ORDER[number]);
+    const capIdx = CRIT_LETTER_ORDER.indexOf(normalizedCap as typeof CRIT_LETTER_ORDER[number]);
+    if (letterIdx === -1 || capIdx === -1) {
+      return { letter: normalizedLetter };
+    }
+    if (letterIdx > capIdx) {
+      return { letter: normalizedCap, capAppliedLetter: normalizedCap };
+    }
+    return { letter: normalizedLetter };
   }
   function labelActivity(v?: string): string {
     const map: Record<string, string> = { _1PerformMagic: 'Perform Magic', _2RangedAttack: 'Ranged Attack', _3PhisicalAttackOrMovement: 'Attack or Movement', _4PrepareMagic: 'Prepare Magic', _5DoNothing: 'Do Nothing' };
@@ -967,16 +1063,26 @@ export default function SingleAttack() {
       }) as Promise<number>;
       const waitPromise = new Promise<void>((res) => setTimeout(res, 1200));
       const [rolled] = await Promise.all([fetchPromise, waitPromise]);
-      const value = typeof rolled === 'number' ? rolled : 1;
-      const tens = value === 100 ? 0 : Math.floor(value / 10);
-      const ones = value === 100 ? 0 : value % 10;
-      setCritTensFace(tens); setCritOnesFace(ones); setCritLastRoll(value);
+      const rawRoll = typeof rolled === 'number' ? rolled : 1;
+      const { rollCap, letterCap, source: capSourceRaw } = resolveCritCap(usingOffHandView);
+      const { value: cappedRoll, capAppliedRoll } = applyRollCap(rawRoll, rollCap);
+      const { letter: cappedLetter, capAppliedLetter } = clampCritLetter(critLetter, letterCap);
 
-      // Modified crit result by letter (same as Crit.tsx)
-      const letterOnly = (critLetter || '').toString().toUpperCase();
+      const tens = cappedRoll === 100 ? 0 : Math.floor(cappedRoll / 10);
+      const ones = cappedRoll === 100 ? 0 : cappedRoll % 10;
+      setCritTensFace(tens);
+      setCritOnesFace(ones);
+      setCritLastRoll(cappedRoll);
+
+      const numericPart = resStr.slice(0, Math.max(0, resStr.length - 1));
+      const resultForBackend = `${numericPart}${cappedLetter}`;
+      if (resultForBackend !== resStr) {
+        setAttackRes((prev) => (prev ? { ...prev, result: resultForBackend } : prev));
+      }
+
       const modifiedCritResult = (() => {
-        const base = value;
-        switch (letterOnly) {
+        const base = cappedRoll;
+        switch (cappedLetter) {
           case 'T': return base - 50;
           case 'A': return base - 20;
           case 'B': return base - 10;
@@ -989,11 +1095,17 @@ export default function SingleAttack() {
 
       try {
         const defenderId = defender.id ?? (players || []).find((pl) => String(pl.characterId) === defenderToken)?.id;
-        const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId!)}&result=${encodeURIComponent(resStr)}&critResult=${encodeURIComponent(modifiedCritResult)}&critType=${encodeURIComponent(attackerCrit || 'none')}`;
+        const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId!)}&result=${encodeURIComponent(resultForBackend)}&critResult=${encodeURIComponent(modifiedCritResult)}&critType=${encodeURIComponent(attackerCrit || 'none')}`;
         const resp = await fetch(url, { method: 'POST' });
         if (!resp.ok) throw new Error('apply-attack-with-crit failed');
         const dto = await resp.json();
-        setCritDto(dto);
+        const capSource = (capAppliedRoll != null || capAppliedLetter) ? capSourceRaw ?? null : null;
+        setCritDto({
+          ...dto,
+          critCapAppliedRoll: capAppliedRoll ?? null,
+          critCapAppliedLetter: capAppliedLetter ?? null,
+          critCapSource: capSource,
+        });
         setCritEnabled(false);
         await Promise.allSettled([refreshDefenderFromServer(), refreshAttackerFromServer()]);
         broadcastAdventureRefresh();
@@ -1859,18 +1971,40 @@ export default function SingleAttack() {
                         </div>
                       </div>
                       {(() => {
-                        const resStr = (attackRes?.result || '').toString().trim();
-                        const upper = resStr.toUpperCase();
-                        const letter = upper && upper !== 'FAIL' ? upper.slice(-1) : '';
+                        const resTrimmed = (attackRes?.result || '').toString().trim();
+                        const upperLetter = resTrimmed.toUpperCase();
+                        const letter = upperLetter && upperLetter !== 'FAIL' ? upperLetter.slice(-1) : '';
                         let modVal: number | null = null;
                         if (critLastRoll != null && letter) {
                           const base = critLastRoll;
-                          switch (letter) { case 'T': modVal = base - 50; break; case 'A': modVal = base - 20; break; case 'B': modVal = base - 10; break; case 'C': modVal = base; break; case 'D': modVal = base + 10; break; case 'E': modVal = base + 20; break; default: modVal = null; }
+                          switch (letter) {
+                            case 'T': modVal = base - 50; break;
+                            case 'A': modVal = base - 20; break;
+                            case 'B': modVal = base - 10; break;
+                            case 'C': modVal = base; break;
+                            case 'D': modVal = base + 10; break;
+                            case 'E': modVal = base + 20; break;
+                            default: modVal = null;
+                          }
                         }
                         return (
                           <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
                             <span className="result-label" style={{ textAlign: 'center' }}>Crit result</span>
-                            <div className="result-box orange" title="Modified value used for crit table"><span className="result-value">{modVal != null ? `${modVal}` : ''}</span></div>
+                            <div className="result-box orange" title="Modified value used for crit table">
+                              <span className="result-value">{modVal != null ? `${modVal}` : ''}</span>
+                            </div>
+                            {(() => {
+                              const parts: string[] = [];
+                              if (critDto?.critCapAppliedLetter) parts.push(`Letter ${critDto.critCapAppliedLetter}`);
+                              if (critDto?.critCapAppliedRoll != null) parts.push(`Roll ${critDto.critCapAppliedRoll}`);
+                              if (parts.length === 0) return null;
+                              const sourceLabel = critDto?.critCapSource === 'OH' ? 'Off-hand' : 'Main';
+                              return (
+                                <span style={{ fontSize: 10, color: '#555', fontWeight: 600 }}>
+                                  {`${parts.join(' & ')} cap (${sourceLabel})`}
+                                </span>
+                              );
+                            })()}
                           </div>
                         );
                       })()}
