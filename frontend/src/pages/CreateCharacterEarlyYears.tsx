@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const COLORS = {
@@ -12,6 +12,81 @@ const COLORS = {
 const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 const SKILL_LEVEL_COUNT = 30;
+
+type SkillAttributeKey = AttributeKey | 'XX';
+type SkillCategory =
+  | 'MM Skills'
+  | 'Weapon Skills'
+  | 'General Skills'
+  | 'Thief Skills'
+  | 'Magic Skills'
+  | 'Other Skills'
+  | 'Secondary skills';
+
+type SkillDefinitionEntry = {
+  name: string;
+  category: SkillCategory;
+  attributeKey: SkillAttributeKey;
+};
+
+type SkillDefinitionWithIndex = SkillDefinitionEntry & { stateIndex: number };
+
+const SKILL_CATEGORIES: readonly SkillCategory[] = [
+  'MM Skills',
+  'Weapon Skills',
+  'General Skills',
+  'Thief Skills',
+  'Magic Skills',
+  'Other Skills',
+  'Secondary skills'
+] as const;
+
+const SKILL_DEFINITIONS: readonly SkillDefinitionEntry[] = [
+  { name: 'None', category: 'MM Skills', attributeKey: 'DEX' },
+  { name: 'Leather', category: 'MM Skills', attributeKey: 'DEX' },
+  { name: 'Heavy Leather', category: 'MM Skills', attributeKey: 'DEX' },
+  { name: 'Chainmail', category: 'MM Skills', attributeKey: 'STR' },
+  { name: 'Plate', category: 'MM Skills', attributeKey: 'STR' },
+  { name: 'Slashing', category: 'Weapon Skills', attributeKey: 'STR' },
+  { name: 'Blunt', category: 'Weapon Skills', attributeKey: 'STR' },
+  { name: 'Two-handed', category: 'Weapon Skills', attributeKey: 'STR' },
+  { name: 'Dual Wield', category: 'Weapon Skills', attributeKey: 'STR' },
+  { name: 'Ranged', category: 'Weapon Skills', attributeKey: 'DEX' },
+  { name: 'VB', category: 'Weapon Skills', attributeKey: 'DEX' },
+  { name: 'Climbing', category: 'General Skills', attributeKey: 'DEX' },
+  { name: 'Riding', category: 'General Skills', attributeKey: 'IT' },
+  { name: 'Swimming', category: 'General Skills', attributeKey: 'DEX' },
+  { name: 'Tracking', category: 'General Skills', attributeKey: 'IQ' },
+  { name: 'Backstab', category: 'Thief Skills', attributeKey: 'XX' },
+  { name: 'Stealth', category: 'Thief Skills', attributeKey: 'DEX' },
+  { name: 'Lockpicking', category: 'Thief Skills', attributeKey: 'IQ' },
+  { name: 'Disarm Traps', category: 'Thief Skills', attributeKey: 'DEX' },
+  { name: 'Runes', category: 'Magic Skills', attributeKey: 'IQ' },
+  { name: 'Object Usage', category: 'Magic Skills', attributeKey: 'IT' },
+  { name: 'Target magic', category: 'Magic Skills', attributeKey: 'DEX' },
+  { name: 'Base magic', category: 'Other Skills', attributeKey: 'XX' },
+  { name: 'Perception', category: 'Other Skills', attributeKey: 'IT' },
+  { name: 'Influence', category: 'Other Skills', attributeKey: 'CH' },
+  { name: 'HP max', category: 'Other Skills', attributeKey: 'CON' },
+  { name: 'Acrobatics', category: 'Secondary skills', attributeKey: 'DEX' },
+  { name: 'Ships', category: 'Secondary skills', attributeKey: 'IT' },
+  { name: 'Caving', category: 'Secondary skills', attributeKey: 'IQ' },
+  { name: 'First Aid', category: 'Secondary skills', attributeKey: 'IQ' },
+  { name: 'Cooking', category: 'Secondary skills', attributeKey: 'IT' },
+  { name: 'Ropes', category: 'Secondary skills', attributeKey: 'IQ' }
+] as const;
+
+const SKILL_DEFINITIONS_WITH_INDEX: readonly SkillDefinitionWithIndex[] = SKILL_DEFINITIONS.map((definition, index) => ({
+  ...definition,
+  stateIndex: index
+}));
+
+const SKILLS_BY_CATEGORY: readonly { category: SkillCategory; items: SkillDefinitionWithIndex[] }[] = SKILL_CATEGORIES
+  .map((category) => ({
+    category,
+    items: SKILL_DEFINITIONS_WITH_INDEX.filter((definition) => definition.category === category)
+  }))
+  .filter((group) => group.items.length > 0);
 
 const CHARACTER_ID_OPTIONS = [
   { value: '', label: 'Select…' },
@@ -92,12 +167,10 @@ type AttributeRow = {
 };
 
 type SkillRowState = {
-  name: string;
   levels: boolean[];
   itemBonus: string;
   specialBonus: string;
   classBonus: number;
-  attributeKey: AttributeKey | null;
 };
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
@@ -160,6 +233,12 @@ function mapAttributeRowsFromState(source?: AttributeSummary[]): AttributeRow[] 
   }));
 }
 
+function formatSigned(value: number): string {
+  if (value > 0) return `+${value}`;
+  if (value < 0) return `${value}`;
+  return '0';
+}
+
 export default function CreateCharacterEarlyYears() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -183,14 +262,14 @@ export default function CreateCharacterEarlyYears() {
   const [attributeRows, setAttributeRows] = useState<AttributeRow[]>(() => mapAttributeRowsFromState(locationState?.attributes));
   const [raceBonusError, setRaceBonusError] = useState<string | null>(null);
   const [raceBonusLoading, setRaceBonusLoading] = useState(false);
-  const [skillRow, setSkillRow] = useState<SkillRowState>(() => ({
-    name: 'Skill 1',
-    levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-    itemBonus: '0',
-    specialBonus: '0',
-    classBonus: 0,
-    attributeKey: ATTRIBUTE_KEYS[0] ?? null
-  }));
+  const [skillRows, setSkillRows] = useState<SkillRowState[]>(() =>
+    SKILL_DEFINITIONS.map(() => ({
+      levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+      itemBonus: '0',
+      specialBonus: '0',
+      classBonus: 0
+    }))
+  );
 
   useEffect(() => {
     document.title = 'Character Creation – Early Years';
@@ -274,21 +353,58 @@ export default function CreateCharacterEarlyYears() {
     ...meta.playerClasses.map((value) => ({ value, label: formatOptionLabel(value) }))
   ], [meta.playerClasses]);
 
-  const attributeRowForSkill = useMemo(() => {
-    if (!skillRow.attributeKey) return attributeRows[0];
-    return attributeRows.find((row) => row.attribute === skillRow.attributeKey) ?? attributeRows[0];
-  }, [attributeRows, skillRow.attributeKey]);
+  const attributeRowMap = useMemo(() => {
+    const map = new Map<AttributeKey, AttributeRow>();
+    attributeRows.forEach((row) => {
+      map.set(row.attribute, row);
+    });
+    return map;
+  }, [attributeRows]);
 
-  const attributeTotalBonus = attributeRowForSkill
-    ? attributeRowForSkill.totalBonus ?? attributeRowForSkill.normalBonus ?? 0
-    : 0;
+  const skillDisplayRows = useMemo(() => {
+    const parseBonusValue = (input: string): number => {
+      if (typeof input !== 'string' || input.trim().length === 0) {
+        return 0;
+      }
+      const parsed = Number.parseInt(input, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
 
-  const levelCount = useMemo(() => skillRow.levels.reduce((total, checked) => (checked ? total + 1 : total), 0), [skillRow.levels]);
-  const levelBonus = levelCount;
-  const itemBonusValue = Number.isFinite(Number(skillRow.itemBonus)) ? Number(skillRow.itemBonus) : 0;
-  const specialBonusValue = Number.isFinite(Number(skillRow.specialBonus)) ? Number(skillRow.specialBonus) : 0;
-  const classBonusValue = skillRow.classBonus;
-  const totalBonus = levelBonus + attributeTotalBonus + classBonusValue + itemBonusValue + specialBonusValue;
+    return SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
+      const state = skillRows[definition.stateIndex] ?? {
+        levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+        itemBonus: '0',
+        specialBonus: '0',
+        classBonus: 0
+      };
+
+      const attributeRow = definition.attributeKey === 'XX'
+        ? undefined
+        : attributeRowMap.get(definition.attributeKey as AttributeKey);
+
+      const attributeBonus = attributeRow
+        ? attributeRow.totalBonus ?? attributeRow.normalBonus ?? 0
+        : 0;
+
+      const levelBonus = state.levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
+      const itemBonus = parseBonusValue(state.itemBonus);
+      const specialBonus = parseBonusValue(state.specialBonus);
+      const classBonus = state.classBonus;
+      const totalBonus = levelBonus + attributeBonus + classBonus + itemBonus + specialBonus;
+
+      return {
+        definition,
+        state,
+        attributeBonus,
+        attributeRow,
+        levelBonus,
+        itemBonus,
+        specialBonus,
+        classBonus,
+        totalBonus
+      };
+    });
+  }, [attributeRowMap, skillRows]);
 
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
     setBaseData((prev) => ({ ...prev, [key]: value }));
@@ -337,26 +453,21 @@ export default function CreateCharacterEarlyYears() {
     }));
   }
 
-  function handleSkillLevelToggle(index: number, checked: boolean) {
-    setSkillRow((prev) => {
-      const nextLevels = [...prev.levels];
-      nextLevels[index] = checked;
-      return { ...prev, levels: nextLevels };
-    });
+  function handleSkillLevelToggle(skillIndex: number, levelIndex: number, checked: boolean) {
+    setSkillRows((prev) => prev.map((row, index) => {
+      if (index !== skillIndex) return row;
+      const nextLevels = [...row.levels];
+      nextLevels[levelIndex] = checked;
+      return { ...row, levels: nextLevels };
+    }));
   }
 
-  function handleSkillBonusChange(key: 'itemBonus' | 'specialBonus', value: string) {
-    setSkillRow((prev) => ({ ...prev, [key]: value }));
+  function handleSkillBonusChange(skillIndex: number, key: 'itemBonus' | 'specialBonus', value: string) {
+    setSkillRows((prev) => prev.map((row, index) => {
+      if (index !== skillIndex) return row;
+      return { ...row, [key]: value };
+    }));
   }
-
-  useEffect(() => {
-    setSkillRow((prev) => {
-      if (!prev.attributeKey || !attributeRows.some((row) => row.attribute === prev.attributeKey)) {
-        return { ...prev, attributeKey: attributeRows[0]?.attribute ?? prev.attributeKey };
-      }
-      return prev;
-    });
-  }, [attributeRows]);
 
   useEffect(() => {
     setAttributeRows(mapAttributeRowsFromState(locationState?.attributes));
@@ -686,6 +797,25 @@ export default function CreateCharacterEarlyYears() {
             text-transform: uppercase;
             font-size: 11px;
             letter-spacing: 0.04em;
+          }
+          .skill-category-header td {
+            background: rgba(47,85,151,0.12);
+            color: ${COLORS.primary};
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+          .skill-group-divider td {
+            padding: 0;
+            border: none;
+            height: 6px;
+          }
+          .skill-group-divider td::after {
+            content: '';
+            display: block;
+            height: 1px;
+            margin: 3px 0;
+            background: ${COLORS.border};
           }
           .skill-levels {
             display: flex;
@@ -1098,49 +1228,67 @@ export default function CreateCharacterEarlyYears() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>{skillRow.name}</td>
-                  <td>
-                    <div className="skill-levels" aria-label="Skill levels">
-                      {skillRow.levels.map((checked, index) => (
-                        <label key={index} htmlFor={`skill-level-${index}`}>
-                          <input
-                            id={`skill-level-${index}`}
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(event) => handleSkillLevelToggle(index, event.target.checked)}
-                            aria-label={`Level ${index + 1}`}
-                          />
-                        </label>
+                {SKILLS_BY_CATEGORY.map((group, groupIndex) => {
+                  const rowsForGroup = skillDisplayRows.filter((row) => row.definition.category === group.category);
+                  if (rowsForGroup.length === 0) return null;
+                  return (
+                    <Fragment key={group.category}>
+                      <tr className="skill-category-header">
+                        <td colSpan={8}>{group.category}</td>
+                      </tr>
+                      {rowsForGroup.map((row) => (
+                        <tr key={row.definition.name}>
+                          <td>{row.definition.name}</td>
+                          <td>
+                            <div className="skill-levels" aria-label={`${row.definition.name} levels`}>
+                              {row.state.levels.map((checked, levelIndex) => (
+                                <label key={levelIndex} htmlFor={`skill-${row.definition.stateIndex}-level-${levelIndex}`}>
+                                  <input
+                                    id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
+                                    aria-label={`Level ${levelIndex + 1}`}
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </td>
+                          <td>{row.levelBonus}</td>
+                          <td>
+                            <div className="skill-attribute">
+                              <span>{row.definition.attributeKey}</span>
+                              <span>{formatSigned(row.attributeBonus)}</span>
+                            </div>
+                          </td>
+                          <td>{row.classBonus}</td>
+                          <td>
+                            <input
+                              type="number"
+                              className="skill-bonus-input"
+                              value={row.state.itemBonus}
+                              onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'itemBonus', event.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              className="skill-bonus-input"
+                              value={row.state.specialBonus}
+                              onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'specialBonus', event.target.value)}
+                            />
+                          </td>
+                          <td>{row.totalBonus}</td>
+                        </tr>
                       ))}
-                    </div>
-                  </td>
-                  <td>{levelBonus}</td>
-                  <td>
-                    <div className="skill-attribute">
-                      <span>{attributeRowForSkill?.attribute ?? '—'}</span>
-                      <span>{attributeTotalBonus >= 0 ? `+${attributeTotalBonus}` : attributeTotalBonus}</span>
-                    </div>
-                  </td>
-                  <td>{classBonusValue}</td>
-                  <td>
-                    <input
-                      type="number"
-                      className="skill-bonus-input"
-                      value={skillRow.itemBonus}
-                      onChange={(event) => handleSkillBonusChange('itemBonus', event.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      className="skill-bonus-input"
-                      value={skillRow.specialBonus}
-                      onChange={(event) => handleSkillBonusChange('specialBonus', event.target.value)}
-                    />
-                  </td>
-                  <td>{totalBonus}</td>
-                </tr>
+                      {groupIndex < SKILLS_BY_CATEGORY.length - 1 && (
+                        <tr className="skill-group-divider" aria-hidden="true">
+                          <td colSpan={8} />
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </section>
