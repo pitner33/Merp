@@ -25,6 +25,7 @@ import com.sol.merp.inventory.InventoryService;
 import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
+import com.sol.merp.storage.ChildhoodSkillPresetService;
 import com.sol.merp.storage.NormalBonusService;
 import com.sol.merp.storage.RaceBonusService;
 import com.sol.merp.storage.SkillLevelBonusService;
@@ -83,6 +84,8 @@ public class ApiController {
     private RaceBonusService raceBonusService;
     @Autowired
     private SkillLevelBonusService skillLevelBonusService;
+    @Autowired
+    private ChildhoodSkillPresetService childhoodSkillPresetService;
 
     // Players
     @GetMapping("/players")
@@ -105,6 +108,23 @@ public class ApiController {
             return ResponseEntity.ok(result.getAsInt());
         }
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
+    @GetMapping("/attributes/childhood-skills/{raceKey}")
+    public ResponseEntity<Map<String, Integer>> getChildhoodSkills(@PathVariable("raceKey") String raceKey) {
+        if (raceKey == null || raceKey.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Map<String, Integer>> byEnum = resolveRace(raceKey)
+                .flatMap(childhoodSkillPresetService::findChildhoodSkills);
+        if (byEnum.isPresent()) {
+            return ResponseEntity.ok(byEnum.get());
+        }
+
+        Optional<Map<String, Integer>> byKey = childhoodSkillPresetService.findChildhoodSkillsByKey(raceKey);
+        return byKey.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     @GetMapping("/attributes/race-bonuses/{raceKey}")

@@ -178,6 +178,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/
 const API_ROOT = API_BASE.replace(/\/$/, '');
 const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bonuses/${encodeURIComponent(raceKey)}`;
 const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) => `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
+const CHILDHOOD_SKILLS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/childhood-skills/${encodeURIComponent(raceKey)}`;
 
 function formatOptionLabel(value: string): string {
   if (!value) return '';
@@ -459,6 +460,49 @@ export default function CreateCharacterEarlyYears() {
     }));
   }
 
+  function applyChildhoodSkillPreset(rawData: Record<string, unknown>) {
+    const normalized = new Map<string, number>();
+    Object.entries(rawData).forEach(([key, value]) => {
+      const normalizedKey = key.trim().toUpperCase();
+      if (!normalizedKey) return;
+      let numeric: number;
+      if (typeof value === 'number') {
+        numeric = value;
+      } else if (typeof value === 'string') {
+        const parsed = Number.parseInt(value, 10);
+        numeric = Number.isFinite(parsed) ? parsed : 0;
+      } else {
+        const parsed = Number.parseInt(String(value), 10);
+        numeric = Number.isFinite(parsed) ? parsed : 0;
+      }
+      const clamped = Math.max(0, Math.min(SKILL_LEVEL_COUNT, Math.round(numeric)));
+      normalized.set(normalizedKey, clamped);
+    });
+
+    const assignments = SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
+      const lookupKey = definition.name.trim().toUpperCase();
+      const count = normalized.get(lookupKey) ?? 0;
+      return { definition, count };
+    });
+
+    setSkillRows((prev) => prev.map((row, index) => {
+      const assignment = assignments[index];
+      const count = assignment?.count ?? 0;
+      const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, levelIndex) => levelIndex < count);
+      return {
+        ...row,
+        levels,
+        levelBonus: 0
+      };
+    }));
+
+    assignments.forEach(({ definition, count }) => {
+      if (count > 0) {
+        void fetchSkillLevelBonus(definition.stateIndex, definition.name, count);
+      }
+    });
+  }
+
   async function fetchSkillLevelBonus(skillIndex: number, skillName: string, levelCount: number) {
     const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(skillName, levelCount);
     try {
@@ -548,6 +592,11 @@ export default function CreateCharacterEarlyYears() {
           totalBonus: row.normalBonus != null ? normal : row.totalBonus
         };
       }));
+      setSkillRows((prev) => prev.map((row) => ({
+        ...row,
+        levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+        levelBonus: 0
+      })));
       return;
     }
 
@@ -588,9 +637,32 @@ export default function CreateCharacterEarlyYears() {
             totalBonus: normal + bonus
           };
         }));
+
+        const childhoodResponse = await fetch(CHILDHOOD_SKILLS_ENDPOINT(raceKey));
+        if (cancelled) return;
+
+        if (childhoodResponse.status === 404) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+            levelBonus: 0
+          })));
+        } else if (!childhoodResponse.ok) {
+          throw new Error(`Failed to load childhood skills for ${raceKey}`);
+        } else {
+          const childhoodData = await childhoodResponse.json() as Record<string, unknown>;
+          applyChildhoodSkillPreset(childhoodData);
+        }
       } catch (error) {
         if (!cancelled) {
           setRaceBonusError(error instanceof Error ? error.message : 'Failed to load race bonuses.');
+        }
+        if (!cancelled) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+            levelBonus: 0
+          })));
         }
       } finally {
         if (!cancelled) {
