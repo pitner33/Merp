@@ -81,6 +81,13 @@ const SKILL_DEFINITIONS_WITH_INDEX: readonly SkillDefinitionWithIndex[] = SKILL_
   stateIndex: index
 }));
 
+const MD_BONUS_ROWS: readonly { label: string; attribute: AttributeKey }[] = [
+  { label: 'Essence MD bonus', attribute: 'IQ' },
+  { label: 'Chanelling MD bonus', attribute: 'IT' },
+  { label: 'Poison MD bonus', attribute: 'CON' },
+  { label: 'Disease MD bonus', attribute: 'CON' }
+] as const;
+
 const SKILLS_BY_CATEGORY: readonly { category: SkillCategory; items: SkillDefinitionWithIndex[] }[] = SKILL_CATEGORIES
   .map((category) => ({
     category,
@@ -109,6 +116,7 @@ type MetaOptions = {
   genders: string[];
   races: RaceOption[];
   playerClasses: string[];
+  armorTypes?: string[];
 };
 
 type CharacterDetailsState = {
@@ -135,6 +143,7 @@ type BaseDataState = {
   alignment: string;
   motivation: string;
   specialty: string;
+  armorType: string;
 };
 
 type SpellListRow = {
@@ -207,7 +216,8 @@ function createInitialBaseData(details?: CharacterDetailsState): BaseDataState {
     personality: '',
     alignment: '',
     motivation: '',
-    specialty: ''
+    specialty: '',
+    armorType: 'none'
   };
 }
 
@@ -247,7 +257,7 @@ export default function CreateCharacterEarlyYears() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as { details?: CharacterDetailsState; meta?: MetaOptions; attributes?: AttributeSummary[] } | undefined;
-  const [meta, setMeta] = useState<MetaOptions>(() => locationState?.meta ?? { genders: [], races: [], playerClasses: [] });
+  const [meta, setMeta] = useState<MetaOptions>(() => locationState?.meta ?? { genders: [], races: [], playerClasses: [], armorTypes: [] });
   const [metaLoading, setMetaLoading] = useState<boolean>(!locationState?.meta);
   const [metaError, setMetaError] = useState<string | null>(null);
   const detailsFromState = locationState?.details;
@@ -284,17 +294,24 @@ export default function CreateCharacterEarlyYears() {
     let ignore = false;
 
     if (locationState?.meta) {
-      setMeta(locationState.meta);
+      setMeta({
+        genders: locationState.meta.genders,
+        races: locationState.meta.races,
+        playerClasses: locationState.meta.playerClasses,
+        armorTypes: locationState.meta.armorTypes ?? []
+      });
       setMetaLoading(false);
       setMetaError(null);
-      return;
+      if (locationState.meta.armorTypes && locationState.meta.armorTypes.length > 0) {
+        return;
+      }
     }
 
     async function loadMeta() {
       try {
         setMetaLoading(true);
         setMetaError(null);
-        const [genders, races, playerClasses] = await Promise.all([
+        const [genders, races, playerClasses, armorTypes] = await Promise.all([
           fetch(`${API_ROOT}/meta/genders`).then(async (res) => {
             if (!res.ok) throw new Error('Failed to load genders');
             return res.json() as Promise<string[]>;
@@ -306,10 +323,14 @@ export default function CreateCharacterEarlyYears() {
           fetch(`${API_ROOT}/meta/player-classes`).then(async (res) => {
             if (!res.ok) throw new Error('Failed to load classes');
             return res.json() as Promise<string[]>;
+          }),
+          fetch(`${API_ROOT}/meta/armor-types`).then(async (res) => {
+            if (!res.ok) throw new Error('Failed to load armor types');
+            return res.json() as Promise<string[]>;
           })
         ]);
         if (ignore) return;
-        setMeta({ genders, races, playerClasses });
+        setMeta({ genders, races, playerClasses, armorTypes });
       } catch (error) {
         if (ignore) return;
         setMetaError(error instanceof Error ? error.message : 'Failed to load metadata.');
@@ -327,6 +348,35 @@ export default function CreateCharacterEarlyYears() {
   }, [locationState]);
 
   useEffect(() => {
+    if (meta.armorTypes && meta.armorTypes.length > 0) {
+      return;
+    }
+    let ignore = false;
+    (async () => {
+      try {
+        const response = await fetch(`${API_ROOT}/meta/armor-types`);
+        if (!response.ok) {
+          throw new Error('Failed to load armor types');
+        }
+        const data = await response.json() as string[];
+        if (ignore) return;
+        setMeta((prev) => ({
+          genders: prev.genders,
+          races: prev.races,
+          playerClasses: prev.playerClasses,
+          armorTypes: data
+        }));
+      } catch (error) {
+        console.warn('Failed to fetch armor types', error);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  }, [meta.armorTypes]);
+
+  useEffect(() => {
     if (!detailsFromState) return;
     setBaseData((prev) => ({
       ...prev,
@@ -334,7 +384,8 @@ export default function CreateCharacterEarlyYears() {
       name: detailsFromState.name ?? prev.name,
       gender: detailsFromState.gender ?? prev.gender,
       race: detailsFromState.race ?? prev.race,
-      playerClass: detailsFromState.playerClass ?? prev.playerClass
+      playerClass: detailsFromState.playerClass ?? prev.playerClass,
+      armorType: prev.armorType || 'none'
     }));
   }, [detailsFromState]);
 
@@ -357,6 +408,11 @@ export default function CreateCharacterEarlyYears() {
     { value: '', label: 'Select…' },
     ...meta.playerClasses.map((value) => ({ value, label: formatOptionLabel(value) }))
   ], [meta.playerClasses]);
+
+  const armorOptions = useMemo(() => [
+    { value: '', label: 'Select…' },
+    ...((meta.armorTypes ?? []).map((value) => ({ value, label: formatOptionLabel(value) })))
+  ], [meta.armorTypes]);
 
   const attributeRowMap = useMemo(() => {
     const map = new Map<AttributeKey, AttributeRow>();
@@ -413,6 +469,26 @@ export default function CreateCharacterEarlyYears() {
       };
     });
   }, [attributeRowMap, skillRows]);
+
+  const mdBonusRows = useMemo(() => {
+    return MD_BONUS_ROWS.map((row) => {
+      const attribute = attributeRowMap.get(row.attribute);
+      const attributeBonus = attribute
+        ? attribute.totalBonus ?? attribute.normalBonus ?? 0
+        : 0;
+      const itemBonus = 0;
+      const specialBonus = 0;
+      const totalBonus = attributeBonus + itemBonus + specialBonus;
+      return {
+        label: row.label,
+        attributeKey: row.attribute,
+        attributeBonus,
+        itemBonus,
+        specialBonus,
+        totalBonus
+      };
+    });
+  }, [attributeRowMap]);
 
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
     setBaseData((prev) => ({ ...prev, [key]: value }));
@@ -1381,36 +1457,53 @@ export default function CreateCharacterEarlyYears() {
           </section>
           <section className="panel">
             <h3>Level, XP &amp; Bonuses</h3>
-            <table>
+            <div className="field">
+              <label htmlFor="summary-level">Level</label>
+              <input id="summary-level" type="number" value={1} readOnly style={{ background: '#f0f3f8' }} />
+            </div>
+            <div className="field">
+              <label htmlFor="summary-xp">XP</label>
+              <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
+            </div>
+            <div className="field">
+              <label htmlFor="summary-armor">Armor</label>
+              <select
+                id="summary-armor"
+                value={baseData.armorType}
+                onChange={(event) => handleBaseDataChange('armorType', event.target.value)}
+              >
+                {armorOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <table className="panel-table">
+              <thead>
+                <tr>
+                  <th>Bonus</th>
+                  <th>Attribute bonus</th>
+                  <th>Item bonus</th>
+                  <th>Special bonus</th>
+                  <th>Total bonus</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr>
-                  <th scope="row">Current Level</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">Total XP</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">XP to Next Level</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">Training Points</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">Armor Bonus</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">Shield Bonus</th>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row">Misc Bonuses</th>
-                  <td>—</td>
-                </tr>
+                {mdBonusRows.map((row) => (
+                  <tr key={row.label}>
+                    <th scope="row">{row.label}</th>
+                    <td>
+                      <div className="skill-attribute">
+                        <span>{row.attributeKey}</span>
+                        <span>{formatSigned(row.attributeBonus)}</span>
+                      </div>
+                    </td>
+                    <td className="right">{formatSigned(row.itemBonus)}</td>
+                    <td className="right">{formatSigned(row.specialBonus)}</td>
+                    <td className="right">{formatSigned(row.totalBonus)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </section>
