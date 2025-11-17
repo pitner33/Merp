@@ -7,6 +7,7 @@ import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.inventory.InventoryService;
 import com.sol.merp.modifiers.AttackModifier;
 import com.sol.merp.modifiers.AttackModifierRepository;
+import com.sol.merp.skills.SkillDefinitionInitializer;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import org.slf4j.Logger;
@@ -26,6 +27,8 @@ public class MerpApplication implements CommandLineRunner {
     public WeaponRepository weaponRepository;
     @Autowired
     public InventoryService inventoryService;
+    @Autowired
+    public SkillDefinitionInitializer skillDefinitionInitializer;
 
 
 
@@ -63,6 +66,8 @@ public class MerpApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        skillDefinitionInitializer.ensureSkillDefinitionsSeeded();
+
         if (playerRepository.count() == 0) {
             // Seed Players once
             playerRepository.save(new Player("JK01", "Törp harcos", Gender.male, Race.dwarf, PlayerClass.warrior, 4, 86d, 25, 51, 101, 21, -5, -15, 0, 15, false, 15, 40, -5, ArmorType.chainmail, -35, 19, 20, 30, -30, -25, 5, 10));

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.sol.merp.attributes.*;
 import com.sol.merp.inventory.PlayerInventoryItem;
+import com.sol.merp.skills.PlayerSkill;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -77,6 +78,10 @@ public class Player {
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<PlayerInventoryItem> inventoryItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerSkill> playerSkills = new ArrayList<>();
 
     // XP level caps (index = level). Level 1..20 supported.
     private static final int[] LEVEL_CAPS = new int[] {
