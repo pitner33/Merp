@@ -171,11 +171,13 @@ type SkillRowState = {
   itemBonus: string;
   specialBonus: string;
   classBonus: number;
+  levelBonus: number;
 };
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const API_ROOT = API_BASE.replace(/\/$/, '');
 const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bonuses/${encodeURIComponent(raceKey)}`;
+const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) => `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
 
 function formatOptionLabel(value: string): string {
   if (!value) return '';
@@ -267,7 +269,8 @@ export default function CreateCharacterEarlyYears() {
       levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
       itemBonus: '0',
       specialBonus: '0',
-      classBonus: 0
+      classBonus: 0,
+      levelBonus: 0
     }))
   );
 
@@ -375,7 +378,8 @@ export default function CreateCharacterEarlyYears() {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: '0',
-        classBonus: 0
+        classBonus: 0,
+        levelBonus: 0
       };
 
       const attributeRow = definition.attributeKey === 'XX'
@@ -386,7 +390,8 @@ export default function CreateCharacterEarlyYears() {
         ? attributeRow.totalBonus ?? attributeRow.normalBonus ?? 0
         : 0;
 
-      const levelBonus = state.levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
+      const levelBonus = Number.isFinite(state.levelBonus) ? state.levelBonus : 0;
+      const levelCount = state.levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
       const itemBonus = parseBonusValue(state.itemBonus);
       const specialBonus = parseBonusValue(state.specialBonus);
       const classBonus = state.classBonus;
@@ -397,6 +402,7 @@ export default function CreateCharacterEarlyYears() {
         state,
         attributeBonus,
         attributeRow,
+        levelCount,
         levelBonus,
         itemBonus,
         specialBonus,
@@ -453,13 +459,67 @@ export default function CreateCharacterEarlyYears() {
     }));
   }
 
+  async function fetchSkillLevelBonus(skillIndex: number, skillName: string, levelCount: number) {
+    const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(skillName, levelCount);
+    try {
+      const response = await fetch(endpoint);
+      let bonus = 0;
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = typeof data === 'number' ? data : Number.parseInt(String(data), 10);
+        bonus = Number.isFinite(parsed) ? parsed : 0;
+      } else if (response.status !== 404) {
+        throw new Error(`Failed to load skill level bonus for ${skillName}`);
+      }
+
+      setSkillRows((prev) => {
+        const row = prev[skillIndex];
+        if (!row) return prev;
+        const currentCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        return prev.map((item, index) => (index === skillIndex ? { ...item, levelBonus: bonus } : item));
+      });
+    } catch (error) {
+      console.warn('Failed to fetch skill level bonus', error);
+      setSkillRows((prev) => {
+        const row = prev[skillIndex];
+        if (!row) return prev;
+        const currentCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        return prev.map((item, index) => (index === skillIndex ? { ...item, levelBonus: 0 } : item));
+      });
+    }
+  }
+
   function handleSkillLevelToggle(skillIndex: number, levelIndex: number, checked: boolean) {
+    const definition = SKILL_DEFINITIONS_WITH_INDEX[skillIndex];
+    const currentRow = skillRows[skillIndex];
+    if (!definition || !currentRow) {
+      return;
+    }
+
+    const nextLevels = [...currentRow.levels];
+    nextLevels[levelIndex] = checked;
+    const levelCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+
     setSkillRows((prev) => prev.map((row, index) => {
       if (index !== skillIndex) return row;
-      const nextLevels = [...row.levels];
-      nextLevels[levelIndex] = checked;
-      return { ...row, levels: nextLevels };
+      return {
+        ...row,
+        levels: nextLevels,
+        levelBonus: levelCount === 0 ? 0 : row.levelBonus
+      };
     }));
+
+    if (levelCount === 0) {
+      return;
+    }
+
+    void fetchSkillLevelBonus(skillIndex, definition.name, levelCount);
   }
 
   function handleSkillBonusChange(skillIndex: number, key: 'itemBonus' | 'specialBonus', value: string) {

@@ -27,6 +27,7 @@ import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.storage.NormalBonusService;
 import com.sol.merp.storage.RaceBonusService;
+import com.sol.merp.storage.SkillLevelBonusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -80,6 +81,8 @@ public class ApiController {
 
     @Autowired
     private RaceBonusService raceBonusService;
+    @Autowired
+    private SkillLevelBonusService skillLevelBonusService;
 
     // Players
     @GetMapping("/players")
@@ -119,6 +122,20 @@ public class ApiController {
         Optional<Map<String, Integer>> byKey = raceBonusService.findRaceBonusesByKey(raceKey);
         return byKey.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @GetMapping("/skills/level-bonus")
+    public ResponseEntity<Integer> getSkillLevelBonus(
+            @RequestParam("skillName") String skillName,
+            @RequestParam("levels") int levelCount) {
+        if (skillName == null || skillName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        Optional<Integer> result = skillLevelBonusService.findSkillLevelBonus(skillName, levelCount);
+        if (result.isPresent()) {
+            return ResponseEntity.ok(result.get());
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
     private Optional<Race> resolveRace(String raw) {
