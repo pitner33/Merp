@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
@@ -29,6 +30,13 @@ function createZeroBonuses(): Record<AttributeKey, number> {
     acc[key] = 0;
     return acc;
   }, {} as Record<AttributeKey, number>);
+}
+
+function createNullOverrides(): Record<AttributeKey, number | null> {
+  return ATTRIBUTE_KEYS.reduce<Record<AttributeKey, number | null>>((acc, key) => {
+    acc[key] = null;
+    return acc;
+  }, {} as Record<AttributeKey, number | null>);
 }
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
@@ -79,6 +87,7 @@ const COLORS = {
 } as const;
 
 export default function CreateCharacter() {
+  const navigate = useNavigate();
   const [rolling, setRolling] = useState(false);
   const [tensFace, setTensFace] = useState(0);
   const [onesFace, setOnesFace] = useState(0);
@@ -88,6 +97,7 @@ export default function CreateCharacter() {
   const [rolledValues, setRolledValues] = useState<RolledValue[]>([]);
   const [assignments, setAssignments] = useState<Record<AttributeKey, string | null>>(createEmptyAssignments);
   const [attributeBonuses, setAttributeBonuses] = useState<Record<AttributeKey, number>>(createZeroBonuses);
+  const [attributeOverrides, setAttributeOverrides] = useState<Record<AttributeKey, number | null>>(createNullOverrides);
   const [raceBonuses, setRaceBonuses] = useState<Record<AttributeKey, number>>(createZeroBonuses);
   const [details, setDetails] = useState<CharacterDetailsState>({
     characterId: '',
@@ -252,7 +262,8 @@ export default function CreateCharacter() {
     return ATTRIBUTE_KEYS.map((attr) => {
       const assignedId = assignments[attr];
       const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
-      const value = assignedEntry?.value ?? 0;
+      const overrideValue = attributeOverrides[attr];
+      const value = overrideValue ?? assignedEntry?.value ?? 0;
       const normalBonus = attributeBonuses[attr] ?? 0;
       const raceBonus = raceBonuses[attr] ?? 0;
       return {
@@ -263,7 +274,7 @@ export default function CreateCharacter() {
         sum: normalBonus + raceBonus
       };
     });
-  }, [assignments, rolledValues, attributeBonuses, raceBonuses]);
+  }, [assignments, rolledValues, attributeBonuses, raceBonuses, attributeOverrides]);
 
   const genderOptions = useMemo(() => [
     { value: '', label: 'Select…' },
@@ -365,7 +376,52 @@ export default function CreateCharacter() {
     }
   }
 
-  async function handleAssignmentChange(attr: AttributeKey, valueId: string) {
+  async function loadNormalBonus(attr: AttributeKey, value: number, requestMarker: string) {
+    pendingBonusRequestRef.current.set(attr, requestMarker);
+    setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+
+    const cachedBonus = normalBonusCacheRef.current.get(value);
+    if (cachedBonus != null) {
+      if (pendingBonusRequestRef.current.get(attr) === requestMarker) {
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: cachedBonus }));
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(NORMAL_BONUS_BY_VALUE_ENDPOINT(value));
+      if (pendingBonusRequestRef.current.get(attr) !== requestMarker) {
+        return;
+      }
+
+      if (response.status === 404) {
+        normalBonusCacheRef.current.set(value, 0);
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to load normal bonus for value ${value}`);
+      }
+
+      const data = await response.json();
+      if (typeof data !== 'number' || !Number.isFinite(data)) {
+        throw new Error('Unexpected normal bonus response');
+      }
+
+      normalBonusCacheRef.current.set(value, data);
+      if (pendingBonusRequestRef.current.get(attr) === requestMarker) {
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: data }));
+      }
+    } catch (error) {
+      if (pendingBonusRequestRef.current.get(attr) === requestMarker) {
+        setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+        setBonusFetchError(error instanceof Error ? error.message : 'Failed to fetch normal bonus.');
+      }
+    }
+  }
+
+  function handleAssignmentChange(attr: AttributeKey, valueId: string) {
     setBonusFetchError(null);
 
     const nextAssignments: Record<AttributeKey, string | null> = { ...assignments };
@@ -381,6 +437,8 @@ export default function CreateCharacter() {
       nextAssignments[attr] = null;
     }
 
+    const assignedEntry = valueId ? rolledValues.find((entry) => entry.id === valueId) : null;
+
     setAssignments(nextAssignments);
     setAttributeBonuses((prev) => {
       const next = { ...prev };
@@ -392,62 +450,82 @@ export default function CreateCharacter() {
       return next;
     });
 
-    if (valueId) {
-      setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
-    }
+    setAttributeOverrides((prev) => {
+      const next = { ...prev };
+      for (const key of ATTRIBUTE_KEYS) {
+        if (nextAssignments[key] == null) {
+          next[key] = null;
+        }
+      }
+      next[attr] = assignedEntry ? assignedEntry.value : null;
+      return next;
+    });
 
     if (!valueId) {
       pendingBonusRequestRef.current.delete(attr);
+      setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
       return;
     }
 
-    const assignedEntry = rolledValues.find((entry) => entry.id === valueId);
     if (!assignedEntry) {
       pendingBonusRequestRef.current.delete(attr);
       setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
       return;
     }
 
-    const assignedValue = assignedEntry.value;
-    pendingBonusRequestRef.current.set(attr, valueId);
+    const requestMarker = `assign:${valueId}:${Date.now()}`;
+    void loadNormalBonus(attr, assignedEntry.value, requestMarker);
+  }
 
-    const cachedBonus = normalBonusCacheRef.current.get(assignedValue);
-    if (cachedBonus != null) {
-      setAttributeBonuses((prev) => ({ ...prev, [attr]: cachedBonus }));
+  function handleOverrideChange(attr: AttributeKey, rawValue: string) {
+    const assignedId = assignments[attr];
+    if (!assignedId) {
       return;
     }
 
-    try {
-      const response = await fetch(NORMAL_BONUS_BY_VALUE_ENDPOINT(assignedValue));
-      if (pendingBonusRequestRef.current.get(attr) !== valueId) {
-        return;
-      }
-
-      if (response.status === 404) {
-        normalBonusCacheRef.current.set(assignedValue, 0);
+    setBonusFetchError(null);
+    const trimmed = rawValue.trim();
+    if (trimmed === '') {
+      setAttributeOverrides((prev) => ({ ...prev, [attr]: null }));
+      const assignedEntry = rolledValues.find((entry) => entry.id === assignedId);
+      if (assignedEntry) {
+        const requestMarker = `assign:${assignedId}:${Date.now()}`;
+        void loadNormalBonus(attr, assignedEntry.value, requestMarker);
+      } else {
+        pendingBonusRequestRef.current.delete(attr);
         setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
+      }
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    const normalized = Math.max(1, Math.min(100, Math.round(parsed)));
+    setAttributeOverrides((prev) => ({ ...prev, [attr]: normalized }));
+    const requestMarker = `override:${attr}:${normalized}:${Date.now()}`;
+    void loadNormalBonus(attr, normalized, requestMarker);
+  }
+
+  function handleBackToInn() {
+    const homeUrl = new URL('/home', window.location.origin).toString();
+    if (window.opener && !window.opener.closed) {
+      try {
+        window.opener.location.href = homeUrl;
+        window.opener.focus();
+        window.close();
         return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to load normal bonus for value ${assignedValue}`);
-      }
-
-      const data = await response.json();
-      if (typeof data !== 'number' || !Number.isFinite(data)) {
-        throw new Error('Unexpected normal bonus response');
-      }
-
-      normalBonusCacheRef.current.set(assignedValue, data);
-      if (pendingBonusRequestRef.current.get(attr) === valueId) {
-        setAttributeBonuses((prev) => ({ ...prev, [attr]: data }));
-      }
-    } catch (error) {
-      if (pendingBonusRequestRef.current.get(attr) === valueId) {
-        setAttributeBonuses((prev) => ({ ...prev, [attr]: 0 }));
-        setBonusFetchError(error instanceof Error ? error.message : 'Failed to fetch normal bonus.');
+      } catch (error) {
+        // fall back to normal navigation
       }
     }
+    navigate('/home');
+  }
+
+  function handleNext() {
+    navigate('/create-character-early-years');
   }
 
   function resetAll() {
@@ -464,6 +542,7 @@ export default function CreateCharacter() {
     setRolledValues([]);
     setAssignments(createEmptyAssignments());
     setAttributeBonuses(createZeroBonuses());
+    setAttributeOverrides(createNullOverrides());
     setRaceBonuses(createZeroBonuses());
     normalBonusCacheRef.current.clear();
     pendingBonusRequestRef.current.clear();
@@ -475,48 +554,39 @@ export default function CreateCharacter() {
 
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <h1 style={{ margin: 0, textAlign: 'center', color: '#ffffff', textShadow: '0 0 6px rgba(0,0,0,0.35)' }}>Character Creation – Base Attributes</h1>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={rollAttribute}
-            disabled={rolling || rolledValues.length >= MAX_ROLL_COUNT}
-            style={{
-              padding: '8px 16px',
-              background: rolling || rolledValues.length >= MAX_ROLL_COUNT ? COLORS.accentLight : COLORS.accent,
-              color: '#fff',
-              border: `1px solid ${rolling || rolledValues.length >= MAX_ROLL_COUNT ? COLORS.accentLight : COLORS.accent}`,
-              borderRadius: 6,
-              cursor: rolling || rolledValues.length >= MAX_ROLL_COUNT ? 'not-allowed' : 'pointer',
-              fontWeight: 700,
-              minWidth: 190
-            }}
-          >
-            {rolledValues.length < MAX_ROLL_COUNT ? `Roll D100 (${rollsRemaining} left)` : 'All rolls complete'}
-          </button>
-          <button
-            type="button"
-            onClick={resetAll}
-            style={{
-              padding: '8px 16px',
-              background: COLORS.danger,
-              color: '#fff',
-              border: '1px solid #651a1a',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontWeight: 700
-            }}
-          >
-            Reset
-          </button>
-        </div>
       </div>
-
-      <p style={{ margin: 0, color: '#ffffff', textShadow: '0 0 4px rgba(0,0,0,0.3)', maxWidth: 800, textAlign: 'center' }}>
-        Roll six base attribute scores using a D100. Any roll below {MIN_ACCEPTED_ROLL} is automatically rerolled. Once all six values
-        are generated, assign them freely to STR, DEX, CON, IQ, IT, and CH.
-      </p>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+        <button
+          type="button"
+          onClick={handleBackToInn}
+          style={{
+            padding: '6px 12px',
+            background: '#d32f2f',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer'
+          }}
+        >
+          Back to the Inn
+        </button>
+        <button
+          type="button"
+          onClick={handleNext}
+          style={{
+            padding: '6px 12px',
+            background: '#2f5597',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            cursor: 'pointer'
+          }}
+        >
+          Next
+        </button>
+      </div>
 
       <div style={{ background: '#fff', borderRadius: 8, padding: 16, border: `1px solid ${COLORS.border}`, boxShadow: '0 2px 8px rgba(47,85,151,0.1)', maxWidth: 960, margin: '0 auto', width: '100%' }}>
         <h2 style={{ marginTop: 0, marginBottom: 12, color: COLORS.primary }}>Character Details</h2>
@@ -626,6 +696,44 @@ export default function CreateCharacter() {
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div className="dice-stage">
           <h2 style={{ margin: 0, color: COLORS.primary }}>Attribute Roll</h2>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={rollAttribute}
+              disabled={rolling || rolledValues.length >= MAX_ROLL_COUNT}
+              style={{
+                padding: '8px 16px',
+                background: rolling || rolledValues.length >= MAX_ROLL_COUNT ? COLORS.accentLight : COLORS.accent,
+                color: '#fff',
+                border: `1px solid ${rolling || rolledValues.length >= MAX_ROLL_COUNT ? COLORS.accentLight : COLORS.accent}`,
+                borderRadius: 6,
+                cursor: rolling || rolledValues.length >= MAX_ROLL_COUNT ? 'not-allowed' : 'pointer',
+                fontWeight: 700,
+                minWidth: 190
+              }}
+            >
+              {rolledValues.length < MAX_ROLL_COUNT ? `Roll D100 (${rollsRemaining} left)` : 'All rolls complete'}
+            </button>
+            <button
+              type="button"
+              onClick={resetAll}
+              style={{
+                padding: '8px 16px',
+                background: COLORS.danger,
+                color: '#fff',
+                border: '1px solid #651a1a',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 700
+              }}
+            >
+              Reset
+            </button>
+          </div>
+          <p style={{ margin: '4px 0 0 0', color: COLORS.textPrimary, textAlign: 'center', maxWidth: 440 }}>
+            Roll six base attribute scores using a D100. Any roll below {MIN_ACCEPTED_ROLL} is automatically rerolled. Once all six values
+            are generated, assign them freely to STR, DEX, CON, IQ, IT, and CH.
+          </p>
           <div className="dice-wrap">
             <div className={`die tens${rolling ? ' rolling' : ''}`} aria-label="tens-die">{tensFace}</div>
             <div className={`die ones${rolling ? ' rolling' : ''}`} aria-label="ones-die">{onesFace}</div>
@@ -680,36 +788,64 @@ export default function CreateCharacter() {
                 const assignedId = assignments[summary.attribute];
                 const availableOptions = rolledValues.filter((entry) => entry.id === assignedId || !assignedValueIds.has(entry.id));
                 const assignedEntry = assignedId ? rolledValues.find((entry) => entry.id === assignedId) : null;
+                const overrideValue = attributeOverrides[summary.attribute];
+                const displayValue = overrideValue ?? assignedEntry?.value ?? '';
+                const inputValue = displayValue === '' ? '' : String(displayValue);
                 return (
                   <tr key={summary.attribute}>
                     <td style={{ padding: '10px 8px', fontWeight: 700, color: COLORS.primary }}>{summary.attribute}</td>
                     <td style={{ padding: '10px 8px' }}>
-                      <select
-                        value={assignedId ?? ''}
-                        onChange={(event) => handleAssignmentChange(summary.attribute, event.target.value)}
-                        disabled={rolledValues.length === 0}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: 6,
-                          border: `1px solid ${COLORS.primary}`,
-                          fontSize: 14,
-                          color: COLORS.textPrimary,
-                          background: '#fff'
-                        }}
-                      >
-                        <option value="">Unassigned</option>
-                        {availableOptions.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            Roll {entry.order}: {entry.value}
-                          </option>
-                        ))}
-                      </select>
-                      {assignedEntry && (
-                        <small style={{ display: 'block', color: COLORS.primary, marginTop: 4 }}>
-                          Assigned value: {assignedEntry.value}
-                        </small>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <select
+                            value={assignedId ?? ''}
+                            onChange={(event) => handleAssignmentChange(summary.attribute, event.target.value)}
+                            disabled={rolledValues.length === 0}
+                            style={{
+                              flex: '1 1 140px',
+                              minWidth: 140,
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              border: `1px solid ${COLORS.primary}`,
+                              fontSize: 14,
+                              color: COLORS.textPrimary,
+                              background: '#fff'
+                            }}
+                          >
+                            <option value="">Unassigned</option>
+                            {availableOptions.map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                Roll {entry.order}: {entry.value}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={inputValue}
+                            onChange={(event) => handleOverrideChange(summary.attribute, event.target.value)}
+                            disabled={!assignedEntry}
+                            placeholder={assignedEntry ? 'Adjust value' : 'Assign first'}
+                            style={{
+                              flex: '0 1 120px',
+                              minWidth: 110,
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              border: `1px solid ${COLORS.border}`,
+                              fontSize: 14,
+                              color: COLORS.textPrimary,
+                              background: assignedEntry ? '#fff' : '#f1f3f6'
+                            }}
+                          />
+                        </div>
+                        {assignedEntry && (
+                          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: COLORS.textPrimary }}>
+                            <span>Rolled: {assignedEntry.value}</span>
+                            <span>Final: {summary.value}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '10px 8px', color: COLORS.textPrimary }}>{summary.normalBonus}</td>
                     <td style={{ padding: '10px 8px', color: COLORS.textPrimary }}>{summary.raceBonus}</td>

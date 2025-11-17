@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import EditPlayer from './pages/EditPlayer';
 import CreateCharacter from './pages/CreateCharacter';
+import CreateCharacterEarlyYears from './pages/CreateCharacterEarlyYears';
 import Landing from './pages/Landing';
 import AdventureMain from './pages/AdventureMain';
 import AdventureFight from './pages/AdventureFight';
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/home" element={<Landing />} />
         <Route path="/players/:id/edit" element={<EditPlayer />} />
         <Route path="/create-character" element={<CreateCharacter />} />
+        <Route path="/create-character-early-years" element={<CreateCharacterEarlyYears />} />
         <Route path="/adventure/main" element={<AdventureMain />} />
         <Route path="/adventure/fight" element={<AdventureFight />} />
         <Route path="/adventure/fight/round" element={<AdventureFightRound />} />
