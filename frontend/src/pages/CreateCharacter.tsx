@@ -503,7 +503,7 @@ export default function CreateCharacter() {
       return;
     }
 
-    const normalized = Math.max(1, Math.min(100, Math.round(parsed)));
+    const normalized = Math.max(1, Math.min(102, Math.round(parsed)));
     setAttributeOverrides((prev) => ({ ...prev, [attr]: normalized }));
     const requestMarker = `override:${attr}:${normalized}:${Date.now()}`;
     void loadNormalBonus(attr, normalized, requestMarker);
@@ -525,7 +525,21 @@ export default function CreateCharacter() {
   }
 
   function handleNext() {
-    navigate('/create-character-early-years');
+    const attributePayload = attributeSummaries.map((summary) => ({
+      attribute: summary.attribute,
+      value: summary.value,
+      normalBonus: summary.normalBonus,
+      raceBonus: summary.raceBonus,
+      sum: summary.sum
+    }));
+
+    navigate('/create-character-early-years', {
+      state: {
+        details,
+        meta,
+        attributes: attributePayload
+      }
+    });
   }
 
   function resetAll() {
@@ -575,13 +589,15 @@ export default function CreateCharacter() {
         <button
           type="button"
           onClick={handleNext}
+          disabled={!isComplete}
           style={{
             padding: '6px 12px',
-            background: '#2f5597',
+            background: isComplete ? '#2f5597' : '#9fb2d9',
             color: '#fff',
             border: 'none',
             borderRadius: 6,
-            cursor: 'pointer'
+            cursor: isComplete ? 'pointer' : 'not-allowed',
+            opacity: isComplete ? 1 : 0.75
           }}
         >
           Next
@@ -822,7 +838,7 @@ export default function CreateCharacter() {
                           <input
                             type="number"
                             min={1}
-                            max={100}
+                            max={102}
                             value={inputValue}
                             onChange={(event) => handleOverrideChange(summary.attribute, event.target.value)}
                             disabled={!assignedEntry}
