@@ -14,28 +14,28 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import com.sol.merp.attributes.Race;
+import com.sol.merp.attributes.PlayerClass;
 
 @Service
-public class ChildhoodSkillPresetService {
+public class ClassSkillBonusService {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final JdbcTemplate jdbc;
 
     @Value("${sheet.tablePrefix}")
     private String tablePrefix;
 
-    public ChildhoodSkillPresetService(JdbcTemplate jdbc) {
+    public ClassSkillBonusService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    public Optional<Map<String, Integer>> findChildhoodSkills(Race race) {
-        if (race == null) {
+    public Optional<Map<String, Integer>> findClassBonuses(PlayerClass playerClass) {
+        if (playerClass == null) {
             return Optional.empty();
         }
-        return findChildhoodSkillsByKey(buildLookupKey(race));
+        return findClassBonusesByKey(buildLookupKey(playerClass));
     }
 
-    public Optional<Map<String, Integer>> findChildhoodSkillsByKey(String rawKey) {
+    public Optional<Map<String, Integer>> findClassBonusesByKey(String rawKey) {
         String lookupKey = normalizeKey(rawKey);
         if (lookupKey == null) {
             return Optional.empty();
@@ -45,7 +45,7 @@ public class ChildhoodSkillPresetService {
             Map<String, Integer> result = jdbc.query(
                     "SELECT * FROM " + tableName + " WHERE UPPER(COL1) = ?",
                     ps -> ps.setString(1, lookupKey),
-                    rs -> rs.next() ? extractChildhoodSkills(rs) : null
+                    rs -> rs.next() ? extractClassBonuses(rs) : null
             );
             return Optional.ofNullable(result);
         } catch (DataAccessException ex) {
@@ -54,15 +54,15 @@ public class ChildhoodSkillPresetService {
         return Optional.empty();
     }
 
-    private Map<String, Integer> extractChildhoodSkills(ResultSet rs) throws SQLException {
-        Map<String, Integer> result = new LinkedHashMap<>();
+    private Map<String, Integer> extractClassBonuses(ResultSet rs) throws SQLException {
+        Map<String, Integer> bonuses = new LinkedHashMap<>();
         for (int i = 0; i < SkillTableColumnOrder.SKILL_SEQUENCE.size(); i++) {
             int columnIndex = i + 2; // COL2..COL33
             String columnName = "COL" + columnIndex;
             Integer value = parseInteger(rs.getString(columnName));
-            result.put(SkillTableColumnOrder.SKILL_SEQUENCE.get(i), value);
+            bonuses.put(SkillTableColumnOrder.SKILL_SEQUENCE.get(i), value);
         }
-        return result;
+        return bonuses;
     }
 
     private Integer parseInteger(String text) {
@@ -72,7 +72,7 @@ public class ChildhoodSkillPresetService {
         try {
             double numeric = Double.parseDouble(text.trim());
             if (Double.isFinite(numeric)) {
-                return (int) Math.max(0, Math.round(numeric));
+                return (int) Math.round(numeric);
             }
         } catch (NumberFormatException ignore) {
             // ignore malformed values
@@ -80,16 +80,13 @@ public class ChildhoodSkillPresetService {
         return 0;
     }
 
-    private String buildLookupKey(Race race) {
-        if (race == null) {
+    private String buildLookupKey(PlayerClass playerClass) {
+        if (playerClass == null) {
             return null;
         }
-        if (race.name().toLowerCase(Locale.ROOT).startsWith("human")) {
-            return "HUMAN";
-        }
-        String displayName = race.getDisplayName();
+        String displayName = playerClass.getDisplayName();
         if (displayName == null || displayName.isBlank()) {
-            return race.name().toUpperCase(Locale.ROOT);
+            return playerClass.name().toUpperCase(Locale.ROOT);
         }
         return displayName.trim().toUpperCase(Locale.ROOT);
     }
@@ -106,6 +103,6 @@ public class ChildhoodSkillPresetService {
     }
 
     private String resolveTableName() {
-        return (tablePrefix != null ? tablePrefix : "") + "CHAR_CHILDHOODSP";
+        return (tablePrefix != null ? tablePrefix : "") + "CHAR_CLASSBONUS";
     }
 }

@@ -26,6 +26,7 @@ import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.storage.ChildhoodSkillPresetService;
+import com.sol.merp.storage.ClassSkillBonusService;
 import com.sol.merp.storage.NormalBonusService;
 import com.sol.merp.storage.RaceBonusService;
 import com.sol.merp.storage.SkillLevelBonusService;
@@ -86,6 +87,8 @@ public class ApiController {
     private SkillLevelBonusService skillLevelBonusService;
     @Autowired
     private ChildhoodSkillPresetService childhoodSkillPresetService;
+    @Autowired
+    private ClassSkillBonusService classSkillBonusService;
 
     // Players
     @GetMapping("/players")
@@ -123,6 +126,23 @@ public class ApiController {
         }
 
         Optional<Map<String, Integer>> byKey = childhoodSkillPresetService.findChildhoodSkillsByKey(raceKey);
+        return byKey.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @GetMapping("/attributes/class-bonuses/{classKey}")
+    public ResponseEntity<Map<String, Integer>> getClassBonuses(@PathVariable("classKey") String classKey) {
+        if (classKey == null || classKey.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Map<String, Integer>> byEnum = resolvePlayerClass(classKey)
+                .flatMap(classSkillBonusService::findClassBonuses);
+        if (byEnum.isPresent()) {
+            return ResponseEntity.ok(byEnum.get());
+        }
+
+        Optional<Map<String, Integer>> byKey = classSkillBonusService.findClassBonusesByKey(classKey);
         return byKey.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
@@ -167,6 +187,26 @@ public class ApiController {
             return Optional.empty();
         }
         for (Race candidate : Race.values()) {
+            if (candidate.name().equalsIgnoreCase(normalized)) {
+                return Optional.of(candidate);
+            }
+            String display = candidate.getDisplayName();
+            if (display != null && display.equalsIgnoreCase(normalized)) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<PlayerClass> resolvePlayerClass(String raw) {
+        if (raw == null) {
+            return Optional.empty();
+        }
+        String normalized = raw.trim();
+        if (normalized.isEmpty()) {
+            return Optional.empty();
+        }
+        for (PlayerClass candidate : PlayerClass.values()) {
             if (candidate.name().equalsIgnoreCase(normalized)) {
                 return Optional.of(candidate);
             }

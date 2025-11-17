@@ -179,6 +179,7 @@ const API_ROOT = API_BASE.replace(/\/$/, '');
 const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bonuses/${encodeURIComponent(raceKey)}`;
 const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) => `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
 const CHILDHOOD_SKILLS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/childhood-skills/${encodeURIComponent(raceKey)}`;
+const CLASS_BONUS_ENDPOINT = (classKey: string) => `${API_ROOT}/attributes/class-bonuses/${encodeURIComponent(classKey)}`;
 
 function formatOptionLabel(value: string): string {
   if (!value) return '';
@@ -595,7 +596,8 @@ export default function CreateCharacterEarlyYears() {
       setSkillRows((prev) => prev.map((row) => ({
         ...row,
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-        levelBonus: 0
+        levelBonus: 0,
+        classBonus: 0
       })));
       return;
     }
@@ -645,7 +647,8 @@ export default function CreateCharacterEarlyYears() {
           setSkillRows((prev) => prev.map((row) => ({
             ...row,
             levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-            levelBonus: 0
+            levelBonus: 0,
+            classBonus: row.classBonus
           })));
         } else if (!childhoodResponse.ok) {
           throw new Error(`Failed to load childhood skills for ${raceKey}`);
@@ -661,7 +664,8 @@ export default function CreateCharacterEarlyYears() {
           setSkillRows((prev) => prev.map((row) => ({
             ...row,
             levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-            levelBonus: 0
+            levelBonus: 0,
+            classBonus: row.classBonus
           })));
         }
       } finally {
@@ -675,6 +679,78 @@ export default function CreateCharacterEarlyYears() {
       cancelled = true;
     };
   }, [baseData.race]);
+
+  useEffect(() => {
+    const classKey = baseData.playerClass?.trim();
+    if (!classKey) {
+      setSkillRows((prev) => prev.map((row) => ({
+        ...row,
+        classBonus: 0
+      })));
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(CLASS_BONUS_ENDPOINT(classKey));
+        if (cancelled) return;
+
+        if (response.status === 404) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            classBonus: 0
+          })));
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to load class bonuses for ${classKey}`);
+        }
+
+        const data = await response.json() as Record<string, unknown>;
+        const normalized = new Map<string, number>();
+        Object.entries(data).forEach(([key, value]) => {
+          const normalizedKey = key.trim().toUpperCase();
+          if (!normalizedKey) return;
+          let numeric: number;
+          if (typeof value === 'number') {
+            numeric = value;
+          } else if (typeof value === 'string') {
+            const parsed = Number.parseInt(value, 10);
+            numeric = Number.isFinite(parsed) ? parsed : 0;
+          } else {
+            const parsed = Number.parseInt(String(value), 10);
+            numeric = Number.isFinite(parsed) ? parsed : 0;
+          }
+          normalized.set(normalizedKey, Math.round(numeric));
+        });
+
+        setSkillRows((prev) => prev.map((row, index) => {
+          const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
+          const lookupKey = definition.name.trim().toUpperCase();
+          const bonus = normalized.get(lookupKey) ?? 0;
+          return {
+            ...row,
+            classBonus: bonus
+          };
+        }));
+      } catch (error) {
+        console.warn('Failed to fetch class bonuses', error);
+        if (!cancelled) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            classBonus: 0
+          })));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseData.playerClass]);
 
   function handleBack() {
     navigate('/create-character');
