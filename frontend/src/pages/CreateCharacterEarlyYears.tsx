@@ -12,6 +12,7 @@ const COLORS = {
 const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 const SKILL_LEVEL_COUNT = 30;
+const HP_MAX_SKILL_NAME = 'HP max';
 
 type SkillAttributeKey = AttributeKey | 'XX';
 type SkillCategory =
@@ -80,6 +81,37 @@ const SKILL_DEFINITIONS_WITH_INDEX: readonly SkillDefinitionWithIndex[] = SKILL_
   ...definition,
   stateIndex: index
 }));
+
+const MM_SPECIAL_BONUS_DEFAULTS: Record<string, string> = {
+  None: '0',
+  Leather: '-15',
+  'Heavy Leather': '-30',
+  Chainmail: '-45',
+  Plate: '-60'
+};
+
+function getDefaultSpecialBonus(skillName: string): string {
+  return MM_SPECIAL_BONUS_DEFAULTS[skillName] ?? '0';
+}
+
+const MM_SKILL_LEVEL_CAPS: Record<string, number> = {
+  None: 4,
+  Leather: 5,
+  'Heavy Leather': 7,
+  Chainmail: 9,
+  Plate: 11
+};
+
+function getSkillLevelArray(levels: boolean[], definition: SkillDefinitionWithIndex): boolean[] {
+  if (definition.category !== 'MM Skills') {
+    return levels;
+  }
+  const cap = MM_SKILL_LEVEL_CAPS[definition.name];
+  if (cap == null) {
+    return levels;
+  }
+  return levels.slice(0, cap);
+}
 
 const MD_BONUS_ROWS: readonly { label: string; attribute: AttributeKey }[] = [
   { label: 'Essence MD bonus', attribute: 'IQ' },
@@ -181,6 +213,7 @@ type SkillRowState = {
   specialBonus: string;
   classBonus: number;
   levelBonus: number;
+  manualLevelInput: string;
 };
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
@@ -253,6 +286,14 @@ function formatSigned(value: number): string {
   return '0';
 }
 
+function parseBonusInput(value: string): number {
+  if (typeof value !== 'string') return 0;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return 0;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export default function CreateCharacterEarlyYears() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -274,17 +315,23 @@ export default function CreateCharacterEarlyYears() {
     level: ''
   })));
   const [attributeRows, setAttributeRows] = useState<AttributeRow[]>(() => mapAttributeRowsFromState(locationState?.attributes));
+  const [mdBonusAdjustments, setMdBonusAdjustments] = useState(() => MD_BONUS_ROWS.map(() => ({ itemBonus: '0', specialBonus: '0' })));
   const [raceBonusError, setRaceBonusError] = useState<string | null>(null);
   const [raceBonusLoading, setRaceBonusLoading] = useState(false);
   const [skillRows, setSkillRows] = useState<SkillRowState[]>(() =>
-    SKILL_DEFINITIONS.map(() => ({
-      levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-      itemBonus: '0',
-      specialBonus: '0',
-      classBonus: 0,
-      levelBonus: 0
-    }))
+    SKILL_DEFINITIONS.map((definition) => {
+      const isHpMax = definition.name === HP_MAX_SKILL_NAME;
+      return {
+        levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+        itemBonus: '0',
+        specialBonus: getDefaultSpecialBonus(definition.name),
+        classBonus: 0,
+        levelBonus: isHpMax ? 0 : -25,
+        manualLevelInput: isHpMax ? '0' : '-25'
+      };
+    })
   );
+  const characterLevel = 1;
 
   useEffect(() => {
     document.title = 'Character Creation – Early Years';
@@ -411,7 +458,7 @@ export default function CreateCharacterEarlyYears() {
 
   const armorOptions = useMemo(() => [
     { value: '', label: 'Select…' },
-    ...((meta.armorTypes ?? []).map((value) => ({ value, label: formatOptionLabel(value) })))
+    ...([...(meta.armorTypes ?? [])].reverse().map((value) => ({ value, label: formatOptionLabel(value) })))
   ], [meta.armorTypes]);
 
   const attributeRowMap = useMemo(() => {
@@ -423,21 +470,19 @@ export default function CreateCharacterEarlyYears() {
   }, [attributeRows]);
 
   const skillDisplayRows = useMemo(() => {
-    const parseBonusValue = (input: string): number => {
-      if (typeof input !== 'string' || input.trim().length === 0) {
-        return 0;
-      }
-      const parsed = Number.parseInt(input, 10);
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-
     return SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
-      const state = skillRows[definition.stateIndex] ?? {
+      const isHpMaxSkill = definition.name === HP_MAX_SKILL_NAME;
+      const baseState = skillRows[definition.stateIndex] ?? {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: '0',
         classBonus: 0,
-        levelBonus: 0
+        levelBonus: isHpMaxSkill ? 0 : -25,
+        manualLevelInput: isHpMaxSkill ? '0' : '-25'
+      };
+      const state = {
+        ...baseState,
+        levels: getSkillLevelArray(baseState.levels, definition)
       };
 
       const attributeRow = definition.attributeKey === 'XX'
@@ -448,11 +493,17 @@ export default function CreateCharacterEarlyYears() {
         ? attributeRow.totalBonus ?? attributeRow.normalBonus ?? 0
         : 0;
 
-      const levelBonus = Number.isFinite(state.levelBonus) ? state.levelBonus : 0;
+      const storedLevelBonus = Number.isFinite(state.levelBonus)
+        ? state.levelBonus
+        : isHpMaxSkill
+          ? 0
+          : -25;
       const levelCount = state.levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
-      const itemBonus = parseBonusValue(state.itemBonus);
-      const specialBonus = parseBonusValue(state.specialBonus);
-      const classBonus = state.classBonus;
+      const levelBonus = isHpMaxSkill ? storedLevelBonus : levelCount === 0 ? -25 : storedLevelBonus;
+      const itemBonus = parseBonusInput(state.itemBonus);
+      const specialBonus = parseBonusInput(state.specialBonus);
+      const classBonusRaw = state.classBonus;
+      const classBonus = classBonusRaw * characterLevel;
       const totalBonus = levelBonus + attributeBonus + classBonus + itemBonus + specialBonus;
 
       return {
@@ -471,13 +522,14 @@ export default function CreateCharacterEarlyYears() {
   }, [attributeRowMap, skillRows]);
 
   const mdBonusRows = useMemo(() => {
-    return MD_BONUS_ROWS.map((row) => {
+    return MD_BONUS_ROWS.map((row, index) => {
       const attribute = attributeRowMap.get(row.attribute);
       const attributeBonus = attribute
         ? attribute.totalBonus ?? attribute.normalBonus ?? 0
         : 0;
-      const itemBonus = 0;
-      const specialBonus = 0;
+      const adjustment = mdBonusAdjustments[index] ?? { itemBonus: '0', specialBonus: '0' };
+      const itemBonus = parseBonusInput(adjustment.itemBonus);
+      const specialBonus = parseBonusInput(adjustment.specialBonus);
       const totalBonus = attributeBonus + itemBonus + specialBonus;
       return {
         label: row.label,
@@ -485,10 +537,12 @@ export default function CreateCharacterEarlyYears() {
         attributeBonus,
         itemBonus,
         specialBonus,
-        totalBonus
+        totalBonus,
+        itemBonusInput: adjustment.itemBonus,
+        specialBonusInput: adjustment.specialBonus
       };
     });
-  }, [attributeRowMap]);
+  }, [attributeRowMap, mdBonusAdjustments]);
 
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
     setBaseData((prev) => ({ ...prev, [key]: value }));
@@ -517,6 +571,13 @@ export default function CreateCharacterEarlyYears() {
         next.learnt = false;
       }
       return next;
+    }));
+  }
+
+  function handleMdBonusChange(index: number, key: 'itemBonus' | 'specialBonus', value: string) {
+    setMdBonusAdjustments((prev) => prev.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      return { ...row, [key]: value };
     }));
   }
 
@@ -566,14 +627,26 @@ export default function CreateCharacterEarlyYears() {
       const assignment = assignments[index];
       const count = assignment?.count ?? 0;
       const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, levelIndex) => levelIndex < count);
+      const isHpMax = assignment?.definition.name === HP_MAX_SKILL_NAME;
+      if (isHpMax) {
+        return {
+          ...row,
+          levels
+        };
+      }
+
+      const resolvedBonus = count === 0 ? -25 : 0;
       return {
         ...row,
         levels,
-        levelBonus: 0
+        levelBonus: resolvedBonus
       };
     }));
 
     assignments.forEach(({ definition, count }) => {
+      if (definition.name === HP_MAX_SKILL_NAME) {
+        return;
+      }
       if (count > 0) {
         void fetchSkillLevelBonus(definition.stateIndex, definition.name, count);
       }
@@ -581,6 +654,9 @@ export default function CreateCharacterEarlyYears() {
   }
 
   async function fetchSkillLevelBonus(skillIndex: number, skillName: string, levelCount: number) {
+    if (skillName === HP_MAX_SKILL_NAME) {
+      return;
+    }
     const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(skillName, levelCount);
     try {
       const response = await fetch(endpoint);
@@ -594,26 +670,51 @@ export default function CreateCharacterEarlyYears() {
       }
 
       setSkillRows((prev) => {
-        const row = prev[skillIndex];
-        if (!row) return prev;
-        const currentCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        const currentRow = prev[skillIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
         if (currentCount !== levelCount) {
           return prev;
         }
-        return prev.map((item, index) => (index === skillIndex ? { ...item, levelBonus: bonus } : item));
+        const resolvedBonus = levelCount === 0 ? -25 : bonus;
+        return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: resolvedBonus } : row));
       });
     } catch (error) {
       console.warn('Failed to fetch skill level bonus', error);
       setSkillRows((prev) => {
-        const row = prev[skillIndex];
-        if (!row) return prev;
-        const currentCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        const currentRow = prev[skillIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
         if (currentCount !== levelCount) {
           return prev;
         }
-        return prev.map((item, index) => (index === skillIndex ? { ...item, levelBonus: 0 } : item));
+        const fallbackBonus = levelCount === 0 ? -25 : 0;
+        return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: fallbackBonus } : row));
       });
     }
+  }
+
+  function handleSkillLevelBonusChange(skillIndex: number, value: string) {
+    const definition = SKILL_DEFINITIONS_WITH_INDEX[skillIndex];
+    if (!definition || definition.name !== HP_MAX_SKILL_NAME) {
+      return;
+    }
+    const trimmed = value.trim();
+    const sanitized = trimmed.length === 0 ? '0' : trimmed;
+    const parsed = Number.parseInt(sanitized, 10);
+    const resolvedBonus = Number.isFinite(parsed) ? parsed : 0;
+    setSkillRows((prev) => prev.map((row, index) => {
+      if (index !== skillIndex) return row;
+      return {
+        ...row,
+        manualLevelInput: sanitized,
+        levelBonus: resolvedBonus
+      };
+    }));
   }
 
   function handleSkillLevelToggle(skillIndex: number, levelIndex: number, checked: boolean) {
@@ -629,18 +730,23 @@ export default function CreateCharacterEarlyYears() {
 
     setSkillRows((prev) => prev.map((row, index) => {
       if (index !== skillIndex) return row;
+      const isHpMax = definition.name === HP_MAX_SKILL_NAME;
+      const nextLevelBonus = levelCount === 0
+        ? isHpMax
+          ? 0
+          : -25
+        : row.levelBonus;
       return {
         ...row,
         levels: nextLevels,
-        levelBonus: levelCount === 0 ? 0 : row.levelBonus
+        levelBonus: nextLevelBonus,
+        manualLevelInput: isHpMax ? String(nextLevelBonus) : row.manualLevelInput
       };
     }));
 
-    if (levelCount === 0) {
-      return;
+    if (definition.name !== HP_MAX_SKILL_NAME) {
+      void fetchSkillLevelBonus(skillIndex, definition.name, levelCount);
     }
-
-    void fetchSkillLevelBonus(skillIndex, definition.name, levelCount);
   }
 
   function handleSkillBonusChange(skillIndex: number, key: 'itemBonus' | 'specialBonus', value: string) {
@@ -669,12 +775,17 @@ export default function CreateCharacterEarlyYears() {
           totalBonus: row.normalBonus != null ? normal : row.totalBonus
         };
       }));
-      setSkillRows((prev) => prev.map((row) => ({
-        ...row,
-        levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-        levelBonus: 0,
-        classBonus: 0
-      })));
+      setSkillRows((prev) => prev.map((row, index) => {
+        const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
+        const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+        return {
+          ...row,
+          levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+          levelBonus: isHpMax ? 0 : -25,
+          classBonus: 0,
+          manualLevelInput: isHpMax ? '0' : row.manualLevelInput
+        };
+      }));
       return;
     }
 
@@ -720,12 +831,17 @@ export default function CreateCharacterEarlyYears() {
         if (cancelled) return;
 
         if (childhoodResponse.status === 404) {
-          setSkillRows((prev) => prev.map((row) => ({
-            ...row,
-            levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-            levelBonus: 0,
-            classBonus: row.classBonus
-          })));
+          setSkillRows((prev) => prev.map((row, index) => {
+            const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
+            const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+            return {
+              ...row,
+              levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+              levelBonus: isHpMax ? 0 : -25,
+              classBonus: row.classBonus,
+              manualLevelInput: isHpMax ? '0' : row.manualLevelInput
+            };
+          }));
         } else if (!childhoodResponse.ok) {
           throw new Error(`Failed to load childhood skills for ${raceKey}`);
         } else {
@@ -737,12 +853,17 @@ export default function CreateCharacterEarlyYears() {
           setRaceBonusError(error instanceof Error ? error.message : 'Failed to load race bonuses.');
         }
         if (!cancelled) {
-          setSkillRows((prev) => prev.map((row) => ({
-            ...row,
-            levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-            levelBonus: 0,
-            classBonus: row.classBonus
-          })));
+          setSkillRows((prev) => prev.map((row, index) => {
+            const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
+            const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+            return {
+              ...row,
+              levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+              levelBonus: isHpMax ? 0 : -25,
+              classBonus: row.classBonus,
+              manualLevelInput: isHpMax ? '0' : row.manualLevelInput
+            };
+          }));
         }
       } finally {
         if (!cancelled) {
@@ -754,7 +875,7 @@ export default function CreateCharacterEarlyYears() {
     return () => {
       cancelled = true;
     };
-  }, [baseData.race]);
+  }, [baseData.race, meta.races]);
 
   useEffect(() => {
     const classKey = baseData.playerClass?.trim();
@@ -935,6 +1056,29 @@ export default function CreateCharacterEarlyYears() {
             text-align: left;
             color: ${COLORS.textPrimary ?? '#123066'};
           }
+          .panel td.center,
+          .panel th.center {
+            text-align: center;
+          }
+          .panel-table .panel-bonus-input {
+            width: 72px;
+            box-sizing: border-box;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid ${COLORS.border};
+            font-size: 14px;
+            color: ${COLORS.textPrimary};
+            background: #fff;
+            text-align: center;
+          }
+          .panel-table .panel-bonus-input::-webkit-outer-spin-button,
+          .panel-table .panel-bonus-input::-webkit-inner-spin-button {
+            margin: 0;
+            -webkit-appearance: none;
+          }
+          .panel-table .panel-bonus-input {
+            -moz-appearance: textfield;
+          }
           .panel tbody th {
             background: rgba(47,85,151,0.08);
             width: 40%;
@@ -949,14 +1093,47 @@ export default function CreateCharacterEarlyYears() {
             font-weight: 600;
           }
           .base-data-form {
-            display: grid;
+            display: flex;
+            flex-direction: column;
             gap: 12px;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          }
+          .base-data-row {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .base-data-row-single {
+            flex-wrap: nowrap;
+          }
+          .base-data-row-single .field {
+            flex: 1 1 0;
+          }
+          .base-data-row:not(.base-data-row-single) {
+            flex-wrap: nowrap;
+          }
+          .base-data-row:not(.base-data-row-single) .field {
+            flex: 1 1 0;
+            min-width: 0;
           }
           .field {
             display: flex;
             flex-direction: column;
             gap: 4px;
+          }
+          .field.field-inline {
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+          }
+          .field.field-inline label {
+            min-width: 72px;
+          }
+          .field.field-inline input,
+          .field.field-inline select {
+            width: 200px;
+            flex: 0 0 200px;
+            box-sizing: border-box;
           }
           .field label {
             font-size: 13px;
@@ -1070,10 +1247,19 @@ export default function CreateCharacterEarlyYears() {
           .skill-table th,
           .skill-table td {
             border: 1px solid ${COLORS.border};
-            padding: 6px 8px;
+            padding: 4px 6px;
             background: #fff;
             color: ${COLORS.textPrimary};
             vertical-align: top;
+          }
+          .skill-table td.middle {
+            vertical-align: middle;
+          }
+          .skill-table td.center {
+            text-align: center;
+          }
+          .skill-table td.center .skill-bonus-input {
+            text-align: center;
           }
           .skill-table thead th {
             background: ${COLORS.primary};
@@ -1104,11 +1290,11 @@ export default function CreateCharacterEarlyYears() {
           .skill-levels {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 3px;
           }
           .skill-levels label {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1164,178 +1350,198 @@ export default function CreateCharacterEarlyYears() {
             {metaLoading && <p className="meta-state">Loading metadata…</p>}
             {metaError && <p className="meta-state error">{metaError}</p>}
             <div className="base-data-form">
-              <div className="field span-2">
-                <label htmlFor="base-character-id">Character ID</label>
-                <select
-                  id="base-character-id"
-                  value={baseData.characterId}
-                  onChange={(event) => handleBaseDataChange('characterId', event.target.value)}
-                >
-                  {CHARACTER_ID_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="base-data-row base-data-row-single base-data-row-id">
+                <div className="field">
+                  <label htmlFor="base-character-id">Character ID</label>
+                  <select
+                    id="base-character-id"
+                    value={baseData.characterId}
+                    onChange={(event) => handleBaseDataChange('characterId', event.target.value)}
+                  >
+                    {CHARACTER_ID_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-name">Name</label>
-                <input
-                  id="base-name"
-                  type="text"
-                  value={baseData.name}
-                  onChange={(event) => handleBaseDataChange('name', event.target.value)}
-                  placeholder="Character name"
-                />
+              <div className="base-data-row">
+                <div className="field">
+                  <label htmlFor="base-name">Name</label>
+                  <input
+                    id="base-name"
+                    type="text"
+                    value={baseData.name}
+                    onChange={(event) => handleBaseDataChange('name', event.target.value)}
+                    placeholder="Character name"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="base-gender">Gender</label>
+                  <select
+                    id="base-gender"
+                    value={baseData.gender}
+                    onChange={(event) => handleBaseDataChange('gender', event.target.value)}
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-gender">Gender</label>
-                <select
-                  id="base-gender"
-                  value={baseData.gender}
-                  onChange={(event) => handleBaseDataChange('gender', event.target.value)}
-                >
-                  {genderOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="base-data-row">
+                <div className="field">
+                  <label htmlFor="base-race">Race</label>
+                  <select
+                    id="base-race"
+                    value={baseData.race}
+                    onChange={(event) => handleBaseDataChange('race', event.target.value)}
+                  >
+                    {raceOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="base-class">Class</label>
+                  <select
+                    id="base-class"
+                    value={baseData.playerClass}
+                    onChange={(event) => handleBaseDataChange('playerClass', event.target.value)}
+                  >
+                    {classOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-race">Race</label>
-                <select
-                  id="base-race"
-                  value={baseData.race}
-                  onChange={(event) => handleBaseDataChange('race', event.target.value)}
-                >
-                  {raceOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="base-data-row">
+                <div className="field">
+                  <label htmlFor="base-magic-school">Magic School</label>
+                  <select
+                    id="base-magic-school"
+                    value={baseData.magicSchool}
+                    onChange={(event) => handleBaseDataChange('magicSchool', event.target.value)}
+                  >
+                    {MAGIC_SCHOOL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="base-age">Age</label>
+                  <input
+                    id="base-age"
+                    type="number"
+                    min={0}
+                    value={baseData.age}
+                    onChange={(event) => handleBaseDataChange('age', event.target.value)}
+                    placeholder="Years"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-class">Class</label>
-                <select
-                  id="base-class"
-                  value={baseData.playerClass}
-                  onChange={(event) => handleBaseDataChange('playerClass', event.target.value)}
-                >
-                  {classOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="base-data-row">
+                <div className="field">
+                  <label htmlFor="base-height">Height</label>
+                  <input
+                    id="base-height"
+                    type="number"
+                    min={0}
+                    value={baseData.height}
+                    onChange={(event) => handleBaseDataChange('height', event.target.value)}
+                    placeholder="cm"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="base-weight">Weight</label>
+                  <input
+                    id="base-weight"
+                    type="number"
+                    min={0}
+                    value={baseData.weight}
+                    onChange={(event) => handleBaseDataChange('weight', event.target.value)}
+                    placeholder="kg"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-magic-school">Magic School</label>
-                <select
-                  id="base-magic-school"
-                  value={baseData.magicSchool}
-                  onChange={(event) => handleBaseDataChange('magicSchool', event.target.value)}
-                >
-                  {MAGIC_SCHOOL_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <div className="base-data-row">
+                <div className="field">
+                  <label htmlFor="base-hair">Hair</label>
+                  <input
+                    id="base-hair"
+                    type="text"
+                    value={baseData.hair}
+                    onChange={(event) => handleBaseDataChange('hair', event.target.value)}
+                    placeholder="Colour / style"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="base-eyes">Eyes</label>
+                  <input
+                    id="base-eyes"
+                    type="text"
+                    value={baseData.eyes}
+                    onChange={(event) => handleBaseDataChange('eyes', event.target.value)}
+                    placeholder="Colour"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-age">Age</label>
-                <input
-                  id="base-age"
-                  type="number"
-                  min={0}
-                  value={baseData.age}
-                  onChange={(event) => handleBaseDataChange('age', event.target.value)}
-                  placeholder="Years"
-                />
+              <div className="base-data-row base-data-row-single">
+                <div className="field">
+                  <label htmlFor="base-personality">Personality</label>
+                  <input
+                    id="base-personality"
+                    type="text"
+                    value={baseData.personality}
+                    onChange={(event) => handleBaseDataChange('personality', event.target.value)}
+                    placeholder="Key personality traits"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-height">Height</label>
-                <input
-                  id="base-height"
-                  type="number"
-                  min={0}
-                  value={baseData.height}
-                  onChange={(event) => handleBaseDataChange('height', event.target.value)}
-                  placeholder="cm"
-                />
+              <div className="base-data-row base-data-row-single">
+                <div className="field">
+                  <label htmlFor="base-alignment">Alignment</label>
+                  <input
+                    id="base-alignment"
+                    type="text"
+                    value={baseData.alignment}
+                    onChange={(event) => handleBaseDataChange('alignment', event.target.value)}
+                    placeholder="Alignment"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-weight">Weight</label>
-                <input
-                  id="base-weight"
-                  type="number"
-                  min={0}
-                  value={baseData.weight}
-                  onChange={(event) => handleBaseDataChange('weight', event.target.value)}
-                  placeholder="kg"
-                />
+              <div className="base-data-row base-data-row-single">
+                <div className="field">
+                  <label htmlFor="base-motivation">Motivation</label>
+                  <input
+                    id="base-motivation"
+                    type="text"
+                    value={baseData.motivation}
+                    onChange={(event) => handleBaseDataChange('motivation', event.target.value)}
+                    placeholder="Primary motivation"
+                  />
+                </div>
               </div>
-              <div className="field">
-                <label htmlFor="base-hair">Hair</label>
-                <input
-                  id="base-hair"
-                  type="text"
-                  value={baseData.hair}
-                  onChange={(event) => handleBaseDataChange('hair', event.target.value)}
-                  placeholder="Colour / style"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="base-eyes">Eyes</label>
-                <input
-                  id="base-eyes"
-                  type="text"
-                  value={baseData.eyes}
-                  onChange={(event) => handleBaseDataChange('eyes', event.target.value)}
-                  placeholder="Colour"
-                />
-              </div>
-              <div className="field span-2">
-                <label htmlFor="base-personality">Personality</label>
-                <input
-                  id="base-personality"
-                  type="text"
-                  value={baseData.personality}
-                  onChange={(event) => handleBaseDataChange('personality', event.target.value)}
-                  placeholder="Key personality traits"
-                />
-              </div>
-              <div className="field span-2">
-                <label htmlFor="base-alignment">Alignment</label>
-                <input
-                  id="base-alignment"
-                  type="text"
-                  value={baseData.alignment}
-                  onChange={(event) => handleBaseDataChange('alignment', event.target.value)}
-                  placeholder="Alignment"
-                />
-              </div>
-              <div className="field span-2">
-                <label htmlFor="base-motivation">Motivation</label>
-                <input
-                  id="base-motivation"
-                  type="text"
-                  value={baseData.motivation}
-                  onChange={(event) => handleBaseDataChange('motivation', event.target.value)}
-                  placeholder="Primary motivation"
-                />
-              </div>
-              <div className="field span-2">
-                <label htmlFor="base-specialty">Specialty</label>
-                <input
-                  id="base-specialty"
-                  type="text"
-                  value={baseData.specialty}
-                  onChange={(event) => handleBaseDataChange('specialty', event.target.value)}
-                  placeholder="Notable specialty"
-                />
+              <div className="base-data-row base-data-row-single">
+                <div className="field">
+                  <label htmlFor="base-specialty">Specialty</label>
+                  <input
+                    id="base-specialty"
+                    type="text"
+                    value={baseData.specialty}
+                    onChange={(event) => handleBaseDataChange('specialty', event.target.value)}
+                    placeholder="Notable specialty"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -1434,20 +1640,20 @@ export default function CreateCharacterEarlyYears() {
               <thead>
                 <tr>
                   <th>Attribute</th>
-                  <th>Base</th>
-                  <th>Normal Bonus</th>
-                  <th>Race Bonus</th>
-                  <th>Total</th>
+                  <th className="center">Base</th>
+                  <th className="center">Normal Bonus</th>
+                  <th className="center">Race Bonus</th>
+                  <th className="center">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {attributeRows.map((row) => (
                   <tr key={row.attribute}>
-                    <td>{row.attribute}</td>
-                    <td>{row.baseValue ?? '—'}</td>
-                    <td>{row.normalBonus ?? '—'}</td>
-                    <td>{row.raceBonus ?? (row.normalBonus == null && row.totalBonus == null ? '—' : 0)}</td>
-                    <td>{row.totalBonus ?? (row.normalBonus ?? '—')}</td>
+                    <td><strong>{row.attribute}</strong></td>
+                    <td className="center">{row.baseValue ?? '—'}</td>
+                    <td className="center">{row.normalBonus ?? '—'}</td>
+                    <td className="center">{row.raceBonus ?? (row.normalBonus == null && row.totalBonus == null ? '—' : 0)}</td>
+                    <td className="center"><strong>{row.totalBonus ?? (row.normalBonus ?? '—')}</strong></td>
                   </tr>
                 ))}
               </tbody>
@@ -1457,15 +1663,15 @@ export default function CreateCharacterEarlyYears() {
           </section>
           <section className="panel">
             <h3>Level, XP &amp; Bonuses</h3>
-            <div className="field">
+            <div className="field field-inline">
               <label htmlFor="summary-level">Level</label>
-              <input id="summary-level" type="number" value={1} readOnly style={{ background: '#f0f3f8' }} />
+              <input id="summary-level" type="number" value={characterLevel} readOnly style={{ background: '#f0f3f8' }} />
             </div>
-            <div className="field">
+            <div className="field field-inline">
               <label htmlFor="summary-xp">XP</label>
               <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
             </div>
-            <div className="field">
+            <div className="field field-inline">
               <label htmlFor="summary-armor">Armor</label>
               <select
                 id="summary-armor"
@@ -1483,25 +1689,39 @@ export default function CreateCharacterEarlyYears() {
               <thead>
                 <tr>
                   <th>Bonus</th>
-                  <th>Attribute bonus</th>
-                  <th>Item bonus</th>
-                  <th>Special bonus</th>
-                  <th>Total bonus</th>
+                  <th className="center">Attribute bonus</th>
+                  <th className="center">Item bonus</th>
+                  <th className="center">Special bonus</th>
+                  <th className="center">Total bonus</th>
                 </tr>
               </thead>
               <tbody>
                 {mdBonusRows.map((row) => (
                   <tr key={row.label}>
                     <th scope="row">{row.label}</th>
-                    <td>
+                    <td className="center">
                       <div className="skill-attribute">
                         <span>{row.attributeKey}</span>
                         <span>{formatSigned(row.attributeBonus)}</span>
                       </div>
                     </td>
-                    <td className="right">{formatSigned(row.itemBonus)}</td>
-                    <td className="right">{formatSigned(row.specialBonus)}</td>
-                    <td className="right">{formatSigned(row.totalBonus)}</td>
+                    <td className="center">
+                      <input
+                        type="number"
+                        className="panel-bonus-input"
+                        value={row.itemBonusInput}
+                        onChange={(event) => handleMdBonusChange(row.label === row.label ? mdBonusRows.findIndex((entry) => entry.label === row.label) : -1, 'itemBonus', event.target.value)}
+                      />
+                    </td>
+                    <td className="center">
+                      <input
+                        type="number"
+                        className="panel-bonus-input"
+                        value={row.specialBonusInput}
+                        onChange={(event) => handleMdBonusChange(mdBonusRows.findIndex((entry) => entry.label === row.label), 'specialBonus', event.target.value)}
+                      />
+                    </td>
+                    <td className="center"><strong>{formatSigned(row.totalBonus)}</strong></td>
                   </tr>
                 ))}
               </tbody>
@@ -1520,12 +1740,12 @@ export default function CreateCharacterEarlyYears() {
                 <tr>
                   <th style={{ width: '12%' }}>Skill</th>
                   <th style={{ width: '28%' }}>Levels</th>
-                  <th style={{ width: '5%' }}>Level Bonus</th>
-                  <th style={{ width: '5%' }}>Attribute Bonus</th>
-                  <th style={{ width: '5%' }}>Class Bonus</th>
-                  <th style={{ width: '5%' }}>Item Bonus</th>
-                  <th style={{ width: '5%' }}>Special Bonus</th>
-                  <th style={{ width: '5%' }}>Total Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Level Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Attribute Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Class Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Item Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Special Bonus</th>
+                  <th style={{ width: '5%' }} className="center">Total Bonus</th>
                 </tr>
               </thead>
               <tbody>
@@ -1555,15 +1775,27 @@ export default function CreateCharacterEarlyYears() {
                               ))}
                             </div>
                           </td>
-                          <td>{row.levelBonus}</td>
+                          <td className="center">
+                            {row.definition.name === HP_MAX_SKILL_NAME ? (
+                              <input
+                                type="number"
+                                className="skill-bonus-input"
+                                value={row.state.manualLevelInput}
+                                onChange={(event) => handleSkillLevelBonusChange(row.definition.stateIndex, event.target.value)}
+                                aria-label={`${row.definition.name} level bonus`}
+                              />
+                            ) : (
+                              row.levelBonus
+                            )}
+                          </td>
                           <td>
                             <div className="skill-attribute">
                               <span>{row.definition.attributeKey}</span>
                               <span>{formatSigned(row.attributeBonus)}</span>
                             </div>
                           </td>
-                          <td>{row.classBonus}</td>
-                          <td>
+                          <td className="center">{row.classBonus}</td>
+                          <td className="center">
                             <input
                               type="number"
                               className="skill-bonus-input"
@@ -1571,7 +1803,7 @@ export default function CreateCharacterEarlyYears() {
                               onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'itemBonus', event.target.value)}
                             />
                           </td>
-                          <td>
+                          <td className="center">
                             <input
                               type="number"
                               className="skill-bonus-input"
@@ -1579,7 +1811,7 @@ export default function CreateCharacterEarlyYears() {
                               onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'specialBonus', event.target.value)}
                             />
                           </td>
-                          <td>{row.totalBonus}</td>
+                          <td className="center middle"><strong>{row.totalBonus}</strong></td>
                         </tr>
                       ))}
                       {groupIndex < SKILLS_BY_CATEGORY.length - 1 && (
