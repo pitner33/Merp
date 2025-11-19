@@ -113,6 +113,17 @@ function getSkillLevelArray(levels: boolean[], definition: SkillDefinitionWithIn
   return levels.slice(0, cap);
 }
 
+const ZERO_LEVEL_BONUS_OVERRIDE_SKILLS = new Set<string>([HP_MAX_SKILL_NAME, 'VB']);
+const LOCKED_SKILLS = new Set<string>(['Base magic']);
+
+function isSkillLocked(skillName: string): boolean {
+  return LOCKED_SKILLS.has(skillName);
+}
+
+function getZeroLevelBonus(skillName: string): number {
+  return ZERO_LEVEL_BONUS_OVERRIDE_SKILLS.has(skillName) ? 0 : -25;
+}
+
 const MD_BONUS_ROWS: readonly { label: string; attribute: AttributeKey }[] = [
   { label: 'Essence MD bonus', attribute: 'IQ' },
   { label: 'Chanelling MD bonus', attribute: 'IT' },
@@ -321,13 +332,14 @@ export default function CreateCharacterEarlyYears() {
   const [skillRows, setSkillRows] = useState<SkillRowState[]>(() =>
     SKILL_DEFINITIONS.map((definition) => {
       const isHpMax = definition.name === HP_MAX_SKILL_NAME;
+      const zeroLevelBonus = getZeroLevelBonus(definition.name);
       return {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: getDefaultSpecialBonus(definition.name),
         classBonus: 0,
-        levelBonus: isHpMax ? 0 : -25,
-        manualLevelInput: isHpMax ? '0' : '-25'
+        levelBonus: zeroLevelBonus,
+        manualLevelInput: isHpMax ? '0' : String(zeroLevelBonus)
       };
     })
   );
@@ -472,17 +484,21 @@ export default function CreateCharacterEarlyYears() {
   const skillDisplayRows = useMemo(() => {
     return SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
       const isHpMaxSkill = definition.name === HP_MAX_SKILL_NAME;
+      const zeroLevelBonus = getZeroLevelBonus(definition.name);
       const baseState = skillRows[definition.stateIndex] ?? {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: '0',
         classBonus: 0,
-        levelBonus: isHpMaxSkill ? 0 : -25,
-        manualLevelInput: isHpMaxSkill ? '0' : '-25'
+        levelBonus: zeroLevelBonus,
+        manualLevelInput: isHpMaxSkill ? '0' : String(zeroLevelBonus)
       };
+      const locked = isSkillLocked(definition.name);
+      const cappedLevels = getSkillLevelArray(baseState.levels, definition);
+      const levels = locked ? Array.from({ length: SKILL_LEVEL_COUNT }, () => false) : cappedLevels;
       const state = {
         ...baseState,
-        levels: getSkillLevelArray(baseState.levels, definition)
+        levels
       };
 
       const attributeRow = definition.attributeKey === 'XX'
@@ -495,16 +511,21 @@ export default function CreateCharacterEarlyYears() {
 
       const storedLevelBonus = Number.isFinite(state.levelBonus)
         ? state.levelBonus
+        : zeroLevelBonus;
+      const levelCount = levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
+      const levelBonusValue = locked
+        ? 0
         : isHpMaxSkill
-          ? 0
-          : -25;
-      const levelCount = state.levels.reduce<number>((total, checked) => (checked ? total + 1 : total), 0);
-      const levelBonus = isHpMaxSkill ? storedLevelBonus : levelCount === 0 ? -25 : storedLevelBonus;
+          ? storedLevelBonus
+          : levelCount === 0
+            ? zeroLevelBonus
+            : storedLevelBonus;
+      const levelBonusDisplay = locked ? '' : levelBonusValue;
       const itemBonus = parseBonusInput(state.itemBonus);
       const specialBonus = parseBonusInput(state.specialBonus);
       const classBonusRaw = state.classBonus;
       const classBonus = classBonusRaw * characterLevel;
-      const totalBonus = levelBonus + attributeBonus + classBonus + itemBonus + specialBonus;
+      const totalBonus = levelBonusValue + attributeBonus + classBonus + itemBonus + specialBonus;
 
       return {
         definition,
@@ -512,7 +533,8 @@ export default function CreateCharacterEarlyYears() {
         attributeBonus,
         attributeRow,
         levelCount,
-        levelBonus,
+        levelBonus: levelBonusValue,
+        levelBonusDisplay,
         itemBonus,
         specialBonus,
         classBonus,
@@ -628,6 +650,8 @@ export default function CreateCharacterEarlyYears() {
       const count = assignment?.count ?? 0;
       const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, levelIndex) => levelIndex < count);
       const isHpMax = assignment?.definition.name === HP_MAX_SKILL_NAME;
+      const locked = assignment ? isSkillLocked(assignment.definition.name) : false;
+      const zeroLevelBonus = assignment ? getZeroLevelBonus(assignment.definition.name) : -25;
       if (isHpMax) {
         return {
           ...row,
@@ -635,16 +659,19 @@ export default function CreateCharacterEarlyYears() {
         };
       }
 
-      const resolvedBonus = count === 0 ? -25 : 0;
+      const resolvedBonus = count === 0 ? zeroLevelBonus : 0;
       return {
         ...row,
-        levels,
+        levels: locked ? Array.from({ length: SKILL_LEVEL_COUNT }, () => false) : levels,
         levelBonus: resolvedBonus
       };
     }));
 
     assignments.forEach(({ definition, count }) => {
       if (definition.name === HP_MAX_SKILL_NAME) {
+        return;
+      }
+      if (isSkillLocked(definition.name)) {
         return;
       }
       if (count > 0) {
@@ -655,6 +682,9 @@ export default function CreateCharacterEarlyYears() {
 
   async function fetchSkillLevelBonus(skillIndex: number, skillName: string, levelCount: number) {
     if (skillName === HP_MAX_SKILL_NAME) {
+      return;
+    }
+    if (isSkillLocked(skillName)) {
       return;
     }
     const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(skillName, levelCount);
@@ -678,7 +708,7 @@ export default function CreateCharacterEarlyYears() {
         if (currentCount !== levelCount) {
           return prev;
         }
-        const resolvedBonus = levelCount === 0 ? -25 : bonus;
+        const resolvedBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : bonus;
         return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: resolvedBonus } : row));
       });
     } catch (error) {
@@ -692,7 +722,7 @@ export default function CreateCharacterEarlyYears() {
         if (currentCount !== levelCount) {
           return prev;
         }
-        const fallbackBonus = levelCount === 0 ? -25 : 0;
+        const fallbackBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : 0;
         return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: fallbackBonus } : row));
       });
     }
@@ -724,6 +754,10 @@ export default function CreateCharacterEarlyYears() {
       return;
     }
 
+    if (isSkillLocked(definition.name)) {
+      return;
+    }
+
     const nextLevels = [...currentRow.levels];
     nextLevels[levelIndex] = checked;
     const levelCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
@@ -731,10 +765,9 @@ export default function CreateCharacterEarlyYears() {
     setSkillRows((prev) => prev.map((row, index) => {
       if (index !== skillIndex) return row;
       const isHpMax = definition.name === HP_MAX_SKILL_NAME;
+      const zeroLevelBonus = getZeroLevelBonus(definition.name);
       const nextLevelBonus = levelCount === 0
-        ? isHpMax
-          ? 0
-          : -25
+        ? zeroLevelBonus
         : row.levelBonus;
       return {
         ...row,
@@ -778,10 +811,11 @@ export default function CreateCharacterEarlyYears() {
       setSkillRows((prev) => prev.map((row, index) => {
         const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
         const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+        const zeroLevelBonus = definition ? getZeroLevelBonus(definition.name) : -25;
         return {
           ...row,
           levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-          levelBonus: isHpMax ? 0 : -25,
+          levelBonus: zeroLevelBonus,
           classBonus: 0,
           manualLevelInput: isHpMax ? '0' : row.manualLevelInput
         };
@@ -834,10 +868,11 @@ export default function CreateCharacterEarlyYears() {
           setSkillRows((prev) => prev.map((row, index) => {
             const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
             const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+            const zeroLevelBonus = definition ? getZeroLevelBonus(definition.name) : -25;
             return {
               ...row,
               levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-              levelBonus: isHpMax ? 0 : -25,
+              levelBonus: zeroLevelBonus,
               classBonus: row.classBonus,
               manualLevelInput: isHpMax ? '0' : row.manualLevelInput
             };
@@ -856,10 +891,12 @@ export default function CreateCharacterEarlyYears() {
           setSkillRows((prev) => prev.map((row, index) => {
             const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
             const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
+            const zeroLevelBonus = definition ? getZeroLevelBonus(definition.name) : -25;
+            const locked = definition ? isSkillLocked(definition.name) : false;
             return {
               ...row,
-              levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-              levelBonus: isHpMax ? 0 : -25,
+              levels: locked ? Array.from({ length: SKILL_LEVEL_COUNT }, () => false) : Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+              levelBonus: zeroLevelBonus,
               classBonus: row.classBonus,
               manualLevelInput: isHpMax ? '0' : row.manualLevelInput
             };
@@ -954,8 +991,16 @@ export default function CreateCharacterEarlyYears() {
   }
 
   function handleNext() {
-    // TODO: wire up next phase when available
-    console.info('Proceed to next creation phase – coming soon.');
+    navigate('/create-character-levelup', {
+      state: {
+        fromEarlyYears: {
+          baseData,
+          attributeRows,
+          skillRows,
+          mdBonusAdjustments
+        }
+      }
+    });
   }
 
   return (
@@ -1761,19 +1806,24 @@ export default function CreateCharacterEarlyYears() {
                         <tr key={row.definition.name}>
                           <td>{row.definition.name}</td>
                           <td>
-                            <div className="skill-levels" aria-label={`${row.definition.name} levels`}>
-                              {row.state.levels.map((checked, levelIndex) => (
-                                <label key={levelIndex} htmlFor={`skill-${row.definition.stateIndex}-level-${levelIndex}`}>
-                                  <input
-                                    id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
-                                    aria-label={`Level ${levelIndex + 1}`}
-                                  />
-                                </label>
-                              ))}
-                            </div>
+                            {isSkillLocked(row.definition.name) ? (
+                              <span aria-hidden="true">—</span>
+                            ) : (
+                              <div className="skill-levels" aria-label={`${row.definition.name} levels`}>
+                                {row.state.levels.map((checked, levelIndex) => (
+                                  <label key={levelIndex} htmlFor={`skill-${row.definition.stateIndex}-level-${levelIndex}`}>
+                                    <input
+                                      id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={row.definition.name === HP_MAX_SKILL_NAME}
+                                      onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
+                                      aria-label={`Level ${levelIndex + 1}`}
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="center">
                             {row.definition.name === HP_MAX_SKILL_NAME ? (
@@ -1784,6 +1834,8 @@ export default function CreateCharacterEarlyYears() {
                                 onChange={(event) => handleSkillLevelBonusChange(row.definition.stateIndex, event.target.value)}
                                 aria-label={`${row.definition.name} level bonus`}
                               />
+                            ) : isSkillLocked(row.definition.name) ? (
+                              ''
                             ) : (
                               row.levelBonus
                             )}

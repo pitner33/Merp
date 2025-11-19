@@ -3,6 +3,7 @@ import './App.css';
 import EditPlayer from './pages/EditPlayer';
 import CreateCharacter from './pages/CreateCharacter';
 import CreateCharacterEarlyYears from './pages/CreateCharacterEarlyYears';
+import CreateCharacterLevelUp from './pages/CreateCharacterLevelUp';
 import Landing from './pages/Landing';
 import AdventureMain from './pages/AdventureMain';
 import AdventureFight from './pages/AdventureFight';
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/players/:id/edit" element={<EditPlayer />} />
         <Route path="/create-character" element={<CreateCharacter />} />
         <Route path="/create-character-early-years" element={<CreateCharacterEarlyYears />} />
+        <Route path="/create-character-levelup" element={<CreateCharacterLevelUp />} />
         <Route path="/adventure/main" element={<AdventureMain />} />
         <Route path="/adventure/fight" element={<AdventureFight />} />
         <Route path="/adventure/fight/round" element={<AdventureFightRound />} />
