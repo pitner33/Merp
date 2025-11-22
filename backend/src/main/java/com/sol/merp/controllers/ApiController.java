@@ -113,6 +113,18 @@ public class ApiController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
+    @GetMapping("/attributes/mana-bonuses/{value}")
+    public ResponseEntity<Integer> getManaBonusByValue(@PathVariable("value") int attributeValue) {
+        if (attributeValue <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+        OptionalInt result = normalBonusService.findManaBonusForValue(attributeValue);
+        if (result.isPresent()) {
+            return ResponseEntity.ok(result.getAsInt());
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
     @GetMapping("/attributes/childhood-skills/{raceKey}")
     public ResponseEntity<Map<String, Integer>> getChildhoodSkills(@PathVariable("raceKey") String raceKey) {
         if (raceKey == null || raceKey.trim().isEmpty()) {

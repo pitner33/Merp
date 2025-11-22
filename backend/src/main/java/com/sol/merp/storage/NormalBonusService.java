@@ -79,6 +79,37 @@ public class NormalBonusService {
         return OptionalInt.empty();
     }
 
+    public OptionalInt findManaBonusForValue(int attributeValue) {
+        if (attributeValue <= 0) {
+            return OptionalInt.empty();
+        }
+        String tableName = resolveTableName();
+        try {
+            Integer result = jdbc.query(
+                    "SELECT * FROM " + tableName + " WHERE ROW_KEY = ?",
+                    ps -> ps.setInt(1, attributeValue),
+                    rs -> {
+                        if (!rs.next()) {
+                            return null;
+                        }
+                        try {
+                            Integer value = parseInteger(safeTrim(rs.getString("COL2")));
+                            return value != null ? value : 0;
+                        } catch (SQLException sqlException) {
+                            logger.warn("Failed to process CHAR_NORMALBONUS mana row for value {}: {}", attributeValue, sqlException.getMessage());
+                            return 0;
+                        }
+                    }
+            );
+            if (result != null) {
+                return OptionalInt.of(result);
+            }
+        } catch (DataAccessException ex) {
+            logger.warn("Failed to load CHAR_NORMALBONUS mana entry for value {}: {}", attributeValue, ex.getMessage());
+        }
+        return OptionalInt.empty();
+    }
+
     private Integer parseInteger(String text) {
         if (text == null || text.isEmpty()) {
             return null;

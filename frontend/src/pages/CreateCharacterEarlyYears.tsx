@@ -233,6 +233,7 @@ const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bo
 const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) => `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
 const CHILDHOOD_SKILLS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/childhood-skills/${encodeURIComponent(raceKey)}`;
 const CLASS_BONUS_ENDPOINT = (classKey: string) => `${API_ROOT}/attributes/class-bonuses/${encodeURIComponent(classKey)}`;
+const MANA_BONUS_ENDPOINT = (value: number) => `${API_ROOT}/attributes/mana-bonuses/${value}`;
 
 function formatOptionLabel(value: string): string {
   if (!value) return '';
@@ -326,6 +327,8 @@ export default function CreateCharacterEarlyYears() {
     level: ''
   })));
   const [attributeRows, setAttributeRows] = useState<AttributeRow[]>(() => mapAttributeRowsFromState(locationState?.attributes));
+  const [manaBonusAdjustment, setManaBonusAdjustment] = useState({ itemBonus: '0', specialBonus: '0' });
+  const [manaAttributeBonus, setManaAttributeBonus] = useState<number | null>(null);
   const [mdBonusAdjustments, setMdBonusAdjustments] = useState(() => MD_BONUS_ROWS.map(() => ({ itemBonus: '0', specialBonus: '0' })));
   const [raceBonusError, setRaceBonusError] = useState<string | null>(null);
   const [raceBonusLoading, setRaceBonusLoading] = useState(false);
@@ -344,6 +347,14 @@ export default function CreateCharacterEarlyYears() {
     })
   );
   const characterLevel = 1;
+
+  const attributeRowMap = useMemo(() => {
+    const map = new Map<AttributeKey, AttributeRow>();
+    attributeRows.forEach((row) => {
+      map.set(row.attribute, row);
+    });
+    return map;
+  }, [attributeRows]);
 
   useEffect(() => {
     document.title = 'Character Creation – Early Years';
@@ -405,6 +416,65 @@ export default function CreateCharacterEarlyYears() {
       ignore = true;
     };
   }, [locationState]);
+
+  useEffect(() => {
+    const magicSchool = baseData.magicSchool?.trim();
+    if (!magicSchool) {
+      setManaAttributeBonus(null);
+      return;
+    }
+
+    const manaAttributeKey: AttributeKey | null = magicSchool === 'essence'
+      ? 'IQ'
+      : magicSchool === 'channeling'
+        ? 'IT'
+        : null;
+
+    if (!manaAttributeKey) {
+      setManaAttributeBonus(null);
+      return;
+    }
+
+    const attributeRow = attributeRowMap.get(manaAttributeKey);
+    const baseValue = attributeRow?.baseValue;
+    if (baseValue == null || !Number.isFinite(baseValue) || baseValue <= 0) {
+      setManaAttributeBonus(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(MANA_BONUS_ENDPOINT(baseValue));
+        if (!response.ok) {
+          if (response.status !== 404) {
+            console.warn('Failed to load normal bonus for mana attribute', baseValue, response.status);
+          }
+          if (!cancelled) {
+            setManaAttributeBonus(null);
+          }
+          return;
+        }
+        const data = await response.json();
+        const rawNumber = typeof data === 'number' ? data : Number.parseInt(String(data), 10);
+        const normalBonus = Number.isFinite(rawNumber) ? rawNumber : 0;
+        const computed = normalBonus * characterLevel * 2;
+        if (!cancelled) {
+          setManaAttributeBonus(computed);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch normal bonus for mana attribute', error);
+        if (!cancelled) {
+          setManaAttributeBonus(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseData.magicSchool, attributeRowMap, characterLevel]);
 
   useEffect(() => {
     if (meta.armorTypes && meta.armorTypes.length > 0) {
@@ -473,14 +543,6 @@ export default function CreateCharacterEarlyYears() {
     ...([...(meta.armorTypes ?? [])].reverse().map((value) => ({ value, label: formatOptionLabel(value) })))
   ], [meta.armorTypes]);
 
-  const attributeRowMap = useMemo(() => {
-    const map = new Map<AttributeKey, AttributeRow>();
-    attributeRows.forEach((row) => {
-      map.set(row.attribute, row);
-    });
-    return map;
-  }, [attributeRows]);
-
   const skillDisplayRows = useMemo(() => {
     return SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
       const isHpMaxSkill = definition.name === HP_MAX_SKILL_NAME;
@@ -543,6 +605,37 @@ export default function CreateCharacterEarlyYears() {
     });
   }, [attributeRowMap, skillRows]);
 
+  const manaBonusRow = useMemo(() => {
+    const magicSchool = baseData.magicSchool?.trim();
+    const manaAttributeKey: AttributeKey | null = magicSchool === 'channeling'
+      ? 'IT'
+      : magicSchool === 'essence'
+        ? 'IQ'
+        : null;
+    const attribute = manaAttributeKey ? attributeRowMap.get(manaAttributeKey) : undefined;
+    const fallbackAttributeBonus = attribute
+      ? attribute.totalBonus ?? attribute.normalBonus ?? 0
+      : 0;
+    const attributeBonus = manaAttributeKey
+      ? manaAttributeBonus != null
+        ? manaAttributeBonus
+        : fallbackAttributeBonus
+      : 0;
+    const itemBonus = parseBonusInput(manaBonusAdjustment.itemBonus);
+    const specialBonus = parseBonusInput(manaBonusAdjustment.specialBonus);
+    const totalBonus = attributeBonus + itemBonus + specialBonus;
+    return {
+      label: 'Mana',
+      attributeLabel: manaAttributeKey ?? '',
+      attributeBonus,
+      itemBonus,
+      specialBonus,
+      totalBonus,
+      itemBonusInput: manaBonusAdjustment.itemBonus,
+      specialBonusInput: manaBonusAdjustment.specialBonus
+    };
+  }, [attributeRowMap, baseData.magicSchool, manaAttributeBonus, manaBonusAdjustment]);
+
   const mdBonusRows = useMemo(() => {
     return MD_BONUS_ROWS.map((row, index) => {
       const attribute = attributeRowMap.get(row.attribute);
@@ -565,6 +658,10 @@ export default function CreateCharacterEarlyYears() {
       };
     });
   }, [attributeRowMap, mdBonusAdjustments]);
+
+  function handleManaBonusChange(key: 'itemBonus' | 'specialBonus', value: string) {
+    setManaBonusAdjustment((prev) => ({ ...prev, [key]: value }));
+  }
 
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
     setBaseData((prev) => ({ ...prev, [key]: value }));
@@ -1116,6 +1213,14 @@ export default function CreateCharacterEarlyYears() {
             background: #fff;
             text-align: center;
           }
+          .panel-table.level-summary-table th,
+          .panel-table.level-summary-table td {
+            padding: 3px 6px;
+          }
+          .panel-table.level-summary-table .panel-bonus-input {
+            width: 60px;
+            padding: 2px 4px;
+          }
           .panel-table .panel-bonus-input::-webkit-outer-spin-button,
           .panel-table .panel-bonus-input::-webkit-inner-spin-button {
             margin: 0;
@@ -1169,10 +1274,10 @@ export default function CreateCharacterEarlyYears() {
           .field.field-inline {
             flex-direction: row;
             align-items: center;
-            gap: 8px;
+            gap: 4px;
           }
           .field.field-inline label {
-            min-width: 72px;
+            min-width: 60px;
           }
           .field.field-inline input,
           .field.field-inline select {
@@ -1708,16 +1813,18 @@ export default function CreateCharacterEarlyYears() {
           </section>
           <section className="panel">
             <h3>Level, XP &amp; Bonuses</h3>
-            <div className="field field-inline">
-              <label htmlFor="summary-level">Level</label>
-              <input id="summary-level" type="number" value={characterLevel} readOnly style={{ background: '#f0f3f8' }} />
+            <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+              <div className="field field-inline" style={{ gap: 8 }}>
+                <label htmlFor="summary-level" style={{ minWidth: 72 }}>Level</label>
+                <input id="summary-level" type="number" value={characterLevel} readOnly style={{ background: '#f0f3f8' }} />
+              </div>
+              <div className="field field-inline">
+                <label htmlFor="summary-xp" style={{ minWidth: 32 }}>XP</label>
+                <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
+              </div>
             </div>
-            <div className="field field-inline">
-              <label htmlFor="summary-xp">XP</label>
-              <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
-            </div>
-            <div className="field field-inline">
-              <label htmlFor="summary-armor">Armor</label>
+            <div className="field field-inline" style={{ gap: 8 }}>
+              <label htmlFor="summary-armor" style={{ minWidth: 72 }}>Armor</label>
               <select
                 id="summary-armor"
                 value={baseData.armorType}
@@ -1730,7 +1837,7 @@ export default function CreateCharacterEarlyYears() {
                 ))}
               </select>
             </div>
-            <table className="panel-table">
+            <table className="panel-table level-summary-table">
               <thead>
                 <tr>
                   <th>Bonus</th>
@@ -1741,6 +1848,32 @@ export default function CreateCharacterEarlyYears() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <th scope="row">{manaBonusRow.label}</th>
+                  <td className="center">
+                    <div className="skill-attribute">
+                      <span>{manaBonusRow.attributeLabel}</span>
+                      <span>{formatSigned(manaBonusRow.attributeBonus)}</span>
+                    </div>
+                  </td>
+                  <td className="center">
+                    <input
+                      type="number"
+                      className="panel-bonus-input"
+                      value={manaBonusRow.itemBonusInput}
+                      onChange={(event) => handleManaBonusChange('itemBonus', event.target.value)}
+                    />
+                  </td>
+                  <td className="center">
+                    <input
+                      type="number"
+                      className="panel-bonus-input"
+                      value={manaBonusRow.specialBonusInput}
+                      onChange={(event) => handleManaBonusChange('specialBonus', event.target.value)}
+                    />
+                  </td>
+                  <td className="center"><strong>{formatSigned(manaBonusRow.totalBonus)}</strong></td>
+                </tr>
                 {mdBonusRows.map((row) => (
                   <tr key={row.label}>
                     <th scope="row">{row.label}</th>
@@ -1755,7 +1888,7 @@ export default function CreateCharacterEarlyYears() {
                         type="number"
                         className="panel-bonus-input"
                         value={row.itemBonusInput}
-                        onChange={(event) => handleMdBonusChange(row.label === row.label ? mdBonusRows.findIndex((entry) => entry.label === row.label) : -1, 'itemBonus', event.target.value)}
+                        onChange={(event) => handleMdBonusChange(mdBonusRows.findIndex((entry) => entry.label === row.label), 'itemBonus', event.target.value)}
                       />
                     </td>
                     <td className="center">
