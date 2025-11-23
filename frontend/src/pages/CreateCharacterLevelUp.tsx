@@ -1427,19 +1427,19 @@ export default function CreateCharacterLevelUp() {
                     <tr>
                       <th>Attribute</th>
                       <th className="center">Base</th>
-                      <th className="center">Normal</th>
-                      <th className="center">Race</th>
+                      <th className="center">Normal Bonus</th>
+                      <th className="center">Race Bonus</th>
                       <th className="center">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {attributeRows.map((row) => (
                       <tr key={row.attribute}>
-                        <td>{row.attribute}</td>
-                        <td className="center">{row.baseValue}</td>
-                        <td className="center">{row.normalBonus}</td>
-                        <td className="center">{row.raceBonus}</td>
-                        <td className="center">{row.totalBonus}</td>
+                        <td><strong>{row.attribute}</strong></td>
+                        <td className="center">{row.baseValue ?? '—'}</td>
+                        <td className="center">{row.normalBonus ?? '—'}</td>
+                        <td className="center">{row.raceBonus ?? (row.normalBonus == null && row.totalBonus == null ? '—' : 0)}</td>
+                        <td className="center"><strong>{row.totalBonus ?? (row.normalBonus ?? '—')}</strong></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1447,63 +1447,94 @@ export default function CreateCharacterLevelUp() {
               </section>
 
               <section className="panel">
-                <h3>Mana &amp; MD Bonuses</h3>
-                <table className="panel-table">
+                <h3>Level, XP &amp; Bonuses</h3>
+                <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                  <div className="field field-inline" style={{ gap: 8 }}>
+                    <label htmlFor="summary-level" style={{ minWidth: 72 }}>Level</label>
+                    <input id="summary-level" type="number" value={characterLevel} readOnly style={{ background: '#f0f3f8' }} />
+                  </div>
+                  <div className="field field-inline">
+                    <label htmlFor="summary-xp" style={{ minWidth: 32 }}>XP</label>
+                    <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
+                  </div>
+                </div>
+                <div className="field field-inline" style={{ gap: 8 }}>
+                  <label htmlFor="summary-armor" style={{ minWidth: 72 }}>Armor</label>
+                  <select
+                    id="summary-armor"
+                    value={baseData.armorType}
+                    onChange={(event) => handleBaseDataChange('armorType', event.target.value)}
+                  >
+                    {armorOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <table className="panel-table level-summary-table">
                   <thead>
                     <tr>
                       <th>Bonus</th>
-                      <th className="center">Attr</th>
-                      <th className="center">Attribute</th>
-                      <th className="center">Item</th>
-                      <th className="center">Special</th>
-                      <th className="center">Total</th>
+                      <th className="center">Attribute bonus</th>
+                      <th className="center">Item bonus</th>
+                      <th className="center">Special bonus</th>
+                      <th className="center">Total bonus</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Mana</td>
-                      <td className="center">{manaBonusRow.attributeLabel}</td>
-                      <td className="center">{formatSigned(manaBonusRow.attributeBonus)}</td>
+                      <th scope="row">{manaBonusRow.label}</th>
+                      <td className="center">
+                        <div className="skill-attribute">
+                          <span>{manaBonusRow.attributeLabel}</span>
+                          <span>{formatSigned(manaBonusRow.attributeBonus)}</span>
+                        </div>
+                      </td>
                       <td className="center">
                         <input
-                          className="panel-bonus-input"
                           type="number"
+                          className="panel-bonus-input"
                           value={manaBonusRow.itemBonusInput}
                           onChange={(event) => handleManaBonusChange('itemBonus', event.target.value)}
                         />
                       </td>
                       <td className="center">
                         <input
-                          className="panel-bonus-input"
                           type="number"
+                          className="panel-bonus-input"
                           value={manaBonusRow.specialBonusInput}
                           onChange={(event) => handleManaBonusChange('specialBonus', event.target.value)}
                         />
                       </td>
-                      <td className="center">{formatSigned(manaBonusRow.totalBonus)}</td>
+                      <td className="center"><strong>{formatSigned(manaBonusRow.totalBonus)}</strong></td>
                     </tr>
-                    {mdBonusRows.map((row, index) => (
+                    {mdBonusRows.map((row) => (
                       <tr key={row.label}>
-                        <td>{row.label}</td>
-                        <td className="center">{row.attributeKey}</td>
-                        <td className="center">{formatSigned(row.attributeBonus)}</td>
+                        <th scope="row">{row.label}</th>
+                        <td className="center">
+                          <div className="skill-attribute">
+                            <span>{row.attributeKey}</span>
+                            <span>{formatSigned(row.attributeBonus)}</span>
+                          </div>
+                        </td>
                         <td className="center">
                           <input
-                            className="panel-bonus-input"
                             type="number"
+                            className="panel-bonus-input"
                             value={row.itemBonusInput}
-                            onChange={(event) => handleMdBonusChange(index, 'itemBonus', event.target.value)}
+                            onChange={(event) => handleMdBonusChange(mdBonusRows.findIndex((entry) => entry.label === row.label), 'itemBonus', event.target.value)}
                           />
                         </td>
                         <td className="center">
                           <input
-                            className="panel-bonus-input"
                             type="number"
+                            className="panel-bonus-input"
                             value={row.specialBonusInput}
-                            onChange={(event) => handleMdBonusChange(index, 'specialBonus', event.target.value)}
+                            onChange={(event) => handleMdBonusChange(mdBonusRows.findIndex((entry) => entry.label === row.label), 'specialBonus', event.target.value)}
                           />
                         </td>
-                        <td className="center">{formatSigned(row.totalBonus)}</td>
+                        <td className="center"><strong>{formatSigned(row.totalBonus)}</strong></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1514,97 +1545,107 @@ export default function CreateCharacterLevelUp() {
 
           <section className="early-years-section">
             <h2 className="early-years-title">Skill Progression</h2>
-            <section className="panel">
-              <h3>Skills</h3>
-              <table className="skill-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '16%' }}>Skill</th>
-                    <th style={{ width: '10%' }}>Category</th>
-                    <th style={{ width: '10%' }}>Attribute</th>
-                    <th style={{ width: '24%' }}>Levels</th>
-                    <th style={{ width: '8%' }} className="center">Lvl Bonus</th>
-                    <th style={{ width: '8%' }} className="center">Attr Bonus</th>
-                    <th style={{ width: '8%' }} className="center">Class Bonus</th>
-                    <th style={{ width: '8%' }} className="center">Item</th>
-                    <th style={{ width: '8%' }} className="center">Special</th>
-                    <th style={{ width: '10%' }} className="center">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {SKILLS_BY_CATEGORY.map((group) => (
-                    <Fragment key={group.category}>
-                      <tr className="skill-category-header">
-                        <td colSpan={10}>{group.category}</td>
-                      </tr>
-                      {group.items.map((definition) => {
-                        const display = skillDisplayRows[definition.stateIndex];
-                        const state = display?.state ?? skillRows[definition.stateIndex];
-                        const isHpMaxSkill = definition.name === HP_MAX_SKILL_NAME;
-                        return (
-                          <tr key={definition.name}>
-                            <td>{definition.name}</td>
-                            <td>{definition.category}</td>
-                            <td>
-                              {definition.attributeKey === 'XX'
-                                ? ''
-                                : definition.attributeKey}
-                            </td>
-                            <td>
-                              <div className="skill-levels">
-                                {state?.levels.map((checked, levelIndex) => (
-                                  <label key={levelIndex}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(event) => handleSkillLevelToggle(definition.stateIndex, levelIndex, event.target.checked)}
-                                    />
-                                  </label>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="center">
-                              {isHpMaxSkill ? (
-                                <input
-                                  className="skill-bonus-input"
-                                  type="number"
-                                  value={state?.manualLevelInput ?? ''}
-                                  onChange={(event) => handleSkillLevelBonusChange(definition.stateIndex, event.target.value)}
-                                />
-                              ) : (
-                                display?.levelBonusDisplay
-                              )}
-                            </td>
-                            <td className="center">{formatSigned(display?.attributeBonus ?? 0)}</td>
-                            <td className="center">{formatSigned(display?.classBonus ?? 0)}</td>
-                            <td className="center">
-                              <input
-                                className="skill-bonus-input"
-                                type="number"
-                                value={state?.itemBonus ?? ''}
-                                onChange={(event) => handleSkillBonusChange(definition.stateIndex, 'itemBonus', event.target.value)}
-                              />
-                            </td>
-                            <td className="center">
-                              <input
-                                className="skill-bonus-input"
-                                type="number"
-                                value={state?.specialBonus ?? ''}
-                                onChange={(event) => handleSkillBonusChange(definition.stateIndex, 'specialBonus', event.target.value)}
-                              />
-                            </td>
-                            <td className="center">{formatSigned(display?.totalBonus ?? 0)}</td>
+            <div className="panel-grid">
+              <section className="panel">
+                <h3>Skill Overview</h3>
+                <table className="skill-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '12%' }}>Skill</th>
+                      <th style={{ width: '28%' }}>Levels</th>
+                      <th style={{ width: '5%' }} className="center">Level Bonus</th>
+                      <th style={{ width: '5%' }} className="center">Attribute Bonus</th>
+                      <th style={{ width: '5%' }} className="center">Class Bonus</th>
+                      <th style={{ width: '5%' }} className="center">Item Bonus</th>
+                      <th style={{ width: '5%' }} className="center">Special Bonus</th>
+                      <th style={{ width: '5%' }} className="center">Total Bonus</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SKILLS_BY_CATEGORY.map((group, groupIndex) => {
+                      const rowsForGroup = skillDisplayRows.filter((row) => row.definition.category === group.category);
+                      if (rowsForGroup.length === 0) return null;
+                      return (
+                        <Fragment key={group.category}>
+                          <tr className="skill-category-header">
+                            <td colSpan={8}>{group.category}</td>
                           </tr>
-                        );
-                      })}
-                      <tr className="skill-group-divider">
-                        <td colSpan={10} />
-                      </tr>
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </section>
+                          {rowsForGroup.map((row) => (
+                            <tr key={row.definition.name}>
+                              <td>{row.definition.name}</td>
+                              <td>
+                                {isSkillLocked(row.definition.name) ? (
+                                  <span aria-hidden="true">—</span>
+                                ) : (
+                                  <div className="skill-levels" aria-label={`${row.definition.name} levels`}>
+                                    {row.state.levels.map((checked, levelIndex) => (
+                                      <label key={levelIndex} htmlFor={`skill-${row.definition.stateIndex}-level-${levelIndex}`}>
+                                        <input
+                                          id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
+                                          type="checkbox"
+                                          checked={checked}
+                                          disabled={row.definition.name === HP_MAX_SKILL_NAME}
+                                          onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
+                                          aria-label={`Level ${levelIndex + 1}`}
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="center">
+                                {row.definition.name === HP_MAX_SKILL_NAME ? (
+                                  <input
+                                    type="number"
+                                    className="skill-bonus-input"
+                                    value={row.state.manualLevelInput}
+                                    onChange={(event) => handleSkillLevelBonusChange(row.definition.stateIndex, event.target.value)}
+                                    aria-label={`${row.definition.name} level bonus`}
+                                  />
+                                ) : isSkillLocked(row.definition.name) ? (
+                                  ''
+                                ) : (
+                                  row.levelBonus
+                                )}
+                              </td>
+                              <td>
+                                <div className="skill-attribute">
+                                  <span>{row.definition.attributeKey}</span>
+                                  <span>{formatSigned(row.attributeBonus)}</span>
+                                </div>
+                              </td>
+                              <td className="center">{row.classBonus}</td>
+                              <td className="center">
+                                <input
+                                  type="number"
+                                  className="skill-bonus-input"
+                                  value={row.state.itemBonus}
+                                  onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'itemBonus', event.target.value)}
+                                />
+                              </td>
+                              <td className="center">
+                                <input
+                                  type="number"
+                                  className="skill-bonus-input"
+                                  value={row.state.specialBonus}
+                                  onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'specialBonus', event.target.value)}
+                                />
+                              </td>
+                              <td className="center middle"><strong>{row.totalBonus}</strong></td>
+                            </tr>
+                          ))}
+                          {groupIndex < SKILLS_BY_CATEGORY.length - 1 && (
+                            <tr className="skill-group-divider" aria-hidden="true">
+                              <td colSpan={8} />
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </section>
+            </div>
           </section>
         </>
       )}
