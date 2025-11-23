@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { get } from '../api/client';
 import { fetchEarlyYearsProfile, type EarlyYearsProfileDto } from '../api/earlyYears';
+import { getLevelCap } from '../utils/xp';
 
 const COLORS = {
   primary: '#2f5597',
@@ -324,6 +325,8 @@ export default function CreateCharacterLevelUp() {
     })
   );
   const characterLevel = 1;
+  const xpValue = 0;
+  const canLevelUp = (characterLevel === 1 && xpValue === 0) || xpValue > getLevelCap(characterLevel);
 
   useEffect(() => {
     document.title = 'Character Creation – Level Up';
@@ -493,6 +496,11 @@ export default function CreateCharacterLevelUp() {
 
   function handleNext() {
     console.info('Proceed to next creation phase – coming soon.');
+  }
+
+  function handleXpLevelUpClick() {
+    if (!canLevelUp) return;
+    console.info('XP level up – coming soon.');
   }
 
   const genderOptions = useMemo(() => [
@@ -1415,7 +1423,34 @@ export default function CreateCharacterLevelUp() {
               </section>
 
               <section className="panel">
-                <h3>Spell Lists</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                  <h3>Spell Lists</h3>
+                  <div className="field field-inline">
+                    <label htmlFor="spell-skill-points">Skill Points</label>
+                    <input
+                      id="spell-skill-points"
+                      type="number"
+                      value={0}
+                      readOnly
+                      style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
+                    />
+                    <button
+                      type="button"
+                      style={{
+                        marginLeft: 8,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: `1px solid ${COLORS.primary}`,
+                        background: COLORS.primary,
+                        color: '#ffffff',
+                        fontSize: 13,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Use
+                    </button>
+                  </div>
+                </div>
                 <table className="spell-table">
                   <thead>
                     <tr>
@@ -1467,7 +1502,19 @@ export default function CreateCharacterLevelUp() {
               </section>
 
               <section className="panel">
-                <h3>Languages</h3>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                  <h3>Languages</h3>
+                  <div className="field field-inline">
+                    <label htmlFor="language-skill-points">Skill Points</label>
+                    <input
+                      id="language-skill-points"
+                      type="number"
+                      value={0}
+                      readOnly
+                      style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
+                    />
+                  </div>
+                </div>
                 <table className="languages-table">
                   <thead>
                     <tr>
@@ -1551,7 +1598,49 @@ export default function CreateCharacterLevelUp() {
                   </div>
                   <div className="field field-inline">
                     <label htmlFor="summary-xp" style={{ minWidth: 32 }}>XP</label>
-                    <input id="summary-xp" type="number" value={0} readOnly style={{ background: '#f0f3f8' }} />
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                      <input
+                        id="summary-xp"
+                        type="number"
+                        value={xpValue}
+                        readOnly
+                        onClick={canLevelUp ? handleXpLevelUpClick : undefined}
+                        style={{
+                          background: canLevelUp ? '#ffd700' : '#f0f3f8',
+                          color: canLevelUp ? '#111' : COLORS.textPrimary,
+                          fontWeight: canLevelUp ? 800 : 400,
+                          cursor: canLevelUp ? 'pointer' : 'default',
+                          paddingRight: canLevelUp ? 24 : undefined
+                        }}
+                      />
+                      {canLevelUp && (
+                        <button
+                          type="button"
+                          onClick={handleXpLevelUpClick}
+                          aria-label="Level up available"
+                          style={{
+                            position: 'absolute',
+                            right: 4,
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            padding: 0,
+                            width: 20,
+                            height: 20,
+                            border: 'none',
+                            background: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#111'
+                          }}
+                        >
+                          <svg width="20" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 2L2 12H7V22H17V12H22L12 2z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="field field-inline" style={{ gap: 8 }}>
@@ -1661,10 +1750,42 @@ export default function CreateCharacterLevelUp() {
                     {SKILLS_BY_CATEGORY.map((group, groupIndex) => {
                       const rowsForGroup = skillDisplayRows.filter((row) => row.definition.category === group.category);
                       if (rowsForGroup.length === 0) return null;
+                      const categoryId = group.category.replace(/\s+/g, '-').toLowerCase();
                       return (
                         <Fragment key={group.category}>
                           <tr className="skill-category-header">
-                            <td colSpan={8}>{group.category}</td>
+                            <td colSpan={8}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                                <span>{group.category}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                  <div className="field field-inline">
+                                    <label htmlFor={`skill-points-${categoryId}`}>Skill Points</label>
+                                    <input
+                                      id={`skill-points-${categoryId}`}
+                                      type="number"
+                                      value={0}
+                                      readOnly
+                                      style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
+                                    />
+                                  </div>
+                                  <div className="field field-inline">
+                                    <label htmlFor={`move-skill-points-${categoryId}`}>Move Skill Points to:</label>
+                                    <input
+                                      id={`move-skill-points-${categoryId}`}
+                                      type="number"
+                                      min={0}
+                                      style={{ width: 80, flex: '0 0 auto' }}
+                                    />
+                                    <select
+                                      id={`move-skill-points-target-${categoryId}`}
+                                      style={{ width: 160, flex: '0 0 auto' }}
+                                    >
+                                      <option value="">Select…</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
                           </tr>
                           {rowsForGroup.map((row) => (
                             <tr key={row.definition.name}>
