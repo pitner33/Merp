@@ -38,9 +38,10 @@ public class Weapon {
     private String critCapMH;
     private String critCapOH;
     private Integer specialModofierTB;
+    private Integer manaCost;
     private Double weight;
 
-    public Weapon(String name, PlayerActivity activityType, AttackType attackType, CritType critType, CritType secondaryCritType, WeaponType weaponType, WeaponSpecType weaponSpecType, Integer extraTBMH, Integer extraTBOH, Integer rollCapMH, Integer rollCapOH, String critCapMH, String critCapOH, Integer specialModofierTB, Double weight) {
+    public Weapon(String name, PlayerActivity activityType, AttackType attackType, CritType critType, CritType secondaryCritType, WeaponType weaponType, WeaponSpecType weaponSpecType, Integer extraTBMH, Integer extraTBOH, Integer rollCapMH, Integer rollCapOH, String critCapMH, String critCapOH, Integer specialModofierTB, Integer manaCost, Double weight) {
         this.name = name;
         this.activityType = activityType;
         this.attackType = attackType;
@@ -55,11 +56,12 @@ public class Weapon {
         this.critCapMH = critCapMH;
         this.critCapOH = critCapOH;
         this.specialModofierTB = specialModofierTB;
+        this.manaCost = manaCost;
         this.weight = weight;
     }
 
     // Constructor for base weapons
-    public Weapon(String name, PlayerActivity activityType, AttackType attackType, CritType critType, WeaponType weaponType, String critCapMH, String critCapOH) {
+    public Weapon(String name, PlayerActivity activityType, AttackType attackType, CritType critType, WeaponType weaponType, String critCapMH, String critCapOH, Integer manaCost) {
         this.name = name;
         this.activityType = activityType;
         this.attackType = attackType;
@@ -74,6 +76,7 @@ public class Weapon {
         this.critCapMH = critCapMH;
         this.critCapOH = critCapOH;
         this.specialModofierTB = 0;
+        this.manaCost = manaCost;
         this.weight = 0D;
     }
 }

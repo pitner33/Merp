@@ -6,4 +6,6 @@ import com.sol.merp.characters.Player;
 
 public interface PlayerSkillRepository extends JpaRepository<PlayerSkill, Long> {
     boolean existsByPlayerAndSkillDefinition(Player player, SkillDefinition skillDefinition);
+
+    java.util.List<PlayerSkill> findByPlayer_Id(Long playerId);
 }

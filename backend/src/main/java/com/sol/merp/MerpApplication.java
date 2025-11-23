@@ -70,26 +70,26 @@ public class MerpApplication implements CommandLineRunner {
 
         if (playerRepository.count() == 0) {
             // Seed Players once
-            playerRepository.save(new Player("JK01", "Törp harcos", Gender.male, Race.dwarf, PlayerClass.warrior, 4, 86d, 25, 51, 101, 21, -5, -15, 0, 15, false, 15, 40, -5, ArmorType.chainmail, -35, 19, 20, 30, -30, -25, 5, 10));
-            playerRepository.save(new Player("JK02", "Tünde íjász", Gender.male, Race.woodElf, PlayerClass.archer, 3, 67d, 35, 35, 10, 116, 0, 15, 0, 40, false, 40, 5, 5, ArmorType.heavyLeather, 20, -17, -20, 55, -20, 10, 0, 50));
-            playerRepository.save(new Player("JK03", "Dúnadán kósza", Gender.male, Race.humanDunadan, PlayerClass.ranger, 2, 55d, -10, 39, 10, 26, 0, -20, 0, 5, true, 5, 0, 15, ArmorType.heavyLeather, 44, 11, 10, 25, 20, 5, 0, -16));
-            playerRepository.save(new Player("JK04", "Gondori papnö", Gender.female, Race.humanGondor, PlayerClass.priest, 2, 34d, 25, 25, -25, 56, 9, -6, 0, 15, false, 15, 0, 20, ArmorType.none, 29, -23, -25, -10, 47, 27, 0, -25));
-            playerRepository.save(new Player("JK05", "Tünde mágus", Gender.female, Race.sinda, PlayerClass.mage, 4, 45d, 25, 25, -25, 26, 8, 77, 0, 20, false, 20, 10, 1, ArmorType.none, 25, -15, -15, -5, 38, 43, 0, 35));
-            playerRepository.save(new Player("JK06", "Dúnadán harcos", Gender.male, Race.humanDunadan, PlayerClass.warrior, 3, 109d, 25, 90, 30, 55, 0, -5, 65, 20, false, 20, 0, 10, ArmorType.chainmail, 25, 23, 10, 30, 15, 5, 15, -5));
-            playerRepository.save(new Player("NJK01", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 1, 34d, 0, 43, 10, 28, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK02", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 2, 47d, 5, 56, 41, 36, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK03", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 2, 47d, 5, 56, 41, 36, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK04", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 3, 60d, 10, 69, 49, 44, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK05", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 3, 60d, 10, 69, 49, 44, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK06", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 1, 34d, 0, 28, 10, 43, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK07", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 2, 47d, 5, 36, 41, 56, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK08", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 2, 47d, 5, 36, 41, 56, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK09", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 3, 60d, 10, 44, 49, 69, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK10", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 3, 60d, 10, 44, 49, 69, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
-            playerRepository.save(new Player("NJK11", "Erös troll", Gender.male, Race.troll, PlayerClass.warrior, 12, 134d, 15, 106, 50, 56, -25, -25, 0, 30, false, 30, 12, 21, ArmorType.heavyLeather, 31, 6, 6, 6, -45, -45, -45, -45));
-            playerRepository.save(new Player("NJK12", "Troll", Gender.male, Race.troll, PlayerClass.warrior, 10, 112d, 10, 88, 40, 46, -25, -25, 0, 20, false, 20, 0, 0, ArmorType.heavyLeather, 26, 4, 4, 4, -45, -45, -45, -45));
-            playerRepository.save(new Player("NJK13", "Ar-Gular", Gender.male, Race.humanBlackNumenor, PlayerClass.mage, 9, 73d, 25, 25, -5, 35, 18, 72, 0, 55, false, 15, 15, 5, ArmorType.none, 40, 35, 25, 25, 28, 38, 70, 25));
-            playerRepository.save(new Player("NJK14", "Medve", Gender.male, Race.animal, PlayerClass.warrior, 3, 150d, 30, 70, -25, -25, -25, -25, 0, 30, false, 15, 0, 0, ArmorType.leather, 40, 60, 0, 0, -45, -45, -45, 10));
+            playerRepository.save(new Player("JK01", "Törp harcos", Gender.male, Race.dwarf, PlayerClass.warrior, 4, 86d, 0, 0, 0, 0, 25, 0, 0, 51, 101, 21, 0, -5, -15, 0, 15, false, 15, 40, -5, ArmorType.chainmail, -35, 19, 20, 30, -30, -25, 5, 10));
+            playerRepository.save(new Player("JK02", "Tünde íjász", Gender.male, Race.woodElf, PlayerClass.archer, 3, 67d, 0, 0, 0, 35, 0, 0, 35, 0, 10, 116, 0, 0, 15, 0, 40, false, 40, 5, 5, ArmorType.heavyLeather, 20, -17, -20, 55, -20, 10, 0, 50));
+            playerRepository.save(new Player("JK03", "Dúnadán kósza", Gender.male, Race.humanDunadan, PlayerClass.ranger, 2, 55d, 2, 0, 5, -10, 0, 0, 39, 0, 10, 26, 0, 0, -20, 0, 5, true, 5, 0, 15, ArmorType.heavyLeather, 44, 11, 10, 25, 20, 5, 0, -16));
+            playerRepository.save(new Player("JK04", "Gondori papnö", Gender.female, Race.humanGondor, PlayerClass.priest, 2, 34d, 6, 25, 0, 0, 0, 0, 25, 0, -25, 56, 0, 9, -6, 0, 15, false, 15, 0, 20, ArmorType.none, 29, -23, -25, -10, 47, 27, 0, -25));
+            playerRepository.save(new Player("JK05", "Tünde mágus", Gender.female, Race.sinda, PlayerClass.mage, 4, 45d, 10, 25, 0, 0, 0, 0, 25, 0, -25, 26, 0, 8, 77, 0, 20, false, 20, 10, 1, ArmorType.none, 25, -15, -15, -5, 38, 43, 0, 35));
+            playerRepository.save(new Player("JK06", "Dúnadán harcos", Gender.male, Race.humanDunadan, PlayerClass.warrior, 3, 109d, 0, 0, 0, 0, 25, 0, 90, 50, 30, 55, 25, 0, -5, 65, 20, false, 20, 0, 10, ArmorType.chainmail, 25, 23, 10, 30, 15, 5, 15, -5));
+            playerRepository.save(new Player("NJK01", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 1, 34d, 0, 0, 0, 0, 0, 0, 43, 0, 10, 28, 0, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK02", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 2, 47d, 0, 0, 0, 5, 0, 0, 56, 0, 41, 36, 0, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK03", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 2, 47d, 0, 0, 0, 5, 0, 0, 56, 0, 41, 36, 0, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK04", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 3, 60d, 0, 0, 0, 10, 0, 0, 69, 0, 49, 44, 0, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK05", "Ork Warrior", Gender.male, Race.orc, PlayerClass.warrior, 3, 60d, 0, 0, 0, 10, 0, 0, 69, 0, 49, 44, 0, -25, -25, 0, 15, true, 10, 10, 10, ArmorType.heavyLeather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK06", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 1, 34d, 0, 0, 0, 0, 0, 0, 28, 0, 10, 43, 0, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK07", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 2, 47d, 0, 0, 5, 0, 0, 0, 36, 0, 41, 56, 0, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK08", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 2, 47d, 0, 0, 5, 0, 0,  0, 36, 0, 41, 56, 0, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK09", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 3, 60d, 0, 0, 10, 0, 0, 0, 44, 0, 49, 69, 0, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK10", "Ork Archer", Gender.male, Race.orc, PlayerClass.archer, 3, 60d, 0, 0, 10, 0, 0, 0, 44, 0, 49, 69, 0, -25, -25, 0, 15, false, 10, 10, 10, ArmorType.leather, 5, 5, 5, 5, -25, -25, 5, 5));
+            playerRepository.save(new Player("NJK11", "Erös troll", Gender.male, Race.troll, PlayerClass.warrior, 12, 134d, 0, 0, 0, 15, 0, 0, 0, 106, 50, 56, 50, -25, -25, 0, 30, false, 30, 12, 21, ArmorType.heavyLeather, 31, 6, 6, 6, -45, -45, -45, -45));
+            playerRepository.save(new Player("NJK12", "Troll", Gender.male, Race.troll, PlayerClass.warrior, 10, 112d, 0, 0, 0, 10, 0, 0, 0, 88, 40, 46, 40, -25, -25, 0, 20, false, 20, 0, 0, ArmorType.heavyLeather, 26, 4, 4, 4, -45, -45, -45, -45));
+            playerRepository.save(new Player("NJK13", "Ar-Gular", Gender.male, Race.humanBlackNumenor, PlayerClass.mage, 9, 73d, 10,  25, 0, 0, 0, 0, 25, 0, -5, 35, 0, 18, 72, 0, 55, false, 15, 15, 5, ArmorType.none, 40, 35, 25, 25, 28, 38, 70, 25));
+            playerRepository.save(new Player("NJK14", "Medve", Gender.male, Race.animal, PlayerClass.warrior, 3, 150d, 0, 0, 30, 0, 0, 0, 0, 0, -25, -25, 70, -25, -25, 0, 30, false, 15, 0, 0, ArmorType.leather, 40, 60, 0, 0, -45, -45, -45, 10));
 
             // Create default AttackModifier per Player
             for (Player p : playerRepository.findAll()) {
@@ -112,38 +112,38 @@ public class MerpApplication implements CommandLineRunner {
 
         if (weaponRepository.count() == 0) {
             //Seed weapons once
-            weaponRepository.save(new Weapon("Do Nothing", PlayerActivity._5DoNothing, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0D));
-            weaponRepository.save(new Weapon("Prepare Magic", PlayerActivity._4PrepareMagic, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0D));
+            weaponRepository.save(new Weapon("Do Nothing", PlayerActivity._5DoNothing, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Prepare Magic", PlayerActivity._4PrepareMagic, AttackType.none, CritType.none, CritType.none, WeaponType.none, WeaponSpecType.none, 0, 0, 0, 0, "", "", 0, 0, 0D));
 
-            weaponRepository.save(new Weapon("Target Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.heat, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Target Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.cold, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Target Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.electricity, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Target Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.bigCreatureMagic, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Ball Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.heat, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Ball Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.cold, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Ball Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.electricity, WeaponType.magic, "E", "E"));
-            weaponRepository.save(new Weapon("Ball Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.bigCreatureMagic, WeaponType.magic, "E", "E"));
+            weaponRepository.save(new Weapon("Target Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.heat, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Target Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.cold, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Target Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.electricity, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Target Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicProjectile, CritType.bigCreatureMagic, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Ball Magic - Heat", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.heat, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Ball Magic - Cold", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.cold, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Ball Magic - Electricity", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.electricity, WeaponType.magic, "E", "E", 1));
+            weaponRepository.save(new Weapon("Ball Magic - Big Creature", PlayerActivity._1PerformMagic, AttackType.magicBall, CritType.bigCreatureMagic, WeaponType.magic, "E", "E", 1));
 
-            weaponRepository.save(new Weapon("Short bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E"));
-            weaponRepository.save(new Weapon("Long bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E"));
+            weaponRepository.save(new Weapon("Short bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E", 0));
+            weaponRepository.save(new Weapon("Long bow", PlayerActivity._2RangedAttack, AttackType.ranged, CritType.piercing, WeaponType.ranged, "E", "E", 0));
 
-            weaponRepository.save(new Weapon("Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.piercing, WeaponType.oneHanded,"C", "E"));
-            weaponRepository.save(new Weapon("One-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E"));
-            weaponRepository.save(new Weapon("One-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E"));
-            weaponRepository.save(new Weapon("One-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.blunt, CritType.blunt, WeaponType.oneHanded, "E", "E"));
-            weaponRepository.save(new Weapon("Two-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E"));
-            weaponRepository.save(new Weapon("Two-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E"));
-            weaponRepository.save(new Weapon("Two-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.blunt, WeaponType.twoHanded, "E", "E"));
+            weaponRepository.save(new Weapon("Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.piercing, WeaponType.oneHanded,"C", "E", 0));
+            weaponRepository.save(new Weapon("One-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("One-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("One-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.blunt, CritType.blunt, WeaponType.oneHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("Two-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("Two-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.slashing, WeaponType.twoHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("Two-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.twoHanded, CritType.blunt, WeaponType.twoHanded, "E", "E", 0));
 
-            weaponRepository.save(new Weapon("Dagger/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.piercing, WeaponType.oneHanded, "C", "C"));
-            weaponRepository.save(new Weapon("Hatchet/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "C", "C"));
-            weaponRepository.save(new Weapon("Club/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "C", "C"));
-            weaponRepository.save(new Weapon("1H Sword/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C"));
-            weaponRepository.save(new Weapon("1H Axe/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C"));
-            weaponRepository.save(new Weapon("1H Mace/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "C"));
-            weaponRepository.save(new Weapon("1H Sword/1H Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E"));
-            weaponRepository.save(new Weapon("1H Axe/1H Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E"));
-            weaponRepository.save(new Weapon("1H Mace/1H Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "E"));
+            weaponRepository.save(new Weapon("Dagger/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.piercing, WeaponType.oneHanded, "C", "C", 0));
+            weaponRepository.save(new Weapon("Hatchet/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "C", "C", 0));
+            weaponRepository.save(new Weapon("Club/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "C", "C", 0));
+            weaponRepository.save(new Weapon("1H Sword/Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C", 0));
+            weaponRepository.save(new Weapon("1H Axe/Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "C", 0));
+            weaponRepository.save(new Weapon("1H Mace/Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "C", 0));
+            weaponRepository.save(new Weapon("1H Sword/1H Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("1H Axe/1H Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
+            weaponRepository.save(new Weapon("1H Mace/1H Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "E", 0));
         }
 
         inventoryService.ensureDefaultWeaponsForAllPlayers();

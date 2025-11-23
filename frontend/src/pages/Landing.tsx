@@ -223,6 +223,25 @@ export default function Landing() {
     return options.find((w) => w.id === equippedWeaponId);
   }
 
+  function computeMmForPlayer(p?: Player | null): number {
+    if (!p) return 0;
+    const base = p.mm ?? 0;
+    const armor = (p.armorType ?? 'none') as string;
+    switch (armor) {
+      case 'leather':
+        return p.mmLeather ?? base;
+      case 'heavyLeather':
+        return p.mmHeavyLeather ?? base;
+      case 'chainmail':
+        return p.mmChainmail ?? base;
+      case 'plate':
+        return p.mmPlate ?? base;
+      case 'none':
+      default:
+        return p.mmNone ?? base;
+    }
+  }
+
   function computeTbPair(p?: Player | null): { main: number; offhand: number } {
     if (!p) return { main: 0, offhand: 0 };
 
@@ -239,16 +258,25 @@ export default function Landing() {
         offhand = 0;
         break;
       case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbOneHanded ?? 0;
+        main = p.tb1HSlashing ?? 0;
         offhand = 0;
         break;
-      case 'dualWield':
-        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+      case 'blunt':
+        main = p.tb1HBlunt ?? 0;
+        offhand = 0;
         break;
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = p.tbUnarmed ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield': {
+        const isBlunt = p.critType === 'blunt';
+        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
+        main = computeDualWieldMainTb(base1H, p.dualWield);
+        offhand = computeDualWieldOffHandTb(base1H, p.dualWield);
+        break;
+      }
       case 'twoHanded':
         main = p.tbTwoHanded ?? 0;
         offhand = 0;
@@ -471,6 +499,7 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('lvl')}>lvl {sortKey==='lvl' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('xp')}>XP {sortKey==='xp' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('hpMax' as keyof Player)}>max HP {sortKey==='hpMax' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}><button onClick={() => toggleSort('totalManaBonus' as keyof Player)}>Mana {sortKey==='totalManaBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}>HP</th>
             <th rowSpan={2}>Weapon/Activity</th>
             <th rowSpan={2}><button onClick={() => toggleSort('attackType' as keyof Player)}>Attack {sortKey==='attackType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -478,11 +507,12 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('armorType' as keyof Player)}>Armor {sortKey==='armorType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('tb' as keyof Player)}>TB {sortKey==='tb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('tbOffHand' as keyof Player)}>TB OH {sortKey==='tbOffHand' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
+            <th colSpan={7} style={{ textAlign: 'center' }}>TB</th>
             <th rowSpan={2}><button onClick={() => toggleSort('vb' as keyof Player)}>VB {sortKey==='vb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('shield' as keyof Player)}>Shield {sortKey==='shield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('dualWield' as keyof Player)}>Dual Wield {sortKey==='dualWield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('mm' as keyof Player)}>MM {sortKey==='mm' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th colSpan={5} style={{ textAlign: 'center' }}>MM</th>
             <th rowSpan={2}><button onClick={() => toggleSort('agilityBonus' as keyof Player)}>AGI Bonus {sortKey==='agilityBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th colSpan={2} style={{ textAlign: 'center' }}>MD</th>
             <th rowSpan={2}><button onClick={() => toggleSort('perception' as keyof Player)}>Perception {sortKey==='perception' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
@@ -495,11 +525,18 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('stealth' as keyof Player)}>Stealth {sortKey==='stealth' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
           </tr>
           <tr>
-            <th><button onClick={() => toggleSort('tbOneHanded' as keyof Player)}>1H {sortKey==='tbOneHanded' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('tb1HSlashing' as keyof Player)}>1H Slashing {sortKey==='tb1HSlashing' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('tb1HBlunt' as keyof Player)}>1H Blunt {sortKey==='tb1HBlunt' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbTwoHanded' as keyof Player)}>2H {sortKey==='tbTwoHanded' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbRanged' as keyof Player)}>Ranged {sortKey==='tbRanged' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('tbUnarmed' as keyof Player)}>Unarmed {sortKey==='tbUnarmed' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbBaseMagic' as keyof Player)}>Base Magic {sortKey==='tbBaseMagic' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('tbTargetMagic' as keyof Player)}>Target Magic {sortKey==='tbTargetMagic' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('mmNone' as keyof Player)}>No armor {sortKey==='mmNone' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('mmLeather' as keyof Player)}>Leather {sortKey==='mmLeather' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('mmHeavyLeather' as keyof Player)}>Heavy Leather {sortKey==='mmHeavyLeather' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('mmChainmail' as keyof Player)}>Chainmail {sortKey==='mmChainmail' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th><button onClick={() => toggleSort('mmPlate' as keyof Player)}>Plate {sortKey==='mmPlate' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('mdLenyeg' as keyof Player)}>Lenyeg {sortKey==='mdLenyeg' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th><button onClick={() => toggleSort('mdKapcsolat' as keyof Player)}>Kapcsolat {sortKey==='mdKapcsolat' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
           </tr>
@@ -607,6 +644,7 @@ export default function Landing() {
                 )}
               </td>
               <td className="right">{p.hpMax}</td>
+              <td className="right">{p.totalManaBonus ?? 0}</td>
               <td style={hpStyle(p)} title={hpTitle(p)}>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
                 <div>{p.hpActual}</div>
@@ -623,9 +661,11 @@ export default function Landing() {
               <td>{p.armorType}</td>
               <td className="right">{computeTbPair(p).main}</td>
               <td className="right">{computeTbPair(p).offhand}</td>
-              <td className="right">{p.tbOneHanded}</td>
+              <td className="right">{p.tb1HSlashing}</td>
+              <td className="right">{p.tb1HBlunt}</td>
               <td className="right">{p.tbTwoHanded}</td>
               <td className="right">{p.tbRanged}</td>
+              <td className="right">{p.tbUnarmed}</td>
               <td className="right">{p.tbBaseMagic}</td>
               <td className="right">{p.tbTargetMagic}</td>
               <td className="right">{p.vb}</td>
@@ -647,7 +687,12 @@ export default function Landing() {
                 )}
               </td>
               <td className="right">{p.dualWield ?? 0}</td>
-              <td className="right">{p.mm}</td>
+              <td className="right">{computeMmForPlayer(p)}</td>
+              <td className="right">{p.mmNone}</td>
+              <td className="right">{p.mmLeather}</td>
+              <td className="right">{p.mmHeavyLeather}</td>
+              <td className="right">{p.mmChainmail}</td>
+              <td className="right">{p.mmPlate}</td>
               <td className="right">{p.agilityBonus}</td>
               <td className="right">{p.mdLenyeg}</td>
               <td className="right">{p.mdKapcsolat}</td>

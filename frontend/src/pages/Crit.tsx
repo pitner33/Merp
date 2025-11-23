@@ -304,6 +304,30 @@ export default function Crit() {
     return options.find((w) => w.id === equippedWeaponId);
   }
 
+  function computeMmForPlayer(player?: Player | typeof pNone): number {
+    if (!player) return 0;
+    const coerce = (val: unknown): number | undefined => {
+      if (val === '' || val == null) return undefined;
+      const parsed = Number(val);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+    const base = coerce((player as Player).mm) ?? 0;
+    const armor = (player.armorType ?? 'none') as string;
+    switch (armor) {
+      case 'leather':
+        return coerce((player as Player).mmLeather) ?? base;
+      case 'heavyLeather':
+        return coerce((player as Player).mmHeavyLeather) ?? base;
+      case 'chainmail':
+        return coerce((player as Player).mmChainmail) ?? base;
+      case 'plate':
+        return coerce((player as Player).mmPlate) ?? base;
+      case 'none':
+      default:
+        return coerce((player as Player).mmNone) ?? base;
+    }
+  }
+
   function computeTbPair(player?: Player | typeof pNone): { main: number; offhand: number } {
     if (!player || !player.attackType) return { main: 0, offhand: 0 };
     const weapon = findEquippedWeapon(player);
@@ -319,16 +343,25 @@ export default function Crit() {
         offhand = 0;
         break;
       case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = (player as Player).tbOneHanded ?? 0;
+        main = (player as Player).tb1HSlashing ?? 0;
         offhand = 0;
         break;
-      case 'dualWield':
-        main = computeDualWieldMainTb((player as Player).tbOneHanded, (player as Player).dualWield);
-        offhand = computeDualWieldOffHandTb((player as Player).tbOneHanded, (player as Player).dualWield);
+      case 'blunt':
+        main = (player as Player).tb1HBlunt ?? 0;
+        offhand = 0;
         break;
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = (player as Player).tbUnarmed ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield': {
+        const isBlunt = (player as Player).critType === 'blunt';
+        const base1H = isBlunt ? ((player as Player).tb1HBlunt ?? 0) : ((player as Player).tb1HSlashing ?? 0);
+        main = computeDualWieldMainTb(base1H, (player as Player).dualWield);
+        offhand = computeDualWieldOffHandTb(base1H, (player as Player).dualWield);
+        break;
+      }
       case 'twoHanded':
         main = (player as Player).tbTwoHanded ?? 0;
         offhand = 0;
@@ -649,7 +682,7 @@ export default function Crit() {
             <td className="right">{p.stunnedForRounds}</td>
             <td className="right">{p.penaltyOfActions}</td>
             <td className="right">{p.hpLossPerRound}</td>
-            <td className="right">{p.mm}</td>
+            <td className="right">{computeMmForPlayer(p)}</td>
             <td className="right">{p.agilityBonus}</td>
             <td className="right">{p.mdLenyeg}</td>
             <td className="right">{p.mdKapcsolat}</td>
@@ -907,7 +940,7 @@ export default function Crit() {
   );
 }
 
-function hpStyle(p: { hpMax: number | string; hpActual: number | string }): CSSProperties {
+function hpStyle(p: { hpMax?: number | string | null; hpActual?: number | string | null }): CSSProperties {
   const max = Number(p.hpMax) || 0;
   const cur = Number(p.hpActual) || 0;
   const ratio = max > 0 ? cur / max : 0;
@@ -922,7 +955,7 @@ function hpStyle(p: { hpMax: number | string; hpActual: number | string }): CSSP
   return { background: bg, color: fg, fontWeight: 600, textAlign: 'center' };
 }
 
-function hpTitle(p: { hpActual: number | string; hpMax: number | string }): string {
+function hpTitle(p: { hpActual?: number | string | null; hpMax?: number | string | null }): string {
   const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
   return `${pct}%`;
 }

@@ -8,6 +8,7 @@
   { "name": "Blunt", "category": "Weapon Skills", "attributeKey": "STR" },
   { "name": "Two-handed", "category": "Weapon Skills", "attributeKey": "STR" },
   { "name": "Dual Wield", "category": "Weapon Skills", "attributeKey": "STR" },
+  { "name": "Unarmed Combat", "category": "Weapon Skills", "attributeKey": "DEX" },
   { "name": "Ranged", "category": "Weapon Skills", "attributeKey": "DEX" },
   { "name": "VB", "category": "Weapon Skills", "attributeKey": "DEX" },
   { "name": "Climbing", "category": "General Skills", "attributeKey": "DEX" },

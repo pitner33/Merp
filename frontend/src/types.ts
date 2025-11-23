@@ -15,15 +15,24 @@ export type Player = {
   attackType?: string;
   critType?: string;
   hpMax: number;
-  hpActual: number;
+  hpActual?: number;
+  totalManaBonus?: number;
   mm?: number;
+  mmNone?: number;
+  mmLeather?: number;
+  mmHeavyLeather?: number;
+  mmChainmail?: number;
+  mmPlate?: number;
   tb?: number;
   tbOffHand?: number;
   dualWield?: number;
   tbUsedForDefense?: number;
   tbOneHanded?: number;
+  tb1HSlashing?: number;
+  tb1HBlunt?: number;
   tbTwoHanded?: number;
   tbRanged?: number;
+  tbUnarmed?: number;
   tbBaseMagic?: number;
   tbTargetMagic?: number;
   armorType?: string;
@@ -63,6 +72,7 @@ export type Weapon = {
   critCapMH?: string;
   critCapOH?: string;
   specialModofierTB?: number;
+  manaCost?: number;
   weight?: number;
 };
 

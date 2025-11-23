@@ -475,6 +475,25 @@ export default function SingleAttack() {
     const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
     return `${pct}%`;
   }
+
+  function computeMmForPlayer(p?: Player | null, armorOverride?: string | null): number {
+    if (!p) return 0;
+    const base = p.mm ?? 0;
+    const armor = (armorOverride ?? p.armorType ?? 'none') as string;
+    switch (armor) {
+      case 'leather':
+        return p.mmLeather ?? base;
+      case 'heavyLeather':
+        return p.mmHeavyLeather ?? base;
+      case 'chainmail':
+        return p.mmChainmail ?? base;
+      case 'plate':
+        return p.mmPlate ?? base;
+      case 'none':
+      default:
+        return p.mmNone ?? base;
+    }
+  }
   function computeTbPair(p?: Player | null): { main: number; offHand: number } {
     if (!p) return { main: 0, offHand: 0 };
 
@@ -501,16 +520,25 @@ export default function SingleAttack() {
         offHand = 0;
         break;
       case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbOneHanded ?? 0;
+        main = p.tb1HSlashing ?? 0;
         offHand = 0;
         break;
-      case 'dualWield':
-        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        offHand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+      case 'blunt':
+        main = p.tb1HBlunt ?? 0;
+        offHand = 0;
         break;
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = p.tbUnarmed ?? 0;
+        offHand = 0;
+        break;
+      case 'dualWield': {
+        const isBlunt = p.critType === 'blunt';
+        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
+        main = computeDualWieldMainTb(base1H, p.dualWield);
+        offHand = computeDualWieldOffHandTb(base1H, p.dualWield);
+        break;
+      }
       case 'twoHanded':
         main = p.tbTwoHanded ?? 0;
         offHand = 0;
@@ -1461,7 +1489,7 @@ export default function SingleAttack() {
                 <td className="right">{attacker.stunnedForRounds}</td>
                 <td className="right">{attacker.penaltyOfActions}</td>
                 <td className="right">{attacker.hpLossPerRound}</td>
-                <td className="right">{attacker.mm}</td>
+                <td className="right">{computeMmForPlayer(attacker, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined)}</td>
                 <td className="right">{attacker.agilityBonus}</td>
                 <td className="right">{attacker.mdLenyeg}</td>
                 <td className="right">{attacker.mdKapcsolat}</td>
@@ -1587,7 +1615,7 @@ export default function SingleAttack() {
                 <td className="right">{defender.stunnedForRounds}</td>
                 <td className="right">{defender.penaltyOfActions}</td>
                 <td className="right">{defender.hpLossPerRound}</td>
-                <td className="right">{defender.mm}</td>
+                <td className="right">{computeMmForPlayer(defender, defenderArmor && defenderArmor !== '' ? defenderArmor : undefined)}</td>
                 <td className="right">{defender.agilityBonus}</td>
                 <td className="right">{defender.mdLenyeg}</td>
                 <td className="right">{defender.mdKapcsolat}</td>

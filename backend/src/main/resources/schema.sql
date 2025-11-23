@@ -1,0 +1,2 @@
+-- ALTER TABLE player_skills
+--   ADD COLUMN level_count INT DEFAULT 0 NULL;

@@ -18,7 +18,9 @@ import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.fight.FightServiceImpl;
 import com.sol.merp.fight.DualWieldCalculator;
+import com.sol.merp.charactercreation.EarlyYearsProfileService;
 import com.sol.merp.dto.AttackResultsDTO;
+import com.sol.merp.dto.EarlyYearsProfileDto;
 import com.sol.merp.modifiers.AttackModifierRepository;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.inventory.InventoryService;
@@ -90,10 +92,43 @@ public class ApiController {
     @Autowired
     private ClassSkillBonusService classSkillBonusService;
 
+    @Autowired
+    private EarlyYearsProfileService earlyYearsProfileService;
+
     // Players
     @GetMapping("/players")
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    @GetMapping("/players/{playerId}/early-years")
+    public ResponseEntity<EarlyYearsProfileDto> getEarlyYearsProfile(@PathVariable Long playerId) {
+        try {
+            EarlyYearsProfileDto dto = earlyYearsProfileService.loadProfile(playerId);
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.warn("Failed to load Early Years profile for player {} -> {}", playerId, ex.toString());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PutMapping("/players/{playerId}/early-years")
+    public ResponseEntity<EarlyYearsProfileDto> saveEarlyYearsProfile(@PathVariable Long playerId,
+                                                                      @RequestBody EarlyYearsProfileDto payload) {
+        if (payload == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            EarlyYearsProfileDto saved = earlyYearsProfileService.saveProfile(playerId, payload);
+            return ResponseEntity.ok(saved);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.warn("Failed to save Early Years profile for player {} -> {}", playerId, ex.toString());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/attributes/normal-bonuses")
@@ -411,8 +446,14 @@ public class ApiController {
         if (incoming.getHpMax() == null) incoming.setHpMax(0D);
         if (incoming.getHpActual() == null) incoming.setHpActual(incoming.getHpMax());
         if (incoming.getMm() == null) incoming.setMm(0);
+        if (incoming.getMmNone() == null) incoming.setMmNone(0);
+        if (incoming.getMmLeather() == null) incoming.setMmLeather(0);
+        if (incoming.getMmHeavyLeather() == null) incoming.setMmHeavyLeather(0);
+        if (incoming.getMmChainmail() == null) incoming.setMmChainmail(0);
+        if (incoming.getMmPlate() == null) incoming.setMmPlate(0);
         if (incoming.getTbUsedForDefense() == null) incoming.setTbUsedForDefense(0);
-        if (incoming.getTbOneHanded() == null) incoming.setTbOneHanded(0);
+        if (incoming.getTb1HSlashing() == null) incoming.setTb1HSlashing(0);
+        if (incoming.getTb1HBlunt() == null) incoming.setTb1HBlunt(0);
         if (incoming.getTbTwoHanded() == null) incoming.setTbTwoHanded(0);
         if (incoming.getTbRanged() == null) incoming.setTbRanged(0);
         if (incoming.getTbBaseMagic() == null) incoming.setTbBaseMagic(0);
@@ -423,6 +464,9 @@ public class ApiController {
         if (incoming.getAgilityBonus() == null) incoming.setAgilityBonus(0);
         if (incoming.getMdLenyeg() == null) incoming.setMdLenyeg(0);
         if (incoming.getMdKapcsolat() == null) incoming.setMdKapcsolat(0);
+        if (incoming.getTotalManaBonus() == null) incoming.setTotalManaBonus(0);
+        if (incoming.getTotalPoisonMdBonus() == null) incoming.setTotalPoisonMdBonus(0);
+        if (incoming.getTotalDiseaseMdBonus() == null) incoming.setTotalDiseaseMdBonus(0);
         if (incoming.getStunnedForRounds() == null || incoming.getStunnedForRounds() < 0) incoming.setStunnedForRounds(0);
         if (incoming.getHpLossPerRound() == null || incoming.getHpLossPerRound() < 0) incoming.setHpLossPerRound(0);
         if (incoming.getPenaltyOfActions() == null) incoming.setPenaltyOfActions(0);
@@ -434,6 +478,16 @@ public class ApiController {
         if (incoming.getRunes() == null) incoming.setRunes(0);
         if (incoming.getInfluence() == null) incoming.setInfluence(0);
         if (incoming.getStealth() == null) incoming.setStealth(0);
+        if (incoming.getClimbing() == null) incoming.setClimbing(0);
+        if (incoming.getRiding() == null) incoming.setRiding(0);
+        if (incoming.getSwimming() == null) incoming.setSwimming(0);
+        if (incoming.getBackstab() == null) incoming.setBackstab(0);
+        if (incoming.getAcrobatics() == null) incoming.setAcrobatics(0);
+        if (incoming.getShips() == null) incoming.setShips(0);
+        if (incoming.getCaving() == null) incoming.setCaving(0);
+        if (incoming.getFirstAid() == null) incoming.setFirstAid(0);
+        if (incoming.getCooking() == null) incoming.setCooking(0);
+        if (incoming.getRopes() == null) incoming.setRopes(0);
 
         Double hpAct = incoming.getHpActual();
         Double hpMax = incoming.getHpMax();
@@ -956,7 +1010,8 @@ public class ApiController {
                 incoming.setHpLossPerRound(0);
 
             // 3/b) Clamp detailed TBs to non-negative (schema may enforce >= 0)
-            if (incoming.getTbOneHanded() == null || incoming.getTbOneHanded() < 0) incoming.setTbOneHanded(0);
+            if (incoming.getTb1HSlashing() == null || incoming.getTb1HSlashing() < 0) incoming.setTb1HSlashing(0);
+            if (incoming.getTb1HBlunt() == null || incoming.getTb1HBlunt() < 0) incoming.setTb1HBlunt(0);
             if (incoming.getTbTwoHanded() == null || incoming.getTbTwoHanded() < 0) incoming.setTbTwoHanded(0);
             if (incoming.getTbRanged() == null || incoming.getTbRanged() < 0) incoming.setTbRanged(0);
             if (incoming.getTbBaseMagic() == null || incoming.getTbBaseMagic() < 0) incoming.setTbBaseMagic(0);
@@ -1132,11 +1187,11 @@ public class ApiController {
             case blunt:
             case clawsAndFangs:
             case grabOrBalance:
-                main = p.getTbOneHanded() != null ? p.getTbOneHanded() : 0;
+                main = p.getTb1HSlashing() != null ? p.getTb1HSlashing() : 0;
                 break;
             case dualWield:
-                main = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
-                off = DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield());
+                main = DualWieldCalculator.computeMainHandTb(p.getTb1HSlashing(), p.getDualWield());
+                off = DualWieldCalculator.computeOffHandTb(p.getTb1HSlashing(), p.getDualWield());
                 break;
             case twoHanded:
                 main = p.getTbTwoHanded() != null ? p.getTbTwoHanded() : 0;

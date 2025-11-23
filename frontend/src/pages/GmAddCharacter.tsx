@@ -4,7 +4,17 @@ import type { Player } from '../types';
 
 type MetaKey = 'genders' | 'races' | 'playerClasses' | 'armorTypes';
 
-type MetaOptions = Record<MetaKey, string[]>;
+type RaceOption = {
+  code: string;
+  displayName?: string | null;
+};
+
+type MetaOptions = {
+  genders: string[];
+  races: RaceOption[];
+  playerClasses: string[];
+  armorTypes: string[];
+};
 
 type NumberKind = 'int' | 'float';
 
@@ -33,9 +43,12 @@ const FIELD_DEFS: readonly FieldDefBase[] = [
   { key: 'playerClass', label: 'Class', type: 'select', metaKey: 'playerClasses' },
   { key: 'lvl', label: 'Level', type: 'number', numberKind: 'int' },
   { key: 'hpMax', label: 'HP Max', type: 'number', numberKind: 'float' },
-  { key: 'tbOneHanded', label: 'TB One-handed', type: 'number', numberKind: 'int' },
+  { key: 'totalManaBonus', label: 'Mana', type: 'number', numberKind: 'int' },
+  { key: 'tb1HSlashing', label: 'TB Slashing', type: 'number', numberKind: 'int' },
+  { key: 'tb1HBlunt', label: 'TB Blunt', type: 'number', numberKind: 'int' },
   { key: 'tbTwoHanded', label: 'TB Two-handed', type: 'number', numberKind: 'int' },
   { key: 'tbRanged', label: 'TB Ranged', type: 'number', numberKind: 'int' },
+  { key: 'tbUnarmed', label: 'TB Unarmed', type: 'number', numberKind: 'int' },
   { key: 'tbBaseMagic', label: 'TB Base Magic', type: 'number', numberKind: 'int' },
   { key: 'tbTargetMagic', label: 'TB Target Magic', type: 'number', numberKind: 'int' },
   { key: 'vb', label: 'VB', type: 'number', numberKind: 'int' },
@@ -44,7 +57,11 @@ const FIELD_DEFS: readonly FieldDefBase[] = [
   { key: 'dualWield', label: 'Dual Wield', type: 'number', numberKind: 'int' },
   { key: 'mdLenyeg', label: 'MD Lényeg', type: 'number', numberKind: 'int' },
   { key: 'mdKapcsolat', label: 'MD Kapcsolat', type: 'number', numberKind: 'int' },
-  { key: 'mm', label: 'MM', type: 'number', numberKind: 'int' },
+  { key: 'mmNone', label: 'No Armor', type: 'number', numberKind: 'int' },
+  { key: 'mmLeather', label: 'Leather', type: 'number', numberKind: 'int' },
+  { key: 'mmHeavyLeather', label: 'Heavy Leather', type: 'number', numberKind: 'int' },
+  { key: 'mmChainmail', label: 'Chainmail', type: 'number', numberKind: 'int' },
+  { key: 'mmPlate', label: 'Plate', type: 'number', numberKind: 'int' },
   { key: 'agilityBonus', label: 'Agility Bonus', type: 'number', numberKind: 'int' },
   { key: 'stealth', label: 'Stealth', type: 'number', numberKind: 'int' },
   { key: 'perception', label: 'Perception', type: 'number', numberKind: 'int' },
@@ -74,7 +91,7 @@ function createInitialValues(): FormValues {
 }
 
 function formatOptionLabel(value: string): string {
-  if (!value) return '';
+  if (typeof value !== 'string' || !value) return '';
   const spaced = value
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -113,7 +130,7 @@ export default function GmAddCharacter() {
         setMetaError(null);
         const [genders, races, playerClasses, armorTypes] = await Promise.all([
           get<string[]>('/meta/genders'),
-          get<string[]>('/meta/races'),
+          get<RaceOption[]>('/meta/races'),
           get<string[]>('/meta/player-classes'),
           get<string[]>('/meta/armor-types')
         ]);
@@ -149,9 +166,18 @@ export default function GmAddCharacter() {
       }
       if (field.type === 'select') {
         const staticLabels = field.options?.map((option) => option.label) ?? [];
-        const metaLabels = field.metaKey
-          ? (meta[field.metaKey]?.map((option) => formatOptionLabel(option)) ?? [])
-          : [];
+        const metaLabels = (() => {
+          if (!field.metaKey) return [];
+          if (field.metaKey === 'races') {
+            return meta.races.map((option) => {
+              const display = option.displayName?.trim();
+              return display && display.length > 0 ? display : formatOptionLabel(option.code);
+            });
+          }
+          const values = meta[field.metaKey];
+          if (!Array.isArray(values)) return [];
+          return (values as string[]).map((option) => formatOptionLabel(option));
+        })();
         const labels = [...staticLabels, ...metaLabels, 'Select…'];
         const longest = labels.reduce((max, label) => Math.max(max, label.length), 0);
         const widthCh = longest + 2;
@@ -262,16 +288,23 @@ export default function GmAddCharacter() {
           <thead>
             <tr>
               {FIELD_DEFS.map((field) => {
-                const isTbColumn = field.key === 'tbOneHanded'
+                const isTbColumn = field.key === 'tb1HSlashing'
+                  || field.key === 'tb1HBlunt'
                   || field.key === 'tbTwoHanded'
                   || field.key === 'tbRanged'
+                  || field.key === 'tbUnarmed'
                   || field.key === 'tbBaseMagic'
                   || field.key === 'tbTargetMagic';
-                if (field.key === 'tbOneHanded') {
+                const isMmColumn = field.key === 'mmNone'
+                  || field.key === 'mmLeather'
+                  || field.key === 'mmHeavyLeather'
+                  || field.key === 'mmChainmail'
+                  || field.key === 'mmPlate';
+                if (field.key === 'tb1HSlashing') {
                   return (
                     <th
                       key="tbGroup"
-                      colSpan={5}
+                      colSpan={7}
                       style={{
                         border: '1px solid #ddd',
                         padding: '6px 8px',
@@ -286,7 +319,29 @@ export default function GmAddCharacter() {
                     </th>
                   );
                 }
+                if (field.key === 'mmNone') {
+                  return (
+                    <th
+                      key="mmGroup"
+                      colSpan={5}
+                      style={{
+                        border: '1px solid #ddd',
+                        padding: '6px 8px',
+                        background: '#2f5597',
+                        color: '#fff',
+                        fontSize: 12,
+                        textTransform: 'uppercase',
+                        textAlign: 'center'
+                      }}
+                    >
+                      MM
+                    </th>
+                  );
+                }
                 if (isTbColumn) {
+                  return null;
+                }
+                if (isMmColumn) {
                   return null;
                 }
                 return (
@@ -311,9 +366,11 @@ export default function GmAddCharacter() {
             </tr>
             <tr>
               {FIELD_DEFS.filter((field) =>
-                field.key === 'tbOneHanded'
+                field.key === 'tb1HSlashing'
+                || field.key === 'tb1HBlunt'
                 || field.key === 'tbTwoHanded'
                 || field.key === 'tbRanged'
+                || field.key === 'tbUnarmed'
                 || field.key === 'tbBaseMagic'
                 || field.key === 'tbTargetMagic'
               ).map((field) => (
@@ -332,6 +389,28 @@ export default function GmAddCharacter() {
                   {field.label.startsWith('TB ')
                     ? field.label.replace(/^TB\s+/i, '')
                     : field.label}
+                </th>
+              ))}
+              {FIELD_DEFS.filter((field) =>
+                field.key === 'mmNone'
+                || field.key === 'mmLeather'
+                || field.key === 'mmHeavyLeather'
+                || field.key === 'mmChainmail'
+                || field.key === 'mmPlate'
+              ).map((field) => (
+                <th
+                  key={field.key}
+                  style={{
+                    border: '1px solid #ddd',
+                    padding: '6px 8px',
+                    background: '#2f5597',
+                    color: '#fff',
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    ...(columnStyles[field.key as FormKey] ?? {})
+                  }}
+                >
+                  {field.label}
                 </th>
               ))}
             </tr>
@@ -382,7 +461,29 @@ export default function GmAddCharacter() {
                       </select>
                     )}
                     {field.type === 'select' && !field.options && field.metaKey && (() => {
-                      const metaKey = field.metaKey;
+                      if (field.metaKey === 'races') {
+                        return (
+                          <select
+                            value={value}
+                            onChange={(e) => updateField(field.key, e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box' }}
+                            disabled={loadingMeta}
+                          >
+                            <option value="">Select…</option>
+                            {meta.races.map((option) => {
+                              const label = option.displayName && option.displayName.trim().length > 0
+                                ? option.displayName
+                                : formatOptionLabel(option.code);
+                              return (
+                                <option key={option.code} value={option.code}>
+                                  {label}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        );
+                      }
+                      const metaKey = field.metaKey as Exclude<MetaKey, 'races'>;
                       const metaOptions = meta[metaKey];
                       return (
                         <select

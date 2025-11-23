@@ -6,6 +6,7 @@ import com.sol.merp.attributes.*;
 import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.skills.PlayerSkill;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,6 +20,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Player {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -29,6 +31,16 @@ public class Player {
     private Gender gender;
     private Race race;
     private PlayerClass playerClass;
+    private String magicSchool = "";
+    private String age = "";
+    private String height = "";
+    private String weight = "";
+    private String hair = "";
+    private String eyes = "";
+    private String personality = "";
+    private String alignment = "";
+    private String motivation = "";
+    private String specialty = "";
     private Boolean isPlaying;
     private Boolean isActive; //capable for actions
     private Boolean isAlive;
@@ -40,24 +52,32 @@ public class Player {
     private PlayerTarget target;
     private Double hpMax;
     private Double hpActual;
-    private Integer mm;
-    private Integer tb; //TODO Hasmpap legyen azattacktype syerinti kulcsokkal és a hozzá tartozó TB értékekkel
-    private Integer tbOneHanded;
+    private Integer mm = 0;
+    private Integer mmNone = 0;
+    private Integer mmLeather = 0;
+    private Integer mmHeavyLeather = 0;
+    private Integer mmChainmail = 0;
+    private Integer mmPlate = 0;
+    private Integer tb;
+    private Integer tb1HSlashing = 0;
+    private Integer tb1HBlunt = 0;
+    private Integer tbUnarmed = 0;
     private Integer tbTwoHanded;
     private Integer tbRanged;
     private Integer tbBaseMagic;
     private Integer tbTargetMagic;
     private Integer tbUsedForDefense;
-    private Integer tbOffHand = 0; //TODO Tesó rugójához kell kkésőbb (esetleg mehet ez is a TB Hashmapba)
+    private Integer tbOffHand = 0;
     private Integer dualWield = 0;
     private Long equippedWeaponId;
-//    private Integer baseMagicTB;
-//    private Integer targetMagicTB;
     private Integer vb;
     private Boolean shield;
     private Integer agilityBonus;
     private Integer mdLenyeg;
     private Integer mdKapcsolat;
+    private Integer totalManaBonus = 0;
+    private Integer totalPoisonMdBonus = 0;
+    private Integer totalDiseaseMdBonus = 0;
     private ArmorType armorType;
     private Boolean isStunned;
     private Integer stunnedForRounds;
@@ -71,6 +91,16 @@ public class Player {
     private Integer runes; //runaolvasas
     private Integer influence; //befolyasolas
     private Integer stealth; //lopakodas/rejtozkodes
+    private Integer climbing = 0;
+    private Integer riding = 0;
+    private Integer swimming = 0;
+    private Integer backstab = 0;
+    private Integer acrobatics = 0;
+    private Integer ships = 0;
+    private Integer caving = 0;
+    private Integer firstAid = 0;
+    private Integer cooking = 0;
+    private Integer ropes = 0;
     @ElementCollection
     @CollectionTable(name = "player_active_penalty_effects", joinColumns = @JoinColumn(name = "player_id"))
     private List<PenaltyEffect> activePenaltyEffects = new ArrayList<>();
@@ -82,6 +112,22 @@ public class Player {
     @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<PlayerSkill> playerSkills = new ArrayList<>();
+
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerSpellList> spellLists = new ArrayList<>();
+
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerLanguage> languages = new ArrayList<>();
+
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerAttributeTotal> attributeTotals = new ArrayList<>();
+
+    @OneToMany(mappedBy = "player", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<PlayerBonusAdjustment> bonusAdjustments = new ArrayList<>();
 
     // XP level caps (index = level). Level 1..20 supported.
     private static final int[] LEVEL_CAPS = new int[] {
@@ -114,62 +160,8 @@ public class Player {
         return (double) LEVEL_CAPS[idx];
     }
 
-//     //this one is used for charactercreation when starting the app
-//     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, PlayerActivity playerActivity, AttackType attackType, CritType critType,
-//                   PlayerTarget target, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer dualWield, Integer vb,
-//                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
-//                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
-//         this.characterId = characterId;
-//         this.name = name;
-//         this.gender = gender;
-//         this.race = race;
-//         this.playerClass = playerClass;
-//         this.isPlaying = false;
-//         this.isActive = true;
-//         this.isAlive = true;
-//         this.lvl = lvl;
-//         this.xp = getLevelCap(lvl);
-//         this.playerActivity = playerActivity;
-//         this.attackType = attackType;
-//         this.critType = critType;
-//         this.target = target;
-//         this.hpMax = hpMax;
-//         this.hpActual = hpMax;
-//         this.mm = mm;
-//         this.tb = 0;
-//         this.tbOneHanded = tbOneHanded;
-//         this.tbTwoHanded = tbTwoHanded;
-//         this.tbRanged = tbRanged;
-//         this.tbBaseMagic = tbBaseMagic;
-//         this.tbTargetMagic = tbTargetMagic;
-//         this.tbUsedForDefense = 0;
-//         this.tbOffHand = 0;
-//         this.dualWield = dualWield != null ? dualWield : 0;
-// //        this.baseMagicTB = baseMagicTB;
-// //        this.targetMagicTB = targetMagicTB;
-//         this.vb = vb;
-//         this.shield = shield;
-//         this.agilityBonus = agilityBonus;
-//         this.mdLenyeg = mdLenyeg;
-//         this.mdKapcsolat = mdKapcsolat;
-//         this.armorType = armorType;
-//         this.isStunned = false;
-//         this.stunnedForRounds = 0;
-//         this.penaltyOfActions = 0;
-//         this.hpLossPerRound = 0;
-//         this.perception = perception;
-//         this.tracking = tracking;
-//         this.lockPicking = lockPicking;
-//         this.disarmTraps = disarmTraps;
-//         this.objectUsage = objectUsage;
-//         this.runes = runes;
-//         this.influence = influence;
-//         this.stealth = stealth;
-//         this.activePenaltyEffects = new ArrayList<>();
-//     }
-
        //this one is used for charactercreation when starting the app
-    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, Double hpMax, Integer mm, Integer tbOneHanded, Integer tbTwoHanded, Integer tbRanged, Integer tbBaseMagic, Integer tbTargetMagic, Integer dualWield, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
+    public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, Double hpMax, Integer mana, Integer mmNone, Integer mmLeather, Integer mmHeavyLeather, Integer mmChainmail, Integer mmPlate, Integer tb1HSlashing, Integer tb1HBlunt, Integer tbTwoHanded, Integer tbRanged, Integer tbUnarmed, Integer tbBaseMagic, Integer tbTargetMagic, Integer dualWield, Integer vb, Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking, Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
         this.characterId = characterId;
         this.name = name;
         this.gender = gender;
@@ -186,11 +178,19 @@ public class Player {
         this.target = PlayerTarget.none;
         this.hpMax = hpMax;
         this.hpActual = hpMax;
-        this.mm = mm;
+        this.totalManaBonus = mana;
+        this.mm = 0;
+        this.mmNone = mmNone;
+        this.mmLeather = mmLeather;
+        this.mmHeavyLeather = mmHeavyLeather;
+        this.mmChainmail = mmChainmail;
+        this.mmPlate = mmPlate;
         this.tb = 0;
-        this.tbOneHanded = tbOneHanded;
+        this.tb1HSlashing = tb1HSlashing;
+        this.tb1HBlunt = tb1HBlunt;
         this.tbTwoHanded = tbTwoHanded;
         this.tbRanged = tbRanged;
+        this.tbUnarmed = tbUnarmed;
         this.tbBaseMagic = tbBaseMagic;
         this.tbTargetMagic = tbTargetMagic;
         this.tbUsedForDefense = 0;
@@ -216,103 +216,6 @@ public class Player {
         this.stealth = stealth;
         this.activePenaltyEffects = new ArrayList<>();
     }
-
-    //TODO delete / ideiglenes a playertarget beallitashoz
-//     public Player(String characterId, String name, Gender gender, Race race, PlayerClass playerClass, Integer lvl, AttackType attackType, CritType critType,
-//                   Double hpMax, Integer mm, Integer dualWield, Integer vb,
-//                   Boolean shield, Integer agilityBonus, Integer mdLenyeg, Integer mdKapcsolat, ArmorType armorType, Integer perception, Integer tracking,
-//                   Integer lockPicking, Integer disarmTraps, Integer objectUsage, Integer runes, Integer influence, Integer stealth) {
-//         this.characterId = characterId;
-//         this.name = name;
-//         this.gender = gender;
-//         this.race = race;
-//         this.playerClass = playerClass;
-//         this.isPlaying = false;
-//         this.isActive = true;
-//         this.lvl = lvl;
-//         this.xp = getLevelCap(lvl);
-//         this.playerActivity = PlayerActivity._5DoNothing;
-//         this.attackType = attackType;
-//         this.critType = critType;
-//         this.target = PlayerTarget.none;
-//         this.hpMax = hpMax;
-//         this.hpActual = hpMax;
-//         this.mm = mm;
-//         this.tb = 0;
-//         this.tbUsedForDefense = 0;
-//         this.tbOffHand = 0;
-//         this.dualWield = dualWield != null ? dualWield : 0;
-// //        this.baseMagicTB = baseMagicTB;
-// //        this.targetMagicTB = targetMagicTB;
-//         this.vb = vb;
-//         this.shield = shield;
-//         this.agilityBonus = agilityBonus;
-//         this.mdLenyeg = mdLenyeg;
-//         this.mdKapcsolat = mdKapcsolat;
-//         this.armorType = armorType;
-//         this.isStunned = false;
-//         this.stunnedForRounds = 0;
-//         this.penaltyOfActions = 0;
-//         this.hpLossPerRound = 0;
-//         this.perception = perception;
-//         this.tracking = tracking;
-//         this.lockPicking = lockPicking;
-//         this.disarmTraps = disarmTraps;
-//         this.objectUsage = objectUsage;
-//         this.runes = runes;
-//         this.influence = influence;
-//         this.stealth = stealth;
-//     }
-
-
-    //    public void setTbUsedForDefense(Integer tbUsedForDefense) {
-//        if (tbUsedForDefense > this.tb / 2) {
-//            this.tbUsedForDefense = this.tb / 2;
-//        } else this.tbUsedForDefense = tbUsedForDefense;
-//    }
-
-    //    public void setHpActual(Double hpActual) {
-//        if (hpActual <= 0d) {
-//            this.hpActual = 0d;
-//            this.isActive = false;
-//            this.playerActivity = PlayerActivity._5DoNothing;
-//            this.isStunned = false;
-//            this.stunnedForRounds = 0;
-//        } else this.hpActual = hpActual;
-//    }
-//
-//    public void setPlayerActivity(PlayerActivity playerActivity) {
-//        if ((playerActivity.equals(PlayerActivity._1PerformMagic)) ||
-//                (playerActivity.equals(PlayerActivity._2RangedAttack)) ||
-//                (playerActivity.equals(PlayerActivity._3PhisicalAttackOrMovement))){
-//            setIsActive(true);
-//        }
-//        this.playerActivity = playerActivity;
-//    }
-//
-//    public void setStunned(Boolean stunned) {
-//        if ((this.hpActual <= 0) || (this.stunnedForRounds == 0)) {
-//            this.isStunned = false;
-//        }
-//        if (stunned) {
-//            this.stunnedForRounds = 1;
-//        }
-//        isStunned = stunned;
-//    }
-
-//    public void setAlive(Boolean alive) {
-//        if (!alive) {
-//            setHpActual(0D);
-//            setIsActive(false);
-//            setIsStunned(false);
-//            setStunnedForRounds(0);
-//            setPlayerActivity(PlayerActivity._5DoNothing);
-//        }
-//        isAlive = alive;
-//    }
-
-
-    //TODO this way won't work - service method needed with same logic, check all Object when POST
 
     public void addPenaltyEffect(int value, int rounds) {
         if (value <= 0 || rounds <= 0) return;

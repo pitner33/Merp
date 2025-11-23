@@ -468,16 +468,25 @@ export default function AdventureFightRound() {
         offhand = 0;
         break;
       case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbOneHanded ?? 0;
+        main = p.tb1HSlashing ?? 0;
         offhand = 0;
         break;
-      case 'dualWield':
-        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+      case 'blunt':
+        main = p.tb1HBlunt ?? 0;
+        offhand = 0;
         break;
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = p.tbUnarmed ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield': {
+        const isBlunt = p.critType === 'blunt';
+        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
+        main = computeDualWieldMainTb(base1H, p.dualWield);
+        offhand = computeDualWieldOffHandTb(base1H, p.dualWield);
+        break;
+      }
       case 'twoHanded':
         main = p.tbTwoHanded ?? 0;
         offhand = 0;
@@ -500,7 +509,9 @@ export default function AdventureFightRound() {
         offhand = 0;
         break;
     }
-    return { main: main + bonusMain, offhand: offhand + bonusOff };
+    main += bonusMain;
+    offhand += bonusOff;
+    return { main, offhand };
   }
 
   function computeTb(p: Player): number {

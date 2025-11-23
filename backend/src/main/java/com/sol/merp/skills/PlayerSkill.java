@@ -40,6 +40,14 @@ public class PlayerSkill {
     @Column(nullable = false)
     private int levelBonus = 0;
 
+    @Builder.Default
+    @Column(name = "level_count", nullable = false)
+    private int levelCount = 0;
+
+    @Builder.Default
+    @Column(name = "levels_mask", length = 128)
+    private String levelsMask = "";
+
     @Column(nullable = false)
     private int attributeBonus = 0;
 
@@ -55,7 +63,15 @@ public class PlayerSkill {
     @Column(nullable = false)
     private int totalBonus = 0;
 
+    @Column(name = "manual_level_input")
+    private Integer manualLevelInput;
+
     public void recomputeTotal() {
         this.totalBonus = levelBonus + attributeBonus + classBonus + itemBonus + specialBonus;
+    }
+
+    public void updateLevelSelections(int levelCount, String levelsMask) {
+        this.levelCount = Math.max(0, levelCount);
+        this.levelsMask = levelsMask != null ? levelsMask : "";
     }
 }

@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { post } from '../api/client';
+import { saveEarlyYearsProfile, type EarlyYearsProfileDto, type BonusAdjustmentDto, type SkillRowDto as EarlyYearsSkillRowDto } from '../api/earlyYears';
 
 const COLORS = {
   primary: '#2f5597',
@@ -52,6 +54,7 @@ const SKILL_DEFINITIONS: readonly SkillDefinitionEntry[] = [
   { name: 'Blunt', category: 'Weapon Skills', attributeKey: 'STR' },
   { name: 'Two-handed', category: 'Weapon Skills', attributeKey: 'STR' },
   { name: 'Dual Wield', category: 'Weapon Skills', attributeKey: 'STR' },
+  { name: 'Unarmed Combat', category: 'Weapon Skills', attributeKey: 'DEX' },
   { name: 'Ranged', category: 'Weapon Skills', attributeKey: 'DEX' },
   { name: 'VB', category: 'Weapon Skills', attributeKey: 'DEX' },
   { name: 'Climbing', category: 'General Skills', attributeKey: 'DEX' },
@@ -332,6 +335,8 @@ export default function CreateCharacterEarlyYears() {
   const [mdBonusAdjustments, setMdBonusAdjustments] = useState(() => MD_BONUS_ROWS.map(() => ({ itemBonus: '0', specialBonus: '0' })));
   const [raceBonusError, setRaceBonusError] = useState<string | null>(null);
   const [raceBonusLoading, setRaceBonusLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [skillRows, setSkillRows] = useState<SkillRowState[]>(() =>
     SKILL_DEFINITIONS.map((definition) => {
       const isHpMax = definition.name === HP_MAX_SKILL_NAME;
@@ -691,6 +696,121 @@ export default function CreateCharacterEarlyYears() {
       }
       return next;
     }));
+  }
+
+  function buildLevelsMask(levels: boolean[]): string {
+    return levels.map((checked) => (checked ? '1' : '0')).join('');
+  }
+
+  function buildEarlyYearsBonusAdjustments(): BonusAdjustmentDto[] {
+    const result: BonusAdjustmentDto[] = [];
+
+    const mana = manaBonusRow;
+    if (mana.attributeLabel) {
+      result.push({
+        bonusKey: 'mana',
+        label: 'Mana',
+        attributeKey: mana.attributeLabel,
+        attributeBonus: mana.attributeBonus,
+        itemBonus: mana.itemBonus,
+        specialBonus: mana.specialBonus,
+        totalBonus: mana.totalBonus,
+        displayOrder: 0
+      });
+    }
+
+    mdBonusRows.forEach((row, index) => {
+      result.push({
+        bonusKey: row.label.toLowerCase().replace(/\s+/g, '-'),
+        label: row.label,
+        attributeKey: row.attributeKey,
+        attributeBonus: row.attributeBonus,
+        itemBonus: row.itemBonus,
+        specialBonus: row.specialBonus,
+        totalBonus: row.totalBonus,
+        displayOrder: index + 1
+      });
+    });
+
+    return result;
+  }
+
+  function buildEarlyYearsSkills(): EarlyYearsSkillRowDto[] {
+    return SKILL_DEFINITIONS_WITH_INDEX.map((definition, index) => {
+      const display = skillDisplayRows[index];
+      const state = skillRows[index];
+      if (!display || !state) {
+        return {
+          skillName: definition.name
+        };
+      }
+      const levelCount = state.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      return {
+        skillName: definition.name,
+        levelBonus: display.levelBonus,
+        levelCount,
+        levelsMask: buildLevelsMask(state.levels),
+        attributeBonus: display.attributeBonus,
+        classBonus: display.classBonus,
+        itemBonus: display.itemBonus,
+        specialBonus: display.specialBonus,
+        totalBonus: display.totalBonus,
+        manualLevelInput: definition.name === HP_MAX_SKILL_NAME
+          ? Number.parseInt(state.manualLevelInput || '0', 10) || 0
+          : undefined
+      };
+    });
+  }
+
+  function buildEarlyYearsProfileDto(): EarlyYearsProfileDto {
+    const attributes = attributeRows.map((row) => ({
+      attributeKey: row.attribute,
+      baseValue: row.baseValue ?? undefined,
+      normalBonus: row.normalBonus ?? undefined,
+      raceBonus: row.raceBonus ?? undefined,
+      totalBonus: row.totalBonus ?? undefined
+    }));
+
+    const spellListsDto = spellLists.map((row, index) => ({
+      id: row.id,
+      name: row.name || null,
+      chance: row.chance !== '' ? Number.parseInt(row.chance, 10) || 0 : 0,
+      learnt: row.learnt,
+      displayOrder: index
+    }));
+
+    const languagesDto = languages.map((row, index) => ({
+      id: row.id,
+      name: row.name || null,
+      level: row.level !== '' ? Number.parseInt(row.level, 10) || 0 : 0,
+      displayOrder: index
+    }));
+
+    return {
+      baseData: {
+        characterId: baseData.characterId || null,
+        name: baseData.name || null,
+        gender: baseData.gender || null,
+        race: baseData.race || null,
+        playerClass: baseData.playerClass || null,
+        magicSchool: baseData.magicSchool || null,
+        age: baseData.age || null,
+        height: baseData.height || null,
+        weight: baseData.weight || null,
+        hair: baseData.hair || null,
+        eyes: baseData.eyes || null,
+        personality: baseData.personality || null,
+        alignment: baseData.alignment || null,
+        motivation: baseData.motivation || null,
+        specialty: baseData.specialty || null,
+        armorType: baseData.armorType || null
+      },
+      attributes,
+      spellLists: spellListsDto,
+      languages: languagesDto,
+      bonusAdjustments: buildEarlyYearsBonusAdjustments(),
+      skills: buildEarlyYearsSkills()
+    };
   }
 
   function handleMdBonusChange(index: number, key: 'itemBonus' | 'specialBonus', value: string) {
@@ -1087,17 +1207,59 @@ export default function CreateCharacterEarlyYears() {
     navigate('/create-character');
   }
 
-  function handleNext() {
-    navigate('/create-character-levelup', {
-      state: {
-        fromEarlyYears: {
-          baseData,
-          attributeRows,
-          skillRows,
-          mdBonusAdjustments
-        }
+  async function handleNext() {
+    if (saving) return;
+    setSaveError(null);
+
+    const characterIdPrefix = baseData.characterId?.trim();
+    const name = baseData.name?.trim();
+    const gender = baseData.gender?.trim();
+    const race = baseData.race?.trim();
+    const playerClass = baseData.playerClass?.trim();
+
+    if (!characterIdPrefix || !name || !gender || !race || !playerClass) {
+      setSaveError('Please fill in Character ID, Name, Gender, Race and Class before continuing.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const playerPayload: Record<string, unknown> = {
+        characterId: characterIdPrefix,
+        name,
+        gender,
+        race,
+        playerClass,
+        armorType: baseData.armorType || 'none'
+      };
+
+      const created = await post<{ id: number }>('/players', playerPayload);
+      const playerId = created?.id;
+      if (!playerId) {
+        throw new Error('Player was created but no id was returned.');
       }
-    });
+
+      const profile = buildEarlyYearsProfileDto();
+      await saveEarlyYearsProfile(playerId, profile);
+
+      navigate('/create-character-levelup', {
+        state: {
+          playerId,
+          fromEarlyYears: {
+            baseData,
+            attributeRows,
+            skillRows,
+            mdBonusAdjustments,
+            spellLists,
+            languages
+          }
+        }
+      });
+    } catch (error) {
+      setSaveError('Failed to save Early Years data. Please check your inputs and try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -1134,9 +1296,12 @@ export default function CreateCharacterEarlyYears() {
             cursor: 'pointer'
           }}
         >
-          Next
+          {saving ? 'Saving…' : 'Next'}
         </button>
       </div>
+      {saveError && (
+        <p style={{ textAlign: 'center', color: COLORS.danger, fontWeight: 600 }}>{saveError}</p>
+      )}
       <style>
         {`
           .early-years-section {

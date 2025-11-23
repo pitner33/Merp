@@ -56,14 +56,24 @@ public class FightServiceImpl implements FightService {
         if (p == null || p.getAttackType() == null) return p != null ? p.getTb() : null;
         switch (p.getAttackType()) {
             case slashing:
+                p.setTbOffHand(0);
+                return p.getTb1HSlashing();
             case blunt:
+                 p.setTbOffHand(0);
+                return p.getTb1HBlunt();
             case clawsAndFangs:
             case grabOrBalance:
                 p.setTbOffHand(0);
-                return p.getTbOneHanded();
+                return p.getTbUnarmed();
             case dualWield:
-                int mainTb = DualWieldCalculator.computeMainHandTb(p.getTbOneHanded(), p.getDualWield());
-                p.setTbOffHand(DualWieldCalculator.computeOffHandTb(p.getTbOneHanded(), p.getDualWield()));
+                int baseMain;
+                if (p.getCritType() == CritType.blunt) {
+                    baseMain = p.getTb1HBlunt();
+                } else {
+                    baseMain = p.getTb1HSlashing();
+                }
+                int mainTb = DualWieldCalculator.computeMainHandTb(baseMain, p.getDualWield());
+                p.setTbOffHand(DualWieldCalculator.computeOffHandTb(baseMain, p.getDualWield()));
                 return mainTb;
             case twoHanded:
                 p.setTbOffHand(0);

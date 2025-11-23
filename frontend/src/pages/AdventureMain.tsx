@@ -336,6 +336,24 @@ export default function AdventureMain() {
     return `${pct}%`;
   }
 
+  function computeMmForPlayer(p: Player): number {
+    const base = p.mm ?? 0;
+    const armor = p.armorType ?? 'none';
+    switch (armor) {
+      case 'leather':
+        return p.mmLeather ?? base;
+      case 'heavyLeather':
+        return p.mmHeavyLeather ?? base;
+      case 'chainmail':
+        return p.mmChainmail ?? base;
+      case 'plate':
+        return p.mmPlate ?? base;
+      case 'none':
+      default:
+        return p.mmNone ?? base;
+    }
+  }
+
   function computeTbPair(p: Player): { main: number; offhand: number } {
     const weaponToken = weaponValueForPlayer(p);
     let bonusMain = 0;
@@ -360,16 +378,25 @@ export default function AdventureMain() {
         offhand = 0;
         break;
       case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbOneHanded ?? 0;
+        main = p.tb1HSlashing ?? 0;
         offhand = 0;
         break;
-      case 'dualWield':
-        main = computeDualWieldMainTb(p.tbOneHanded, p.dualWield);
-        offhand = computeDualWieldOffHandTb(p.tbOneHanded, p.dualWield);
+      case 'blunt':
+        main = p.tb1HBlunt ?? 0;
+        offhand = 0;
         break;
+      case 'clawsAndFangs':
+      case 'grabOrBalance':
+        main = p.tbUnarmed ?? 0;
+        offhand = 0;
+        break;
+      case 'dualWield': {
+        const isBlunt = p.critType === 'blunt';
+        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
+        main = computeDualWieldMainTb(base1H, p.dualWield);
+        offhand = computeDualWieldOffHandTb(base1H, p.dualWield);
+        break;
+      }
       case 'twoHanded':
         main = p.tbTwoHanded ?? 0;
         offhand = 0;
@@ -836,7 +863,7 @@ export default function AdventureMain() {
                 <th rowSpan={2}>TB</th>
                 <th rowSpan={2}>TB OH</th>
                 <th rowSpan={2}>TB for Defense</th>
-                <th colSpan={5} style={{ textAlign: 'center' }}>TB</th>
+                <th colSpan={7} style={{ textAlign: 'center' }}>TB</th>
                 <th rowSpan={2}>VB</th>
                 <th rowSpan={2}>Shield</th>
                 <th rowSpan={2}>Dual Wield</th>
@@ -844,6 +871,7 @@ export default function AdventureMain() {
                 <th rowSpan={2}>Penalty</th>
                 <th rowSpan={2}>HP Loss/Round</th>
                 <th rowSpan={2}>MM</th>
+                <th colSpan={5} style={{ textAlign: 'center' }}>MM</th>
                 <th rowSpan={2}>AGI Bonus</th>
                 <th colSpan={2} style={{ textAlign: 'center' }}>MD</th>
                 <th rowSpan={2}>Perception</th>
@@ -856,11 +884,18 @@ export default function AdventureMain() {
                 <th rowSpan={2}>Stealth</th>
               </tr>
               <tr>
-                <th>1H</th>
+                <th>1H Slashing</th>
+                <th>1H Blunt</th>
                 <th>2H</th>
                 <th>Ranged</th>
+                <th>Unarmed</th>
                 <th>Base Magic</th>
                 <th>Target Magic</th>
+                <th>No armor</th>
+                <th>Leather</th>
+                <th>Heavy Leather</th>
+                <th>Chainmail</th>
+                <th>Plate</th>
                 <th>Lenyeg</th>
                 <th>Kapcsolat</th>
               </tr>
@@ -1180,9 +1215,11 @@ export default function AdventureMain() {
                       );
                     })()}
                   </td>
-                  <td className="right">{p.tbOneHanded}</td>
+                  <td className="right">{p.tb1HSlashing}</td>
+                  <td className="right">{p.tb1HBlunt}</td>
                   <td className="right">{p.tbTwoHanded}</td>
                   <td className="right">{p.tbRanged}</td>
+                  <td className="right">{p.tbUnarmed}</td>
                   <td className="right">{p.tbBaseMagic}</td>
                   <td className="right">{p.tbTargetMagic}</td>
                   <td className="right">{p.vb}</td>
@@ -1226,7 +1263,12 @@ export default function AdventureMain() {
                   <td className="right">{p.stunnedForRounds}</td>
                   <td className="right">{p.penaltyOfActions}</td>
                   <td className="right">{p.hpLossPerRound}</td>
-                  <td className="right">{p.mm}</td>
+                  <td className="right">{computeMmForPlayer(p)}</td>
+                  <td className="right">{p.mmNone}</td>
+                  <td className="right">{p.mmLeather}</td>
+                  <td className="right">{p.mmHeavyLeather}</td>
+                  <td className="right">{p.mmChainmail}</td>
+                  <td className="right">{p.mmPlate}</td>
                   <td className="right">{p.agilityBonus}</td>
                   <td className="right">{p.mdLenyeg}</td>
                   <td className="right">{p.mdKapcsolat}</td>

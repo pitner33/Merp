@@ -41,6 +41,7 @@ type FormValues = {
   critCapMH: string;
   critCapOH: string;
   specialModofierTB: string;
+  manaCost: string;
   weight: string;
 };
 
@@ -59,6 +60,7 @@ const FIELD_DEFS: readonly FieldDef[] = [
   { key: 'critCapMH', label: 'Crit Cap MH', type: 'text' },
   { key: 'critCapOH', label: 'Crit Cap OH', type: 'text' },
   { key: 'specialModofierTB', label: 'Special Modifier TB', type: 'number', numberKind: 'int' },
+  { key: 'manaCost', label: 'Mana Cost', type: 'number', numberKind: 'int' },
   { key: 'weight', label: 'Weight', type: 'number', numberKind: 'float' }
 ];
 

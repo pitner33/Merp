@@ -257,6 +257,7 @@ export default function PlayerInventory() {
               <th style={thStyle}>Crit Cap MH</th>
               <th style={thStyle}>Crit Cap OH</th>
               <th style={thStyle}>Special Modifier TB</th>
+              <th style={thStyle}>Mana cost</th>
               <th style={thStyle}>Weight</th>
               <th style={thStyle}>Actions</th>
             </tr>
@@ -286,6 +287,7 @@ export default function PlayerInventory() {
                   <td style={tdStyle}>{weapon.critCapMH ?? '—'}</td>
                   <td style={tdStyle}>{weapon.critCapOH ?? '—'}</td>
                   <td style={tdStyle}>{formatNumber(weapon.specialModofierTB)}</td>
+                  <td style={tdStyle}>{formatNumber(weapon.manaCost)}</td>
                   <td style={tdStyle}>{weapon.weight != null ? `${weapon.weight}` : '—'}</td>
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <button

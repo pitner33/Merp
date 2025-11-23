@@ -4,6 +4,7 @@ import com.sol.merp.attributes.AttackType;
 import com.sol.merp.attributes.PlayerActivity;
 import com.sol.merp.attributes.PlayerTarget;
 import com.sol.merp.attributes.CritType;
+import com.sol.merp.attributes.ArmorType;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.fight.FightCount;
 import com.sol.merp.fight.DualWieldCalculator;
@@ -356,6 +357,38 @@ public class PlayerServiceImpl implements PlayerService {
         adventurerOrderedListObject.setPlayerList(newOrderedList);
     }
 
+    private void setMmBasedOnArmorType(Player player) {
+        if (player == null) {
+            return;
+        }
+        Integer base = player.getMm();
+        if (base == null) base = 0;
+        ArmorType armor = player.getArmorType();
+        if (armor == null) {
+            armor = ArmorType.none;
+        }
+        Integer effective;
+        switch (armor) {
+            case leather:
+                effective = player.getMmLeather() != null ? player.getMmLeather() : base;
+                break;
+            case heavyLeather:
+                effective = player.getMmHeavyLeather() != null ? player.getMmHeavyLeather() : base;
+                break;
+            case chainmail:
+                effective = player.getMmChainmail() != null ? player.getMmChainmail() : base;
+                break;
+            case plate:
+                effective = player.getMmPlate() != null ? player.getMmPlate() : base;
+                break;
+            case none:
+            default:
+                effective = player.getMmNone() != null ? player.getMmNone() : base;
+                break;
+        }
+        player.setMm(effective);
+    }
+
     @Override
     public void checkAndSetStats(Player player) {
         // Normalize nulls
@@ -422,6 +455,9 @@ public class PlayerServiceImpl implements PlayerService {
         // Set TB by attack selection
         setTbBasedOnAttackType(player);
 
+        // Set MM by armor selection
+        setMmBasedOnArmorType(player);
+
         // Cap TB used for defense: if TB < 0 -> set to 0 immediately; else clamp to [0, tb/2]
         Integer tb = player.getTb();
         Integer tbDef = player.getTbUsedForDefense();
@@ -448,15 +484,27 @@ public class PlayerServiceImpl implements PlayerService {
         }
         switch (at) {
             case slashing:
+                player.setTb(player.getTb1HSlashing());
+                player.setTbOffHand(0);
+                break;
             case blunt:
+                player.setTb(player.getTb1HBlunt());
+                player.setTbOffHand(0);
+                break;
             case clawsAndFangs:
             case grabOrBalance:
-                player.setTb(player.getTbOneHanded());
+                player.setTb(player.getTbUnarmed());
                 player.setTbOffHand(0);
                 break;
             case dualWield: {
-                int main = DualWieldCalculator.computeMainHandTb(player.getTbOneHanded(), player.getDualWield());
-                int off = DualWieldCalculator.computeOffHandTb(player.getTbOneHanded(), player.getDualWield());
+                int baseMain;
+                if (player.getCritType() == CritType.blunt) {
+                    baseMain = player.getTb1HBlunt();
+                } else {
+                    baseMain = player.getTb1HSlashing();
+                }
+                int main = DualWieldCalculator.computeMainHandTb(baseMain, player.getDualWield());
+                int off = DualWieldCalculator.computeOffHandTb(baseMain, player.getDualWield());
                 player.setTb(main);
                 player.setTbOffHand(off);
                 break;
