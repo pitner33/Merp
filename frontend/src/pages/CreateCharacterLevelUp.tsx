@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { get } from '../api/client';
 import { fetchEarlyYearsProfile, type EarlyYearsProfileDto } from '../api/earlyYears';
 
 const COLORS = {
@@ -126,6 +127,11 @@ function getZeroLevelBonus(skillName: string): number {
   return ZERO_LEVEL_BONUS_OVERRIDE_SKILLS.has(skillName) ? 0 : -25;
 }
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
+const API_ROOT = API_BASE.replace(/\/$/, '');
+const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) =>
+  `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
+
 const MD_BONUS_ROWS: readonly { label: string; attribute: AttributeKey }[] = [
   { label: 'Essence MD bonus', attribute: 'IQ' },
   { label: 'Chanelling MD bonus', attribute: 'IT' },
@@ -139,12 +145,6 @@ const SKILLS_BY_CATEGORY: readonly { category: SkillCategory; items: SkillDefini
     items: SKILL_DEFINITIONS_WITH_INDEX.filter((definition) => definition.category === category)
   }))
   .filter((group) => group.items.length > 0);
-
-const CHARACTER_ID_OPTIONS = [
-  { value: '', label: 'Select…' },
-  { value: 'JK', label: 'JK' },
-  { value: 'NJK', label: 'NJK' }
-] as const;
 
 const MAGIC_SCHOOL_OPTIONS = [
   { value: '', label: 'Select…' },
@@ -214,6 +214,7 @@ type AttributeRow = {
 
 type SkillRowState = {
   levels: boolean[];
+  lockedLevels: boolean[];
   itemBonus: string;
   specialBonus: string;
   classBonus: number;
@@ -271,7 +272,7 @@ export default function CreateCharacterLevelUp() {
   const [loading, setLoading] = useState<boolean>(!!playerId);
   const [error, setError] = useState<string | null>(null);
 
-  const [meta] = useState<MetaOptions>({ genders: [], races: [], playerClasses: [], armorTypes: [] });
+  const [meta, setMeta] = useState<MetaOptions>({ genders: [], races: [], playerClasses: [], armorTypes: [] });
   const [baseData, setBaseData] = useState<BaseDataState>(() => ({
     characterId: '',
     name: '',
@@ -313,6 +314,7 @@ export default function CreateCharacterLevelUp() {
       const zeroLevelBonus = getZeroLevelBonus(definition.name);
       return {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+        lockedLevels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: getDefaultSpecialBonus(definition.name),
         classBonus: 0,
@@ -325,6 +327,29 @@ export default function CreateCharacterLevelUp() {
 
   useEffect(() => {
     document.title = 'Character Creation – Level Up';
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    (async () => {
+      try {
+        const [genders, races, playerClasses, armorTypes] = await Promise.all([
+          get<string[]>('/meta/genders'),
+          get<RaceOption[]>('/meta/races'),
+          get<string[]>('/meta/player-classes'),
+          get<string[]>('/meta/armor-types')
+        ]);
+        if (ignore) return;
+        setMeta({ genders, races, playerClasses, armorTypes });
+      } catch (e) {
+        console.warn('Failed to load metadata', e);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -449,6 +474,7 @@ export default function CreateCharacterLevelUp() {
         const levelBonus = match.levelBonus != null ? match.levelBonus : zeroLevelBonus;
         return {
           levels,
+          lockedLevels: levels.slice(),
           itemBonus: match.itemBonus != null ? String(match.itemBonus) : row.itemBonus,
           specialBonus: match.specialBonus != null ? String(match.specialBonus) : row.specialBonus,
           classBonus: match.classBonus != null ? match.classBonus : row.classBonus,
@@ -503,6 +529,7 @@ export default function CreateCharacterLevelUp() {
       const zeroLevelBonus = getZeroLevelBonus(definition.name);
       const baseState = skillRows[definition.stateIndex] ?? {
         levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+        lockedLevels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
         itemBonus: '0',
         specialBonus: '0',
         classBonus: 0,
@@ -667,6 +694,54 @@ export default function CreateCharacterLevelUp() {
     }));
   }
 
+  async function fetchSkillLevelBonus(skillIndex: number, skillName: string, levelCount: number) {
+    if (skillName === HP_MAX_SKILL_NAME) {
+      return;
+    }
+    if (isSkillLocked(skillName)) {
+      return;
+    }
+    const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(skillName, levelCount);
+    try {
+      const response = await fetch(endpoint);
+      let bonus = 0;
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = typeof data === 'number' ? data : Number.parseInt(String(data), 10);
+        bonus = Number.isFinite(parsed) ? parsed : 0;
+      } else if (response.status !== 404) {
+        throw new Error(`Failed to load skill level bonus for ${skillName}`);
+      }
+
+      setSkillRows((prev) => {
+        const currentRow = prev[skillIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const resolvedBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : bonus;
+        return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: resolvedBonus } : row));
+      });
+    } catch (error) {
+      console.warn('Failed to fetch skill level bonus', error);
+      setSkillRows((prev) => {
+        const currentRow = prev[skillIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const fallbackBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : 0;
+        return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: fallbackBonus } : row));
+      });
+    }
+  }
+
   function handleSkillLevelBonusChange(skillIndex: number, value: string) {
     const definition = SKILL_DEFINITIONS_WITH_INDEX[skillIndex];
     if (!definition || definition.name !== HP_MAX_SKILL_NAME) {
@@ -697,6 +772,10 @@ export default function CreateCharacterLevelUp() {
       return;
     }
 
+    if (currentRow.lockedLevels[levelIndex]) {
+      return;
+    }
+
     const nextLevels = [...currentRow.levels];
     nextLevels[levelIndex] = checked;
     const levelCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
@@ -715,6 +794,10 @@ export default function CreateCharacterLevelUp() {
         manualLevelInput: isHpMax ? String(nextLevelBonus) : row.manualLevelInput
       };
     }));
+
+    if (definition.name !== HP_MAX_SKILL_NAME) {
+      void fetchSkillLevelBonus(skillIndex, definition.name, levelCount);
+    }
   }
 
   function handleSkillBonusChange(skillIndex: number, key: 'itemBonus' | 'specialBonus', value: string) {
@@ -1099,6 +1182,10 @@ export default function CreateCharacterLevelUp() {
             background: #2f9f55;
             border-color: #1f6f3a;
           }
+          .skill-levels input[type="checkbox"]:checked:disabled {
+            background: #7ed99a;
+            border-color: #49a666;
+          }
           .skill-levels input[type="checkbox"]:focus-visible {
             outline: 2px solid ${COLORS.primary};
             outline-offset: 1px;
@@ -1137,17 +1224,13 @@ export default function CreateCharacterLevelUp() {
                   <div className="base-data-row base-data-row-single base-data-row-id">
                     <div className="field">
                       <label htmlFor="base-character-id">Character ID</label>
-                      <select
+                      <input
                         id="base-character-id"
+                        type="text"
                         value={baseData.characterId}
-                        onChange={(event) => handleBaseDataChange('characterId', event.target.value)}
-                      >
-                        {CHARACTER_ID_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        readOnly
+                        disabled
+                      />
                     </div>
                   </div>
                   <div className="base-data-row">
@@ -1157,7 +1240,8 @@ export default function CreateCharacterLevelUp() {
                         id="base-name"
                         type="text"
                         value={baseData.name}
-                        onChange={(event) => handleBaseDataChange('name', event.target.value)}
+                        readOnly
+                        disabled
                         placeholder="Character name"
                       />
                     </div>
@@ -1166,7 +1250,7 @@ export default function CreateCharacterLevelUp() {
                       <select
                         id="base-gender"
                         value={baseData.gender}
-                        onChange={(event) => handleBaseDataChange('gender', event.target.value)}
+                        disabled
                       >
                         {genderOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1182,7 +1266,7 @@ export default function CreateCharacterLevelUp() {
                       <select
                         id="base-race"
                         value={baseData.race}
-                        onChange={(event) => handleBaseDataChange('race', event.target.value)}
+                        disabled
                       >
                         {raceOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1196,7 +1280,7 @@ export default function CreateCharacterLevelUp() {
                       <select
                         id="base-class"
                         value={baseData.playerClass}
-                        onChange={(event) => handleBaseDataChange('playerClass', event.target.value)}
+                        disabled
                       >
                         {classOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1212,7 +1296,7 @@ export default function CreateCharacterLevelUp() {
                       <select
                         id="base-magic-school"
                         value={baseData.magicSchool}
-                        onChange={(event) => handleBaseDataChange('magicSchool', event.target.value)}
+                        disabled
                       >
                         {MAGIC_SCHOOL_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1350,6 +1434,8 @@ export default function CreateCharacterLevelUp() {
                             onChange={(event) => handleSpellListChange(index, { name: event.target.value })}
                             placeholder={`Spell list ${index + 1}`}
                             aria-label={`Spell list ${index + 1} name`}
+                            readOnly={row.learnt}
+                            disabled={row.learnt}
                           />
                         </td>
                         <td>
@@ -1361,6 +1447,8 @@ export default function CreateCharacterLevelUp() {
                             onChange={(event) => handleSpellListChange(index, { chance: event.target.value })}
                             placeholder="0-100"
                             aria-label={`Spell list ${index + 1} chance`}
+                            readOnly={row.learnt}
+                            disabled={row.learnt}
                           />
                         </td>
                         <td className="center">
@@ -1369,6 +1457,7 @@ export default function CreateCharacterLevelUp() {
                             checked={row.learnt}
                             onChange={(event) => handleSpellListChange(index, { learnt: event.target.checked })}
                             aria-label={`Spell list ${index + 1} learnt`}
+                            disabled={row.learnt}
                           />
                         </td>
                       </tr>
@@ -1387,30 +1476,37 @@ export default function CreateCharacterLevelUp() {
                     </tr>
                   </thead>
                   <tbody>
-                    {languages.map((row, index) => (
-                      <tr key={row.id}>
-                        <td>
-                          <input
-                            type="text"
-                            value={row.name}
-                            onChange={(event) => handleLanguageChange(index, { name: event.target.value })}
-                            placeholder={`Language ${index + 1}`}
-                            aria-label={`Language ${index + 1} name`}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            max={5}
-                            value={row.level}
-                            onChange={(event) => handleLanguageChange(index, { level: event.target.value })}
-                            placeholder="0-5"
-                            aria-label={`Language ${index + 1} level`}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {languages.map((row, index) => {
+                      const isMaxLevel = Number(row.level) === 5;
+                      return (
+                        <tr key={row.id}>
+                          <td>
+                            <input
+                              type="text"
+                              value={row.name}
+                              onChange={(event) => handleLanguageChange(index, { name: event.target.value })}
+                              placeholder={`Language ${index + 1}`}
+                              aria-label={`Language ${index + 1} name`}
+                              readOnly={isMaxLevel}
+                              disabled={isMaxLevel}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min={0}
+                              max={5}
+                              value={row.level}
+                              onChange={(event) => handleLanguageChange(index, { level: event.target.value })}
+                              placeholder="0-5"
+                              aria-label={`Language ${index + 1} level`}
+                              readOnly={isMaxLevel}
+                              disabled={isMaxLevel}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </section>
@@ -1584,7 +1680,7 @@ export default function CreateCharacterLevelUp() {
                                           id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
                                           type="checkbox"
                                           checked={checked}
-                                          disabled={row.definition.name === HP_MAX_SKILL_NAME}
+                                          disabled={row.definition.name === HP_MAX_SKILL_NAME || row.state.lockedLevels[levelIndex]}
                                           onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
                                           aria-label={`Level ${levelIndex + 1}`}
                                         />
