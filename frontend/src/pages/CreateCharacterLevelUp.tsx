@@ -221,6 +221,18 @@ type SkillRowState = {
   classBonus: number;
   levelBonus: number;
   manualLevelInput: string;
+  hpMaxLevellingLevels?: boolean[];
+};
+
+type SkillPointBuckets = {
+  mmSkills: number;
+  weaponSkills: number;
+  generalSkills: number;
+  thiefSkills: number;
+  magicSkills: number;
+  otherSkills: number;
+  spells: number;
+  languages: number;
 };
 
 function mapAttributeRowsFromProfile(source?: EarlyYearsProfileDto['attributes']): AttributeRow[] {
@@ -324,6 +336,16 @@ export default function CreateCharacterLevelUp() {
       };
     })
   );
+  const [skillPoints, setSkillPoints] = useState<SkillPointBuckets>({
+    mmSkills: 0,
+    weaponSkills: 0,
+    generalSkills: 0,
+    thiefSkills: 0,
+    magicSkills: 0,
+    otherSkills: 0,
+    spells: 0,
+    languages: 0
+  });
   const characterLevel = 1;
   const xpValue = 0;
   const canLevelUp = (characterLevel === 1 && xpValue === 0) || xpValue > getLevelCap(characterLevel);
@@ -484,7 +506,10 @@ export default function CreateCharacterLevelUp() {
           levelBonus,
           manualLevelInput: isHpMax
             ? String(match.manualLevelInput != null ? match.manualLevelInput : levelBonus)
-            : row.manualLevelInput
+            : row.manualLevelInput,
+          hpMaxLevellingLevels: isHpMax
+            ? row.hpMaxLevellingLevels ?? Array.from({ length: SKILL_LEVEL_COUNT }, () => false)
+            : row.hpMaxLevellingLevels
         };
       });
     });
@@ -500,7 +525,73 @@ export default function CreateCharacterLevelUp() {
 
   function handleXpLevelUpClick() {
     if (!canLevelUp) return;
-    console.info('XP level up – coming soon.');
+    const classKey = baseData.playerClass?.trim();
+    if (!classKey) {
+      console.warn('Missing player class – cannot load levelling skill points.');
+      return;
+    }
+    void (async () => {
+      try {
+        const data = await get<Record<string, number>>(`/attributes/class-levelling/${encodeURIComponent(classKey)}`);
+        setSkillPoints({
+          mmSkills: data.mmSkills ?? 0,
+          weaponSkills: data.weaponSkills ?? 0,
+          generalSkills: data.generalSkills ?? 0,
+          thiefSkills: data.thiefSkills ?? 0,
+          magicSkills: data.magicSkills ?? 0,
+          otherSkills: data.otherSkills ?? 0,
+          spells: data.spells ?? 0,
+          languages: data.languages ?? 0
+        });
+
+        const hpMaxLevelsRaw = data.otherSkills ?? 0;
+        const hpMaxLevels = Number.isFinite(hpMaxLevelsRaw) ? hpMaxLevelsRaw : 0;
+        if (hpMaxLevels > 0) {
+          const hpMaxDef = SKILL_DEFINITIONS_WITH_INDEX.find((def) => def.name === HP_MAX_SKILL_NAME);
+          if (hpMaxDef) {
+            const clampedLevels = Math.max(0, Math.min(SKILL_LEVEL_COUNT, hpMaxLevels));
+            setSkillRows((previous) => {
+              const next = [...previous];
+              const existing = next[hpMaxDef.stateIndex] ?? {
+                levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+                lockedLevels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+                itemBonus: '0',
+                specialBonus: getDefaultSpecialBonus(HP_MAX_SKILL_NAME),
+                classBonus: 0,
+                levelBonus: getZeroLevelBonus(HP_MAX_SKILL_NAME),
+                manualLevelInput: '0'
+              };
+              const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.levels?.[index]);
+              const lockedLevels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.lockedLevels?.[index]);
+              const hpMaxLevellingLevels = Array.from(
+                { length: SKILL_LEVEL_COUNT },
+                (_, index) => !!existing.hpMaxLevellingLevels?.[index]
+              );
+
+              let remaining = clampedLevels;
+              for (let i = 0; i < SKILL_LEVEL_COUNT && remaining > 0; i += 1) {
+                if (!levels[i]) {
+                  levels[i] = true;
+                  lockedLevels[i] = true;
+                  hpMaxLevellingLevels[i] = true;
+                  remaining -= 1;
+                }
+              }
+
+              next[hpMaxDef.stateIndex] = {
+                ...existing,
+                levels,
+                lockedLevels,
+                hpMaxLevellingLevels
+              };
+              return next;
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load levelling skill points', error);
+      }
+    })();
   }
 
   const genderOptions = useMemo(() => [
@@ -1194,6 +1285,10 @@ export default function CreateCharacterLevelUp() {
             background: #7ed99a;
             border-color: #49a666;
           }
+          .skill-levels input.hpmax-level-input-new[type="checkbox"]:checked:disabled {
+            background: #2f9f55;
+            border-color: #1f6f3a;
+          }
           .skill-levels input[type="checkbox"]:focus-visible {
             outline: 2px solid ${COLORS.primary};
             outline-offset: 1px;
@@ -1430,7 +1525,7 @@ export default function CreateCharacterLevelUp() {
                     <input
                       id="spell-skill-points"
                       type="number"
-                      value={0}
+                      value={skillPoints.spells}
                       readOnly
                       style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
                     />
@@ -1509,7 +1604,7 @@ export default function CreateCharacterLevelUp() {
                     <input
                       id="language-skill-points"
                       type="number"
-                      value={0}
+                      value={skillPoints.languages}
                       readOnly
                       style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
                     />
@@ -1751,6 +1846,14 @@ export default function CreateCharacterLevelUp() {
                       const rowsForGroup = skillDisplayRows.filter((row) => row.definition.category === group.category);
                       if (rowsForGroup.length === 0) return null;
                       const categoryId = group.category.replace(/\s+/g, '-').toLowerCase();
+                      const categorySkillPoints =
+                        group.category === 'MM Skills' ? skillPoints.mmSkills :
+                        group.category === 'Weapon Skills' ? skillPoints.weaponSkills :
+                        group.category === 'General Skills' ? skillPoints.generalSkills :
+                        group.category === 'Thief Skills' ? skillPoints.thiefSkills :
+                        group.category === 'Magic Skills' ? skillPoints.magicSkills :
+                        group.category === 'Other Skills' ? 0 :
+                        0;
                       return (
                         <Fragment key={group.category}>
                           <tr className="skill-category-header">
@@ -1763,7 +1866,7 @@ export default function CreateCharacterLevelUp() {
                                     <input
                                       id={`skill-points-${categoryId}`}
                                       type="number"
-                                      value={0}
+                                      value={categorySkillPoints}
                                       readOnly
                                       style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
                                     />
@@ -1795,18 +1898,32 @@ export default function CreateCharacterLevelUp() {
                                   <span aria-hidden="true">—</span>
                                 ) : (
                                   <div className="skill-levels" aria-label={`${row.definition.name} levels`}>
-                                    {row.state.levels.map((checked, levelIndex) => (
-                                      <label key={levelIndex} htmlFor={`skill-${row.definition.stateIndex}-level-${levelIndex}`}>
-                                        <input
-                                          id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
-                                          type="checkbox"
-                                          checked={checked}
-                                          disabled={row.definition.name === HP_MAX_SKILL_NAME || row.state.lockedLevels[levelIndex]}
-                                          onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
-                                          aria-label={`Level ${levelIndex + 1}`}
-                                        />
-                                      </label>
-                                    ))}
+                                    {row.state.levels.map((checked, levelIndex) => {
+                                      const isHpMax = row.definition.name === HP_MAX_SKILL_NAME;
+                                      const isLevellingLevel = isHpMax && !!row.state.hpMaxLevellingLevels?.[levelIndex];
+                                      const inputId = `skill-${row.definition.stateIndex}-level-${levelIndex}`;
+                                      const inputClassName = isHpMax && isLevellingLevel
+                                        ? 'hpmax-level-input hpmax-level-input-new'
+                                        : isHpMax
+                                          ? 'hpmax-level-input'
+                                          : undefined;
+                                      return (
+                                        <label
+                                          key={levelIndex}
+                                          htmlFor={inputId}
+                                        >
+                                          <input
+                                            id={inputId}
+                                            type="checkbox"
+                                            className={inputClassName}
+                                            checked={checked}
+                                            disabled={row.definition.name === HP_MAX_SKILL_NAME || row.state.lockedLevels[levelIndex]}
+                                            onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
+                                            aria-label={`Level ${levelIndex + 1}`}
+                                          />
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </td>

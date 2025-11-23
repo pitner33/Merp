@@ -28,6 +28,7 @@ import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.storage.ChildhoodSkillPresetService;
+import com.sol.merp.storage.ClassLevellingSkillPointsService;
 import com.sol.merp.storage.ClassSkillBonusService;
 import com.sol.merp.storage.NormalBonusService;
 import com.sol.merp.storage.RaceBonusService;
@@ -91,6 +92,8 @@ public class ApiController {
     private ChildhoodSkillPresetService childhoodSkillPresetService;
     @Autowired
     private ClassSkillBonusService classSkillBonusService;
+    @Autowired
+    private ClassLevellingSkillPointsService classLevellingSkillPointsService;
 
     @Autowired
     private EarlyYearsProfileService earlyYearsProfileService;
@@ -190,6 +193,23 @@ public class ApiController {
         }
 
         Optional<Map<String, Integer>> byKey = classSkillBonusService.findClassBonusesByKey(classKey);
+        return byKey.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @GetMapping("/attributes/class-levelling/{classKey}")
+    public ResponseEntity<Map<String, Integer>> getClassLevellingSkillPoints(@PathVariable("classKey") String classKey) {
+        if (classKey == null || classKey.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Map<String, Integer>> byEnum = resolvePlayerClass(classKey)
+                .flatMap(classLevellingSkillPointsService::findSkillPoints);
+        if (byEnum.isPresent()) {
+            return ResponseEntity.ok(byEnum.get());
+        }
+
+        Optional<Map<String, Integer>> byKey = classLevellingSkillPointsService.findSkillPointsByKey(classKey);
         return byKey.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
