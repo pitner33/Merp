@@ -446,59 +446,137 @@ public class EarlyYearsProfileService {
     }
 
     private void replaceAttributeTotals(Player player, List<EarlyYearsProfileDto.AttributeTotalDto> rows) {
-        playerAttributeTotalRepository.deleteByPlayer_Id(player.getId());
+        List<PlayerAttributeTotal> existing = playerAttributeTotalRepository.findByPlayer_Id(player.getId());
+        Map<String, PlayerAttributeTotal> existingByKey = existing.stream()
+                .filter(Objects::nonNull)
+                .filter(attr -> trimToNull(attr.getAttributeKey()) != null)
+                .collect(Collectors.toMap(
+                        attr -> trimToNull(attr.getAttributeKey()),
+                        attr -> attr,
+                        (a, b) -> a,
+                        HashMap::new
+                ));
+
         if (rows == null || rows.isEmpty()) {
+            if (!existing.isEmpty()) {
+                playerAttributeTotalRepository.deleteAll(existing);
+            }
             return;
         }
-        List<PlayerAttributeTotal> entities = rows.stream()
-                .filter(Objects::nonNull)
-                .filter(row -> trimToNull(row.getAttributeKey()) != null)
-                .map(row -> PlayerAttributeTotal.builder()
+
+        Map<String, EarlyYearsProfileDto.AttributeTotalDto> rowsByKey = new HashMap<>();
+        for (EarlyYearsProfileDto.AttributeTotalDto row : rows) {
+            if (row == null) {
+                continue;
+            }
+            String key = trimToNull(row.getAttributeKey());
+            if (key == null) {
+                continue;
+            }
+            rowsByKey.put(key, row);
+        }
+
+        List<PlayerAttributeTotal> toSave = new ArrayList<>();
+        List<PlayerAttributeTotal> toDelete = new ArrayList<>(existing);
+
+        for (Map.Entry<String, EarlyYearsProfileDto.AttributeTotalDto> entry : rowsByKey.entrySet()) {
+            String key = entry.getKey();
+            EarlyYearsProfileDto.AttributeTotalDto row = entry.getValue();
+
+            PlayerAttributeTotal entity = existingByKey.get(key);
+            if (entity == null) {
+                entity = PlayerAttributeTotal.builder()
                         .player(player)
-                        .attributeKey(trimToNull(row.getAttributeKey()))
-                        .baseValue(row.getBaseValue())
-                        .normalBonus(row.getNormalBonus())
-                        .raceBonus(row.getRaceBonus())
-                        .totalBonus(row.getTotalBonus())
-                        .build())
-                .toList();
-        if (!entities.isEmpty()) {
-            playerAttributeTotalRepository.saveAll(entities);
+                        .attributeKey(key)
+                        .build();
+            }
+            entity.setBaseValue(row.getBaseValue());
+            entity.setNormalBonus(row.getNormalBonus());
+            entity.setRaceBonus(row.getRaceBonus());
+            entity.setTotalBonus(row.getTotalBonus());
+
+            toSave.add(entity);
+            toDelete.remove(entity);
+        }
+
+        if (!toDelete.isEmpty()) {
+            playerAttributeTotalRepository.deleteAll(toDelete);
+        }
+        if (!toSave.isEmpty()) {
+            playerAttributeTotalRepository.saveAll(toSave);
         }
     }
 
     private void replaceBonusAdjustments(Player player, List<EarlyYearsProfileDto.BonusAdjustmentDto> rows) {
-        playerBonusAdjustmentRepository.deleteByPlayer_Id(player.getId());
+        List<PlayerBonusAdjustment> existing = playerBonusAdjustmentRepository.findByPlayer_IdOrderByDisplayOrderAsc(player.getId());
+        Map<String, PlayerBonusAdjustment> existingByKey = existing.stream()
+                .filter(Objects::nonNull)
+                .filter(adj -> trimToNull(adj.getBonusKey()) != null)
+                .collect(Collectors.toMap(
+                        adj -> trimToNull(adj.getBonusKey()),
+                        adj -> adj,
+                        (a, b) -> a,
+                        HashMap::new
+                ));
+
         if (rows == null || rows.isEmpty()) {
+            if (!existing.isEmpty()) {
+                playerBonusAdjustmentRepository.deleteAll(existing);
+            }
             return;
         }
-        List<PlayerBonusAdjustment> entities = new ArrayList<>();
-        int index = 0;
+
+        Map<String, EarlyYearsProfileDto.BonusAdjustmentDto> rowsByKey = new HashMap<>();
         for (EarlyYearsProfileDto.BonusAdjustmentDto row : rows) {
             if (row == null) {
                 continue;
             }
-            String key = trimToNull(row.getBonusKey());
+            String rawKey = trimToNull(row.getBonusKey());
             String label = trimToNull(row.getLabel());
-            if (key == null && label == null) {
+            if (rawKey == null && label == null) {
                 continue;
             }
-            PlayerBonusAdjustment entity = PlayerBonusAdjustment.builder()
-                    .player(player)
-                    .bonusKey(key != null ? key : (label != null ? label.toLowerCase(Locale.ROOT).replaceAll("\\s+", "-") : "bonus-" + index))
-                    .label(label != null ? label : "")
-                    .attributeKey(trimToNull(row.getAttributeKey()))
-                    .attributeBonus(row.getAttributeBonus())
-                    .itemBonus(row.getItemBonus())
-                    .specialBonus(row.getSpecialBonus())
-                    .totalBonus(row.getTotalBonus())
-                    .displayOrder(row.getDisplayOrder() != null ? row.getDisplayOrder() : index)
-                    .build();
-            entities.add(entity);
+            String key = rawKey != null ? rawKey : label.toLowerCase(Locale.ROOT).replaceAll("\\s+", "-");
+            rowsByKey.put(key, row);
+        }
+
+        List<PlayerBonusAdjustment> toSave = new ArrayList<>();
+        List<PlayerBonusAdjustment> toDelete = new ArrayList<>(existing);
+        int index = 0;
+
+        for (Map.Entry<String, EarlyYearsProfileDto.BonusAdjustmentDto> entry : rowsByKey.entrySet()) {
+            String key = entry.getKey();
+            EarlyYearsProfileDto.BonusAdjustmentDto row = entry.getValue();
+
+            PlayerBonusAdjustment entity = existingByKey.get(key);
+            if (entity == null) {
+                entity = PlayerBonusAdjustment.builder()
+                        .player(player)
+                        .bonusKey(key)
+                        .build();
+            }
+
+            String label = trimToNull(row.getLabel());
+            entity.setLabel(label != null ? label : "");
+            entity.setAttributeKey(trimToNull(row.getAttributeKey()));
+            entity.setAttributeBonus(row.getAttributeBonus());
+            entity.setItemBonus(row.getItemBonus());
+            entity.setSpecialBonus(row.getSpecialBonus());
+            entity.setTotalBonus(row.getTotalBonus());
+
+            Integer displayOrder = row.getDisplayOrder();
+            entity.setDisplayOrder(displayOrder != null ? displayOrder : index);
+
+            toSave.add(entity);
+            toDelete.remove(entity);
             index++;
         }
-        if (!entities.isEmpty()) {
-            playerBonusAdjustmentRepository.saveAll(entities);
+
+        if (!toDelete.isEmpty()) {
+            playerBonusAdjustmentRepository.deleteAll(toDelete);
+        }
+        if (!toSave.isEmpty()) {
+            playerBonusAdjustmentRepository.saveAll(toSave);
         }
     }
 

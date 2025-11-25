@@ -1,7 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { get } from '../api/client';
-import { fetchEarlyYearsProfile, type EarlyYearsProfileDto } from '../api/earlyYears';
+import {
+  fetchEarlyYearsProfile,
+  saveEarlyYearsProfile,
+  type EarlyYearsProfileDto,
+  type BonusAdjustmentDto,
+  type SkillRowDto as EarlyYearsSkillRowDto
+} from '../api/earlyYears';
 import { getLevelCap } from '../utils/xp';
 
 const COLORS = {
@@ -140,6 +146,16 @@ const MD_BONUS_ROWS: readonly { label: string; attribute: AttributeKey }[] = [
   { label: 'Disease MD bonus', attribute: 'CON' }
 ] as const;
 
+function formatOptionLabel(value: string): string {
+  if (!value) return '';
+  const spaced = value
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 const SKILLS_BY_CATEGORY: readonly { category: SkillCategory; items: SkillDefinitionWithIndex[] }[] = SKILL_CATEGORIES
   .map((category) => ({
     category,
@@ -231,9 +247,72 @@ type SkillPointBuckets = {
   thiefSkills: number;
   magicSkills: number;
   otherSkills: number;
+  secondarySkills: number;
   spells: number;
   languages: number;
 };
+
+function getSkillPointBucketKeyForCategory(category: SkillCategory): keyof SkillPointBuckets | null {
+  switch (category) {
+    case 'MM Skills':
+      return 'mmSkills';
+    case 'Weapon Skills':
+      return 'weaponSkills';
+    case 'General Skills':
+      return 'generalSkills';
+    case 'Thief Skills':
+      return 'thiefSkills';
+    case 'Magic Skills':
+      return 'magicSkills';
+    case 'Other Skills':
+      return 'otherSkills';
+    case 'Secondary skills':
+      return 'secondarySkills';
+    default:
+      return null;
+  }
+}
+
+function getTargetSkillPointBucketKey(category: SkillCategory): keyof SkillPointBuckets | null {
+  const direct = getSkillPointBucketKeyForCategory(category);
+  if (direct) {
+    return direct;
+  }
+  return null;
+}
+
+function getSkillPointTransferRatio(sourceCategory: SkillCategory, targetCategory: SkillCategory): number {
+  const isSourceCore =
+    sourceCategory === 'MM Skills' ||
+    sourceCategory === 'Weapon Skills' ||
+    sourceCategory === 'General Skills' ||
+    sourceCategory === 'Thief Skills' ||
+    sourceCategory === 'Magic Skills';
+  const isTargetCore =
+    targetCategory === 'MM Skills' ||
+    targetCategory === 'Weapon Skills' ||
+    targetCategory === 'General Skills' ||
+    targetCategory === 'Thief Skills' ||
+    targetCategory === 'Magic Skills';
+
+  if (isSourceCore && isTargetCore) {
+    return 0.5;
+  }
+
+  if (targetCategory === 'Other Skills' || targetCategory === 'Secondary skills') {
+    return 1;
+  }
+
+  return 1;
+}
+
+function getRowSkillPointCost(levelCount: number): number {
+  const clamped = Math.max(0, Math.min(3, levelCount));
+  if (clamped === 0) return 0;
+  if (clamped === 1) return 1;
+  if (clamped === 2) return 3;
+  return 6;
+}
 
 function mapAttributeRowsFromProfile(source?: EarlyYearsProfileDto['attributes']): AttributeRow[] {
   if (source && source.length > 0) {
@@ -275,6 +354,57 @@ function parseBonusInput(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function applySpellSkillPoints(spellLists: SpellListRow[], points: number): SpellListRow[] {
+  if (!Number.isFinite(points) || points <= 0) {
+    return spellLists;
+  }
+
+  let remainingPercent = points * 20;
+  if (remainingPercent <= 0) {
+    return spellLists;
+  }
+
+  const next = [...spellLists];
+
+  for (let rowIndex = 0; rowIndex < next.length && remainingPercent > 0; rowIndex += 1) {
+    const row = next[rowIndex];
+    if (row.learnt) {
+      continue;
+    }
+
+    const numeric = Number.parseInt(String(row.chance ?? ''), 10);
+    const currentChance = Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 0;
+
+    if (currentChance >= 100) {
+      next[rowIndex] = { ...row, chance: '100', learnt: true };
+      continue;
+    }
+
+    const missingToFull = 100 - currentChance;
+    if (remainingPercent >= missingToFull) {
+      // Fill this spell to 100%, consume only what is needed, carry over the remainder
+      remainingPercent -= missingToFull;
+      next[rowIndex] = {
+        ...row,
+        chance: '100',
+        learnt: true
+      };
+    } else {
+      // Use up the rest of the available percent on this spell
+      const newChance = currentChance + remainingPercent;
+      next[rowIndex] = {
+        ...row,
+        chance: String(newChance),
+        learnt: newChance >= 100 || row.learnt
+      };
+      remainingPercent = 0;
+      break;
+    }
+  }
+
+  return next;
+}
+
 export default function CreateCharacterLevelUp() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -284,6 +414,8 @@ export default function CreateCharacterLevelUp() {
   const [profile, setProfile] = useState<EarlyYearsProfileDto | null>(null);
   const [loading, setLoading] = useState<boolean>(!!playerId);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [meta, setMeta] = useState<MetaOptions>({ genders: [], races: [], playerClasses: [], armorTypes: [] });
   const [baseData, setBaseData] = useState<BaseDataState>(() => ({
@@ -343,12 +475,29 @@ export default function CreateCharacterLevelUp() {
     thiefSkills: 0,
     magicSkills: 0,
     otherSkills: 0,
+    secondarySkills: 0,
     spells: 0,
     languages: 0
+  });
+  const [moveSkillPointsByCategory, setMoveSkillPointsByCategory] = useState<Record<SkillCategory, number>>(() => {
+    const initial: Record<SkillCategory, number> = {} as Record<SkillCategory, number>;
+    SKILL_CATEGORIES.forEach((category) => {
+      initial[category] = 0;
+    });
+    return initial;
+  });
+  const [moveSkillPointsTargetByCategory, setMoveSkillPointsTargetByCategory] = useState<Record<SkillCategory, SkillCategory | ''>>(() => {
+    const initial: Record<SkillCategory, SkillCategory | ''> = {} as Record<SkillCategory, SkillCategory | ''>;
+    SKILL_CATEGORIES.forEach((category) => {
+      initial[category] = '';
+    });
+    return initial;
   });
   const characterLevel = 1;
   const xpValue = 0;
   const canLevelUp = (characterLevel === 1 && xpValue === 0) || xpValue > getLevelCap(characterLevel);
+  const [levelUpUsed, setLevelUpUsed] = useState(false);
+  const canUseLevelUp = canLevelUp && !levelUpUsed;
 
   useEffect(() => {
     document.title = 'Character Creation – Level Up';
@@ -519,79 +668,113 @@ export default function CreateCharacterLevelUp() {
     navigate('/create-character-early-years', { state: locationState });
   }
 
-  function handleNext() {
-    console.info('Proceed to next creation phase – coming soon.');
+  async function handleAccept() {
+    if (!playerId) {
+      setError('Missing playerId. Please return to Early Years and try again.');
+      return;
+    }
+    if (saving) return;
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const payload = buildLevelUpProfileDto();
+      await saveEarlyYearsProfile(playerId, payload);
+
+      // Clear all remaining skill points after successful save
+      setSkillPoints({
+        mmSkills: 0,
+        weaponSkills: 0,
+        generalSkills: 0,
+        thiefSkills: 0,
+        magicSkills: 0,
+        otherSkills: 0,
+        secondarySkills: 0,
+        spells: 0,
+        languages: 0
+      });
+    } catch (e) {
+      setSaveError('Failed to save Level Up data. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleXpLevelUpClick() {
-    if (!canLevelUp) return;
+  async function loadLevellingSkillPoints(preserveSpellsAndLanguages: boolean) {
     const classKey = baseData.playerClass?.trim();
     if (!classKey) {
       console.warn('Missing player class – cannot load levelling skill points.');
       return;
     }
-    void (async () => {
-      try {
-        const data = await get<Record<string, number>>(`/attributes/class-levelling/${encodeURIComponent(classKey)}`);
-        setSkillPoints({
-          mmSkills: data.mmSkills ?? 0,
-          weaponSkills: data.weaponSkills ?? 0,
-          generalSkills: data.generalSkills ?? 0,
-          thiefSkills: data.thiefSkills ?? 0,
-          magicSkills: data.magicSkills ?? 0,
-          otherSkills: data.otherSkills ?? 0,
-          spells: data.spells ?? 0,
-          languages: data.languages ?? 0
-        });
+    try {
+      const data = await get<Record<string, number>>(`/attributes/class-levelling/${encodeURIComponent(classKey)}`);
+      setSkillPoints((prev) => ({
+        ...prev,
+        mmSkills: data.mmSkills ?? 0,
+        weaponSkills: data.weaponSkills ?? 0,
+        generalSkills: data.generalSkills ?? 0,
+        thiefSkills: data.thiefSkills ?? 0,
+        magicSkills: data.magicSkills ?? 0,
+        // otherSkills and secondarySkills are player-managed only (via transfers / row changes), keep existing values
+        otherSkills: prev.otherSkills,
+        secondarySkills: prev.secondarySkills,
+        spells: preserveSpellsAndLanguages ? prev.spells : (data.spells ?? 0),
+        languages: preserveSpellsAndLanguages ? prev.languages : (data.languages ?? 0)
+      }));
 
-        const hpMaxLevelsRaw = data.otherSkills ?? 0;
-        const hpMaxLevels = Number.isFinite(hpMaxLevelsRaw) ? hpMaxLevelsRaw : 0;
-        if (hpMaxLevels > 0) {
-          const hpMaxDef = SKILL_DEFINITIONS_WITH_INDEX.find((def) => def.name === HP_MAX_SKILL_NAME);
-          if (hpMaxDef) {
-            const clampedLevels = Math.max(0, Math.min(SKILL_LEVEL_COUNT, hpMaxLevels));
-            setSkillRows((previous) => {
-              const next = [...previous];
-              const existing = next[hpMaxDef.stateIndex] ?? {
-                levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-                lockedLevels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
-                itemBonus: '0',
-                specialBonus: getDefaultSpecialBonus(HP_MAX_SKILL_NAME),
-                classBonus: 0,
-                levelBonus: getZeroLevelBonus(HP_MAX_SKILL_NAME),
-                manualLevelInput: '0'
-              };
-              const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.levels?.[index]);
-              const lockedLevels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.lockedLevels?.[index]);
-              const hpMaxLevellingLevels = Array.from(
-                { length: SKILL_LEVEL_COUNT },
-                (_, index) => !!existing.hpMaxLevellingLevels?.[index]
-              );
+      const hpMaxLevelsRaw = data.otherSkills ?? 0;
+      const hpMaxLevels = Number.isFinite(hpMaxLevelsRaw) ? hpMaxLevelsRaw : 0;
+      // Only apply HP Max autolevelling for the primary level-up action, not during Reset
+      if (!preserveSpellsAndLanguages && hpMaxLevels > 0) {
+        const hpMaxDef = SKILL_DEFINITIONS_WITH_INDEX.find((def) => def.name === HP_MAX_SKILL_NAME);
+        if (hpMaxDef) {
+          const clampedLevels = Math.max(0, Math.min(SKILL_LEVEL_COUNT, hpMaxLevels));
+          setSkillRows((previous) => {
+            const next = [...previous];
+            const existing = next[hpMaxDef.stateIndex] ?? {
+              levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+              lockedLevels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+              itemBonus: '0',
+              specialBonus: getDefaultSpecialBonus(HP_MAX_SKILL_NAME),
+              classBonus: 0,
+              levelBonus: getZeroLevelBonus(HP_MAX_SKILL_NAME),
+              manualLevelInput: '0'
+            };
+            const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.levels?.[index]);
+            const lockedLevels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, index) => !!existing.lockedLevels?.[index]);
+            const hpMaxLevellingLevels = Array.from(
+              { length: SKILL_LEVEL_COUNT },
+              (_, index) => !!existing.hpMaxLevellingLevels?.[index]
+            );
 
-              let remaining = clampedLevels;
-              for (let i = 0; i < SKILL_LEVEL_COUNT && remaining > 0; i += 1) {
-                if (!levels[i]) {
-                  levels[i] = true;
-                  lockedLevels[i] = true;
-                  hpMaxLevellingLevels[i] = true;
-                  remaining -= 1;
-                }
+            let remaining = clampedLevels;
+            for (let i = 0; i < SKILL_LEVEL_COUNT && remaining > 0; i += 1) {
+              if (!levels[i]) {
+                levels[i] = true;
+                lockedLevels[i] = true;
+                hpMaxLevellingLevels[i] = true;
+                remaining -= 1;
               }
+            }
 
-              next[hpMaxDef.stateIndex] = {
-                ...existing,
-                levels,
-                lockedLevels,
-                hpMaxLevellingLevels
-              };
-              return next;
-            });
-          }
+            next[hpMaxDef.stateIndex] = {
+              ...existing,
+              levels,
+              lockedLevels,
+              hpMaxLevellingLevels
+            };
+            return next;
+          });
         }
-      } catch (error) {
-        console.warn('Failed to load levelling skill points', error);
       }
-    })();
+    } catch (error) {
+      console.warn('Failed to load levelling skill points', error);
+    }
+  }
+
+  function handleXpLevelUpClick() {
+    if (!canUseLevelUp) return;
+    setLevelUpUsed(true);
+    void loadLevellingSkillPoints(false);
   }
 
   const genderOptions = useMemo(() => [
@@ -611,7 +794,7 @@ export default function CreateCharacterLevelUp() {
 
   const armorOptions = useMemo(() => [
     { value: '', label: 'Select…' },
-    ...([...(meta.armorTypes ?? [])].reverse().map((value) => ({ value, label: value })))
+    ...([...(meta.armorTypes ?? [])].reverse().map((value) => ({ value, label: formatOptionLabel(value) })))
   ], [meta.armorTypes]);
 
   const attributeRowMap = useMemo(() => {
@@ -739,6 +922,121 @@ export default function CreateCharacterLevelUp() {
     });
   }, [attributeRowMap, mdBonusAdjustments]);
 
+  function buildLevelsMask(levels: boolean[]): string {
+    return levels.map((checked) => (checked ? '1' : '0')).join('');
+  }
+
+  function buildLevelUpBonusAdjustments(): BonusAdjustmentDto[] {
+    const result: BonusAdjustmentDto[] = [];
+
+    const mana = manaBonusRow;
+    if (mana.attributeLabel) {
+      result.push({
+        bonusKey: 'mana',
+        label: 'Mana',
+        attributeKey: mana.attributeLabel,
+        attributeBonus: mana.attributeBonus,
+        itemBonus: mana.itemBonus,
+        specialBonus: mana.specialBonus,
+        totalBonus: mana.totalBonus,
+        displayOrder: 0
+      });
+    }
+
+    mdBonusRows.forEach((row, index) => {
+      result.push({
+        bonusKey: row.label.toLowerCase().replace(/\s+/g, '-'),
+        label: row.label,
+        attributeKey: row.attributeKey,
+        attributeBonus: row.attributeBonus,
+        itemBonus: row.itemBonus,
+        specialBonus: row.specialBonus,
+        totalBonus: row.totalBonus,
+        displayOrder: index + 1
+      });
+    });
+
+    return result;
+  }
+
+  function buildLevelUpSkills(): EarlyYearsSkillRowDto[] {
+    return SKILL_DEFINITIONS_WITH_INDEX.map((definition, index) => {
+      const display = skillDisplayRows[index];
+      const state = skillRows[index];
+      if (!display || !state) {
+        return {
+          skillName: definition.name
+        };
+      }
+      const levelCount = state.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      return {
+        skillName: definition.name,
+        levelBonus: display.levelBonus,
+        levelCount,
+        levelsMask: buildLevelsMask(state.levels),
+        attributeBonus: display.attributeBonus,
+        classBonus: display.classBonus,
+        itemBonus: display.itemBonus,
+        specialBonus: display.specialBonus,
+        totalBonus: display.totalBonus,
+        manualLevelInput: definition.name === HP_MAX_SKILL_NAME
+          ? Number.parseInt(state.manualLevelInput || '0', 10) || 0
+          : undefined
+      };
+    });
+  }
+
+  function buildLevelUpProfileDto(): EarlyYearsProfileDto {
+    const attributes = attributeRows.map((row) => ({
+      attributeKey: row.attribute,
+      baseValue: row.baseValue ?? undefined,
+      normalBonus: row.normalBonus ?? undefined,
+      raceBonus: row.raceBonus ?? undefined,
+      totalBonus: row.totalBonus ?? undefined
+    }));
+
+    const spellListsDto = spellLists.map((row, index) => ({
+      id: row.id,
+      name: row.name || null,
+      chance: row.chance !== '' ? Number.parseInt(row.chance, 10) || 0 : 0,
+      learnt: row.learnt,
+      displayOrder: index
+    }));
+
+    const languagesDto = languages.map((row, index) => ({
+      id: row.id,
+      name: row.name || null,
+      level: row.level !== '' ? Number.parseInt(row.level, 10) || 0 : 0,
+      displayOrder: index
+    }));
+
+    return {
+      baseData: {
+        characterId: baseData.characterId || null,
+        name: baseData.name || null,
+        gender: baseData.gender || null,
+        race: baseData.race || null,
+        playerClass: baseData.playerClass || null,
+        magicSchool: baseData.magicSchool || null,
+        age: baseData.age || null,
+        height: baseData.height || null,
+        weight: baseData.weight || null,
+        hair: baseData.hair || null,
+        eyes: baseData.eyes || null,
+        personality: baseData.personality || null,
+        alignment: baseData.alignment || null,
+        motivation: baseData.motivation || null,
+        specialty: baseData.specialty || null,
+        armorType: baseData.armorType || null
+      },
+      attributes,
+      spellLists: spellListsDto,
+      languages: languagesDto,
+      bonusAdjustments: buildLevelUpBonusAdjustments(),
+      skills: buildLevelUpSkills()
+    };
+  }
+
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
     setBaseData((prev) => ({ ...prev, [key]: value }));
   }
@@ -769,6 +1067,19 @@ export default function CreateCharacterLevelUp() {
     }));
   }
 
+  function handleUseSpellSkillPoints() {
+    const available = skillPoints.spells;
+    if (!Number.isFinite(available) || available <= 0) {
+      return;
+    }
+
+    setSpellLists((prev) => applySpellSkillPoints(prev, available));
+    setSkillPoints((prev) => ({
+      ...prev,
+      spells: 0
+    }));
+  }
+
   function handleMdBonusChange(index: number, key: 'itemBonus' | 'specialBonus', value: string) {
     setMdBonusAdjustments((prev) => prev.map((row, rowIndex) => {
       if (rowIndex !== index) return row;
@@ -777,19 +1088,55 @@ export default function CreateCharacterLevelUp() {
   }
 
   function handleLanguageChange(index: number, changes: Partial<LanguageRow>) {
-    setLanguages((prev) => prev.map((row, rowIndex) => {
-      if (rowIndex !== index) return row;
-      const next: LanguageRow = { ...row, ...changes };
-      if (changes.level !== undefined) {
-        const numeric = Number(changes.level);
-        if (!Number.isFinite(numeric)) {
-          next.level = '';
-        } else {
-          const clamped = Math.min(5, Math.max(0, Math.floor(numeric)));
-          next.level = String(clamped);
+    // LEVEL changes: consume/refund language skill points per level difference
+    if (changes.level !== undefined) {
+      const currentRow = languages[index];
+      if (!currentRow) {
+        return;
+      }
+
+      const prevLevelNumericRaw = Number(currentRow.level);
+      const prevLevel = Number.isFinite(prevLevelNumericRaw)
+        ? Math.min(5, Math.max(0, Math.floor(prevLevelNumericRaw)))
+        : 0;
+
+      const requestedNumericRaw = Number(changes.level);
+      const requestedLevel = Number.isFinite(requestedNumericRaw)
+        ? Math.min(5, Math.max(0, Math.floor(requestedNumericRaw)))
+        : 0;
+
+      let delta = requestedLevel - prevLevel;
+      if (delta > 0) {
+        const available = skillPoints.languages;
+        if (!Number.isFinite(available) || available <= 0) {
+          delta = 0;
+        } else if (delta > available) {
+          delta = available;
         }
       }
-      return next;
+
+      const finalLevel = prevLevel + delta;
+      const finalLevelText = String(finalLevel);
+
+      setLanguages((prev) => prev.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+        return { ...row, ...changes, level: finalLevelText };
+      }));
+
+      if (delta !== 0) {
+        setSkillPoints((prev) => ({
+          ...prev,
+          languages: prev.languages - delta
+        }));
+      }
+
+      return;
+    }
+
+    // Non-level changes (e.g. name) do not affect skill points
+    setLanguages((prev) => prev.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      return { ...row, ...changes };
     }));
   }
 
@@ -875,9 +1222,32 @@ export default function CreateCharacterLevelUp() {
       return;
     }
 
-    const nextLevels = [...currentRow.levels];
+    const prevLevels = currentRow.levels;
+    const prevUnlockedCount = prevLevels.reduce((total, selected, index) => {
+      return selected && !currentRow.lockedLevels[index] ? total + 1 : total;
+    }, 0);
+
+    const nextLevels = [...prevLevels];
     nextLevels[levelIndex] = checked;
+    const nextUnlockedCount = nextLevels.reduce((total, selected, index) => {
+      return selected && !currentRow.lockedLevels[index] ? total + 1 : total;
+    }, 0);
     const levelCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+
+    const bucketKey = getSkillPointBucketKeyForCategory(definition.category);
+    let costDelta = 0;
+    if (bucketKey) {
+      if (definition.category === 'MM Skills') {
+        costDelta = checked ? 1 : -1;
+      } else {
+        const prevCost = getRowSkillPointCost(prevUnlockedCount);
+        const nextCost = getRowSkillPointCost(nextUnlockedCount);
+        costDelta = nextCost - prevCost;
+      }
+      if (costDelta > 0 && skillPoints[bucketKey] < costDelta) {
+        return;
+      }
+    }
 
     setSkillRows((prev) => prev.map((row, index) => {
       if (index !== skillIndex) return row;
@@ -893,6 +1263,13 @@ export default function CreateCharacterLevelUp() {
         manualLevelInput: isHpMax ? String(nextLevelBonus) : row.manualLevelInput
       };
     }));
+
+    if (bucketKey && costDelta !== 0) {
+      setSkillPoints((prev) => ({
+        ...prev,
+        [bucketKey]: prev[bucketKey] - costDelta
+      }));
+    }
 
     if (definition.name !== HP_MAX_SKILL_NAME) {
       void fetchSkillLevelBonus(skillIndex, definition.name, levelCount);
@@ -910,6 +1287,140 @@ export default function CreateCharacterLevelUp() {
     setManaBonusAdjustment((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleMoveSkillPointsChange(category: SkillCategory, rawValue: string) {
+    const sourceBucketKey = getSkillPointBucketKeyForCategory(category);
+    if (!sourceBucketKey) {
+      setMoveSkillPointsByCategory((prev) => ({
+        ...prev,
+        [category]: 0
+      }));
+      return;
+    }
+
+    const previousValue = moveSkillPointsByCategory[category] ?? 0;
+    const trimmed = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue ?? '');
+    const parsed = trimmed.length === 0 ? 0 : Number.parseInt(trimmed, 10);
+    let nextValue = Number.isFinite(parsed) ? parsed : 0;
+    if (nextValue < 0) {
+      nextValue = 0;
+    }
+
+    const available = skillPoints[sourceBucketKey];
+    if (nextValue > available) {
+      nextValue = available;
+    }
+
+    if (nextValue === previousValue) {
+      return;
+    }
+
+    setMoveSkillPointsByCategory((prev) => ({
+      ...prev,
+      [category]: nextValue
+    }));
+  }
+
+  function handleMoveSkillPointsTargetChange(category: SkillCategory, targetCategoryValue: string) {
+    const resolved = (targetCategoryValue || '') as SkillCategory | '';
+
+    // Always store the selected target (or reset when empty)
+    setMoveSkillPointsTargetByCategory((prev) => ({
+      ...prev,
+      [category]: resolved
+    }));
+
+    if (!resolved) {
+      return;
+    }
+
+    const sourceBucketKey = getSkillPointBucketKeyForCategory(category);
+    if (!sourceBucketKey) {
+      return;
+    }
+
+    const plannedAmountRaw = moveSkillPointsByCategory[category] ?? 0;
+    if (plannedAmountRaw <= 0) {
+      // Nothing to transfer
+      return;
+    }
+
+    const sourceAvailable = skillPoints[sourceBucketKey];
+    if (sourceAvailable <= 0) {
+      return;
+    }
+
+    const amountToMove = Math.min(plannedAmountRaw, sourceAvailable);
+    const targetBucketKey = getTargetSkillPointBucketKey(resolved);
+    const ratio = targetBucketKey ? getSkillPointTransferRatio(category, resolved) : 0;
+
+    if (!targetBucketKey || ratio <= 0 || amountToMove <= 0) {
+      return;
+    }
+
+    setSkillPoints((prev) => {
+      const next = { ...prev };
+
+      // Remove from source
+      next[sourceBucketKey] = Math.max(0, (next[sourceBucketKey] ?? 0) - amountToMove);
+
+      // Add to target with ratio
+      const added = amountToMove * ratio;
+      next[targetBucketKey] = (next[targetBucketKey] ?? 0) + added;
+
+      return next;
+    });
+
+    // Reset Move controls back to default state for this category
+    setMoveSkillPointsByCategory((prev) => ({
+      ...prev,
+      [category]: 0
+    }));
+    setMoveSkillPointsTargetByCategory((prev) => ({
+      ...prev,
+      [category]: ''
+    }));
+  }
+
+  function handleResetSkillPointsAndLevels() {
+    // Reset all skill levels to their locked (Early Years / preset) state
+    setSkillRows((prev) => prev.map((row, index) => {
+      const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
+      if (!definition) return row;
+      if (definition.name === HP_MAX_SKILL_NAME) {
+        // Do not modify HP Max when resetting skill points
+        return row;
+      }
+      const resetLevels = row.levels.map((_, levelIndex) => row.lockedLevels[levelIndex]);
+      const levelCount = resetLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      const isHpMax = definition.name === HP_MAX_SKILL_NAME;
+      const zeroLevelBonus = getZeroLevelBonus(definition.name);
+      const nextLevelBonus = isHpMax
+        ? row.levelBonus
+        : levelCount === 0
+          ? zeroLevelBonus
+          : row.levelBonus;
+      return {
+        ...row,
+        levels: resetLevels,
+        levelBonus: nextLevelBonus,
+        manualLevelInput: isHpMax ? row.manualLevelInput : row.manualLevelInput
+      };
+    }));
+
+    // Refresh level bonuses for non-HP, non-locked skills based on locked levels only
+    SKILL_DEFINITIONS_WITH_INDEX.forEach((definition, skillIndex) => {
+      if (definition.name === HP_MAX_SKILL_NAME) return;
+      if (isSkillLocked(definition.name)) return;
+      const row = skillRows[skillIndex];
+      if (!row) return;
+      const lockedCount = row.lockedLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      void fetchSkillLevelBonus(skillIndex, definition.name, lockedCount);
+    });
+
+    // Reload original skill point buckets for core skills only (preserve spells and languages)
+    void loadLevellingSkillPoints(true);
+  }
+
   return (
     <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -917,35 +1428,42 @@ export default function CreateCharacterLevelUp() {
           Character Creation – Level Up
         </h1>
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
-        <button
-          type="button"
-          onClick={handleBack}
-          style={{
-            padding: '6px 12px',
-            background: '#d32f2f',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer'
-          }}
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleNext}
-          style={{
-            padding: '6px 12px',
-            background: COLORS.primary,
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            cursor: 'pointer'
-          }}
-        >
-          Next
-        </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+          <button
+            type="button"
+            onClick={handleBack}
+            style={{
+              padding: '6px 12px',
+              background: '#d32f2f',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: 'pointer'
+            }}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={handleAccept}
+            style={{
+              padding: '6px 12px',
+              background: '#2e7d32',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.8 : 1
+            }}
+            disabled={saving}
+          >
+            {saving ? 'Saving…' : 'ACCEPT'}
+          </button>
+        </div>
+        {saveError && (
+          <p style={{ textAlign: 'center', color: COLORS.danger, fontWeight: 600, margin: 0 }}>{saveError}</p>
+        )}
       </div>
       {loading && (
         <p style={{ textAlign: 'center', color: COLORS.textPrimary }}>Loading Early Years profile...</p>
@@ -1531,6 +2049,7 @@ export default function CreateCharacterLevelUp() {
                     />
                     <button
                       type="button"
+                      onClick={handleUseSpellSkillPoints}
                       style={{
                         marginLeft: 8,
                         padding: '4px 10px',
@@ -1699,16 +2218,16 @@ export default function CreateCharacterLevelUp() {
                         type="number"
                         value={xpValue}
                         readOnly
-                        onClick={canLevelUp ? handleXpLevelUpClick : undefined}
+                        onClick={canUseLevelUp ? handleXpLevelUpClick : undefined}
                         style={{
-                          background: canLevelUp ? '#ffd700' : '#f0f3f8',
-                          color: canLevelUp ? '#111' : COLORS.textPrimary,
-                          fontWeight: canLevelUp ? 800 : 400,
-                          cursor: canLevelUp ? 'pointer' : 'default',
-                          paddingRight: canLevelUp ? 24 : undefined
+                          background: canUseLevelUp ? '#ffd700' : canLevelUp ? '#ffe082' : '#f0f3f8',
+                          color: canUseLevelUp ? '#111' : COLORS.textPrimary,
+                          fontWeight: canUseLevelUp ? 800 : 400,
+                          cursor: canUseLevelUp ? 'pointer' : 'default',
+                          paddingRight: canUseLevelUp ? 24 : undefined
                         }}
                       />
-                      {canLevelUp && (
+                      {canUseLevelUp && (
                         <button
                           type="button"
                           onClick={handleXpLevelUpClick}
@@ -1827,7 +2346,34 @@ export default function CreateCharacterLevelUp() {
             <h2 className="early-years-title">Skill Progression</h2>
             <div className="panel-grid">
               <section className="panel">
-                <h3>Skill Overview</h3>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '20% 28% 5% 5% 5% 5% 5% 5%',
+                    alignItems: 'center',
+                    columnGap: 8
+                  }}
+                >
+                  <h3 style={{ margin: 0, gridColumn: '1 / 2' }}>Skill Overview</h3>
+                  <div style={{ gridColumn: '2 / 3', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleResetSkillPointsAndLevels}
+                      style={{
+                        padding: '2px 10px',
+                        fontSize: 11,
+                        borderRadius: 6,
+                        border: '1px solid #e65100',
+                        background: '#ff9800',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      RESET SKILL POINTS
+                    </button>
+                  </div>
+                </div>
                 <table className="skill-table">
                   <thead>
                     <tr>
@@ -1846,47 +2392,57 @@ export default function CreateCharacterLevelUp() {
                       const rowsForGroup = skillDisplayRows.filter((row) => row.definition.category === group.category);
                       if (rowsForGroup.length === 0) return null;
                       const categoryId = group.category.replace(/\s+/g, '-').toLowerCase();
-                      const categorySkillPoints =
-                        group.category === 'MM Skills' ? skillPoints.mmSkills :
-                        group.category === 'Weapon Skills' ? skillPoints.weaponSkills :
-                        group.category === 'General Skills' ? skillPoints.generalSkills :
-                        group.category === 'Thief Skills' ? skillPoints.thiefSkills :
-                        group.category === 'Magic Skills' ? skillPoints.magicSkills :
-                        group.category === 'Other Skills' ? 0 :
-                        0;
+                      const bucketKeyForGroup = getSkillPointBucketKeyForCategory(group.category);
+                      const categorySkillPoints = bucketKeyForGroup ? skillPoints[bucketKeyForGroup] : 0;
+                      const isCategoryDepleted = bucketKeyForGroup != null && categorySkillPoints <= 0;
                       return (
                         <Fragment key={group.category}>
                           <tr className="skill-category-header">
-                            <td colSpan={8}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                                <span>{group.category}</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                                  <div className="field field-inline">
-                                    <label htmlFor={`skill-points-${categoryId}`}>Skill Points</label>
-                                    <input
-                                      id={`skill-points-${categoryId}`}
-                                      type="number"
-                                      value={categorySkillPoints}
-                                      readOnly
-                                      style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
-                                    />
-                                  </div>
+                            <td>
+                              <span>{group.category}</span>
+                            </td>
+                            <td colSpan={7}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                <div className="field field-inline">
+                                  <label htmlFor={`skill-points-${categoryId}`}>Skill Points</label>
+                                  <input
+                                    id={`skill-points-${categoryId}`}
+                                    type="number"
+                                    value={categorySkillPoints}
+                                    readOnly
+                                    style={{ background: '#f0f3f8', width: 80, flex: '0 0 auto' }}
+                                  />
+                                </div>
+                                {bucketKeyForGroup != null && group.category !== 'Other Skills' && group.category !== 'Secondary skills' && (
                                   <div className="field field-inline">
                                     <label htmlFor={`move-skill-points-${categoryId}`}>Move Skill Points to:</label>
                                     <input
                                       id={`move-skill-points-${categoryId}`}
                                       type="number"
                                       min={0}
+                                      value={moveSkillPointsByCategory[group.category] ?? 0}
+                                      onChange={(event) => handleMoveSkillPointsChange(group.category, event.target.value)}
+                                      disabled={!bucketKeyForGroup}
                                       style={{ width: 80, flex: '0 0 auto' }}
                                     />
                                     <select
                                       id={`move-skill-points-target-${categoryId}`}
+                                      disabled={!bucketKeyForGroup}
                                       style={{ width: 160, flex: '0 0 auto' }}
+                                      value={moveSkillPointsTargetByCategory[group.category] ?? ''}
+                                      onChange={(event) => handleMoveSkillPointsTargetChange(group.category, event.target.value)}
                                     >
                                       <option value="">Select…</option>
+                                      {SKILL_CATEGORIES
+                                        .filter((categoryOption) => categoryOption !== group.category && !['Spells', 'Languages'].includes(categoryOption))
+                                        .map((categoryOption) => (
+                                          <option key={categoryOption} value={categoryOption}>
+                                            {categoryOption}
+                                          </option>
+                                        ))}
                                     </select>
                                   </div>
-                                </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1907,6 +2463,9 @@ export default function CreateCharacterLevelUp() {
                                         : isHpMax
                                           ? 'hpmax-level-input'
                                           : undefined;
+                                      const isLockedLevel = row.definition.name === HP_MAX_SKILL_NAME || row.state.lockedLevels[levelIndex];
+                                      const isNewLevel = !checked && !isLockedLevel;
+                                      const shouldDisable = isLockedLevel || (isNewLevel && isCategoryDepleted);
                                       return (
                                         <label
                                           key={levelIndex}
@@ -1917,7 +2476,7 @@ export default function CreateCharacterLevelUp() {
                                             type="checkbox"
                                             className={inputClassName}
                                             checked={checked}
-                                            disabled={row.definition.name === HP_MAX_SKILL_NAME || row.state.lockedLevels[levelIndex]}
+                                            disabled={shouldDisable}
                                             onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
                                             aria-label={`Level ${levelIndex + 1}`}
                                           />
