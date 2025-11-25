@@ -15,6 +15,7 @@ export type BaseDataDto = {
   gender?: string | null;
   race?: string | null;
   playerClass?: string | null;
+  lvl?: number | null;
   magicSchool?: string | null;
   age?: string | null;
   height?: string | null;

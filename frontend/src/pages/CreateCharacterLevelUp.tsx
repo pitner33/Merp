@@ -9,6 +9,7 @@ import {
   type SkillRowDto as EarlyYearsSkillRowDto
 } from '../api/earlyYears';
 import { getLevelCap } from '../utils/xp';
+import type { Player } from '../types';
 
 const COLORS = {
   primary: '#2f5597',
@@ -409,7 +410,12 @@ export default function CreateCharacterLevelUp() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as { playerId?: number } | undefined;
-  const playerId = locationState?.playerId;
+  const search = typeof location.search === 'string' ? location.search : '';
+  const searchParams = new URLSearchParams(search);
+  const queryPlayerIdRaw = searchParams.get('playerId');
+  const queryPlayerId = queryPlayerIdRaw != null ? Number.parseInt(queryPlayerIdRaw, 10) : NaN;
+  const resolvedQueryPlayerId = Number.isFinite(queryPlayerId) && queryPlayerId > 0 ? queryPlayerId : undefined;
+  const playerId = locationState?.playerId ?? resolvedQueryPlayerId;
 
   const [profile, setProfile] = useState<EarlyYearsProfileDto | null>(null);
   const [loading, setLoading] = useState<boolean>(!!playerId);
@@ -493,8 +499,9 @@ export default function CreateCharacterLevelUp() {
     });
     return initial;
   });
-  const characterLevel = 1;
-  const xpValue = 0;
+  const [characterLevel, setCharacterLevel] = useState(1);
+  const [xpValue, setXpValue] = useState(0);
+  const [displayLevel, setDisplayLevel] = useState(1);
   const canLevelUp = (characterLevel === 1 && xpValue === 0) || xpValue > getLevelCap(characterLevel);
   const [levelUpUsed, setLevelUpUsed] = useState(false);
   const canUseLevelUp = canLevelUp && !levelUpUsed;
@@ -549,6 +556,29 @@ export default function CreateCharacterLevelUp() {
         if (!ignore) {
           setLoading(false);
         }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [playerId]);
+
+  useEffect(() => {
+    let ignore = false;
+    if (!playerId) {
+      return;
+    }
+    (async () => {
+      try {
+        const data = await get<Player>(`/players/${playerId}`);
+        if (ignore || !data) return;
+        const lvl = Number.isFinite(data.lvl) && data.lvl > 0 ? data.lvl : 1;
+        const xp = Number.isFinite(data.xp) && data.xp >= 0 ? data.xp : 0;
+        setCharacterLevel(lvl);
+        setDisplayLevel(lvl);
+        setXpValue(xp);
+      } catch (e) {
+        console.warn('Failed to load player level and XP', e);
       }
     })();
     return () => {
@@ -774,6 +804,7 @@ export default function CreateCharacterLevelUp() {
   function handleXpLevelUpClick() {
     if (!canUseLevelUp) return;
     setLevelUpUsed(true);
+    setDisplayLevel((prev) => (xpValue === 0 ? prev : prev + 1));
     void loadLevellingSkillPoints(false);
   }
 
@@ -1017,6 +1048,7 @@ export default function CreateCharacterLevelUp() {
         gender: baseData.gender || null,
         race: baseData.race || null,
         playerClass: baseData.playerClass || null,
+        lvl: displayLevel,
         magicSchool: baseData.magicSchool || null,
         age: baseData.age || null,
         height: baseData.height || null,
@@ -2208,7 +2240,7 @@ export default function CreateCharacterLevelUp() {
                 <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
                   <div className="field field-inline" style={{ gap: 8 }}>
                     <label htmlFor="summary-level" style={{ minWidth: 72 }}>Level</label>
-                    <input id="summary-level" type="number" value={characterLevel} readOnly style={{ background: '#f0f3f8' }} />
+                    <input id="summary-level" type="number" value={displayLevel} readOnly style={{ background: '#f0f3f8' }} />
                   </div>
                   <div className="field field-inline">
                     <label htmlFor="summary-xp" style={{ minWidth: 32 }}>XP</label>

@@ -45,6 +45,7 @@ public class EarlyYearsProfileDto {
         private String gender;
         private String race;
         private String playerClass;
+        private Integer lvl;
         private String magicSchool;
         private String age;
         private String height;

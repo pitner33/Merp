@@ -88,6 +88,7 @@ public class EarlyYearsProfileService {
                 .gender(enumToString(player.getGender()))
                 .race(enumToString(player.getRace()))
                 .playerClass(enumToString(player.getPlayerClass()))
+                .lvl(player.getLvl())
                 .magicSchool(player.getMagicSchool())
                 .age(player.getAge())
                 .height(player.getHeight())
@@ -369,6 +370,9 @@ public class EarlyYearsProfileService {
         player.setGender(parseEnum(Gender.class, baseData.getGender()));
         player.setRace(parseEnum(Race.class, baseData.getRace()));
         player.setPlayerClass(parseEnum(PlayerClass.class, baseData.getPlayerClass()));
+        if (baseData.getLvl() != null) {
+            player.setLvl(baseData.getLvl());
+        }
         player.setMagicSchool(trimToEmpty(baseData.getMagicSchool()));
         player.setAge(trimToEmpty(baseData.getAge()));
         player.setHeight(trimToEmpty(baseData.getHeight()));

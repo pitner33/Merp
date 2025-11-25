@@ -203,6 +203,18 @@ export default function Landing() {
     } catch {}
   }
 
+  function handleLevelUpClick(p: Player) {
+    if (!isXpOverCap(Number(p.lvl), Number(p.xp))) return;
+    const playerId = typeof p.id === 'number' ? p.id : null;
+    if (playerId == null) return;
+    try {
+      const url = new URL(`/create-character-levelup?playerId=${playerId}`, window.location.origin).toString();
+      window.open(url, `LevelUpWindow_${playerId}`);
+    } catch {
+      window.open(`/create-character-levelup?playerId=${playerId}`, '_blank');
+    }
+  }
+
   function toggleSort(key: keyof Player) {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -629,10 +641,11 @@ export default function Landing() {
                 className="right"
                 style={
                   isXpOverCap(Number(p.lvl), Number(p.xp))
-                    ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800 }
+                    ? { position: 'relative', background: '#ffd700', color: '#111', fontWeight: 800, cursor: 'pointer' }
                     : { position: 'relative' }
                 }
                 title={isXpOverCap(Number(p.lvl), Number(p.xp)) ? 'Level up available' : undefined}
+                onClick={() => handleLevelUpClick(p)}
               >
                 {formatXp(Number(p.xp))}
                 {isXpOverCap(Number(p.lvl), Number(p.xp)) && (
