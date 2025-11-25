@@ -2114,7 +2114,7 @@ export default function CreateCharacterEarlyYears() {
                                       id={`skill-${row.definition.stateIndex}-level-${levelIndex}`}
                                       type="checkbox"
                                       checked={checked}
-                                      disabled={row.definition.name === HP_MAX_SKILL_NAME}
+                                      disabled
                                       onChange={(event) => handleSkillLevelToggle(row.definition.stateIndex, levelIndex, event.target.checked)}
                                       aria-label={`Level ${levelIndex + 1}`}
                                     />
