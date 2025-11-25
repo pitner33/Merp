@@ -50,6 +50,7 @@ export type Player = {
   stunnedForRounds?: number;
   penaltyOfActions?: number;
   hpLossPerRound?: number;
+  activePenaltyEffects?: { value?: number; remainingRounds?: number }[];
   objectUsage?: number;
   runes?: number;
   influence?: number;

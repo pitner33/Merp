@@ -42,12 +42,23 @@ export default function Landing() {
     else if (pct < 75 && pct >= 50) { bg = '#ffd966'; fg = '#000000'; }
     else if (pct < 50 && pct >= 20) { bg = '#f4a261'; fg = '#000000'; }
     else { bg = '#e76f51'; fg = '#ffffff'; }
-    return { background: bg, color: fg, fontWeight: 600, textAlign: 'center' };
+    return { background: bg, color: fg, fontWeight: 600, textAlign: 'center', minWidth: 42 };
   }
 
   function hpTitle(p: Player): string {
     const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
     return `${pct}%`;
+  }
+
+  function penaltyRemainingRounds(p: Player): number {
+    if (!p.activePenaltyEffects || p.activePenaltyEffects.length === 0) return 0;
+    return p.activePenaltyEffects.reduce((max, effect) => {
+      if (!effect) return max;
+      const value = Number(effect.value) || 0;
+      const remaining = Number(effect.remainingRounds) || 0;
+      if (value === 0 || remaining <= 0) return max;
+      return Math.max(max, remaining);
+    }, 0);
   }
 
   function isRevived(p: Player): boolean {
@@ -511,19 +522,21 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('lvl')}>lvl {sortKey==='lvl' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('xp')}>XP {sortKey==='xp' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('hpMax' as keyof Player)}>max HP {sortKey==='hpMax' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th rowSpan={2}><button onClick={() => toggleSort('totalManaBonus' as keyof Player)}>Mana {sortKey==='totalManaBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}>HP</th>
+            <th rowSpan={2}><button onClick={() => toggleSort('totalManaBonus' as keyof Player)}>Mana {sortKey==='totalManaBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}>Active</th>
+            <th rowSpan={2}>Stunned</th>
             <th rowSpan={2}>Weapon/Activity</th>
             <th rowSpan={2}><button onClick={() => toggleSort('attackType' as keyof Player)}>Attack {sortKey==='attackType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('critType' as keyof Player)}>Crit {sortKey==='critType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('armorType' as keyof Player)}>Armor {sortKey==='armorType' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}><button onClick={() => toggleSort('mm' as keyof Player)}>MM {sortKey==='mm' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('tb' as keyof Player)}>TB {sortKey==='tb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('tbOffHand' as keyof Player)}>TB OH {sortKey==='tbOffHand' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th colSpan={7} style={{ textAlign: 'center' }}>TB</th>
             <th rowSpan={2}><button onClick={() => toggleSort('vb' as keyof Player)}>VB {sortKey==='vb' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('shield' as keyof Player)}>Shield {sortKey==='shield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('dualWield' as keyof Player)}>Dual Wield {sortKey==='dualWield' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th rowSpan={2}><button onClick={() => toggleSort('mm' as keyof Player)}>MM {sortKey==='mm' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th colSpan={7} style={{ textAlign: 'center' }}>TB</th>
             <th colSpan={5} style={{ textAlign: 'center' }}>MM</th>
             <th rowSpan={2}><button onClick={() => toggleSort('agilityBonus' as keyof Player)}>AGI Bonus {sortKey==='agilityBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th colSpan={2} style={{ textAlign: 'center' }}>MD</th>
@@ -657,10 +670,58 @@ export default function Landing() {
                 )}
               </td>
               <td className="right">{p.hpMax}</td>
-              <td className="right">{p.totalManaBonus ?? 0}</td>
               <td style={hpStyle(p)} title={hpTitle(p)}>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>{hpTitle(p)}</div>
                 <div>{p.hpActual}</div>
+                {Number(p.hpLossPerRound ?? 0) !== 0 ? (
+                  <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p.hpLossPerRound}/ rnd</div>
+                ) : null}
+              </td>
+              <td className="right">{p.totalManaBonus ?? 0}</td>
+              <td>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+                  {p.isActive ? (
+                    <span title="Active" aria-label="Active">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="6" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span title="Inactive" aria-label="Inactive">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="6" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </span>
+                  )}
+                  {(() => {
+                    const penalty = Number(p.penaltyOfActions ?? 0);
+                    const remaining = penaltyRemainingRounds(p);
+                    if (penalty === 0) return null;
+                    const label = remaining > 0 ? `${penalty} / ${remaining} rnd` : `${penalty} pen`;
+                    return <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>{label}</span>;
+                  })()}
+                </div>
+              </td>
+              <td>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+                  {p.isStunned ? (
+                    <span title="Stunned" aria-label="Stunned">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span title="Not stunned" aria-label="Not stunned">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8" />
+                      </svg>
+                    </span>
+                  )}
+                  {Number(p.stunnedForRounds ?? 0) > 0 ? (
+                    <span style={{ fontSize: 11, color: '#e11d48', fontWeight: 600 }}>+{p.stunnedForRounds} rnd</span>
+                  ) : null}
+                </div>
               </td>
               <td>
                 {(() => {
@@ -672,15 +733,9 @@ export default function Landing() {
               <td>{p.attackType}</td>
               <td>{p.critType}</td>
               <td>{p.armorType}</td>
+              <td className="right">{computeMmForPlayer(p)}</td>
               <td className="right">{computeTbPair(p).main}</td>
               <td className="right">{computeTbPair(p).offhand}</td>
-              <td className="right">{p.tb1HSlashing}</td>
-              <td className="right">{p.tb1HBlunt}</td>
-              <td className="right">{p.tbTwoHanded}</td>
-              <td className="right">{p.tbRanged}</td>
-              <td className="right">{p.tbUnarmed}</td>
-              <td className="right">{p.tbBaseMagic}</td>
-              <td className="right">{p.tbTargetMagic}</td>
               <td className="right">{p.vb}</td>
               <td>
                 {p.shield ? (
@@ -700,7 +755,13 @@ export default function Landing() {
                 )}
               </td>
               <td className="right">{p.dualWield ?? 0}</td>
-              <td className="right">{computeMmForPlayer(p)}</td>
+              <td className="right">{p.tb1HSlashing}</td>
+              <td className="right">{p.tb1HBlunt}</td>
+              <td className="right">{p.tbTwoHanded}</td>
+              <td className="right">{p.tbRanged}</td>
+              <td className="right">{p.tbUnarmed}</td>
+              <td className="right">{p.tbBaseMagic}</td>
+              <td className="right">{p.tbTargetMagic}</td>
               <td className="right">{p.mmNone}</td>
               <td className="right">{p.mmLeather}</td>
               <td className="right">{p.mmHeavyLeather}</td>

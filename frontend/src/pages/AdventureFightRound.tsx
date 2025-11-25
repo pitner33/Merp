@@ -444,12 +444,23 @@ export default function AdventureFightRound() {
     else if (pct < 75 && pct >= 50) { bg = '#ffd966'; fg = '#000000'; }
     else if (pct < 50 && pct >= 20) { bg = '#f4a261'; fg = '#000000'; }
     else { bg = '#e76f51'; fg = '#ffffff'; }
-    return { background: bg, color: fg, fontWeight: 600, textAlign: 'center' };
+    return { background: bg, color: fg, fontWeight: 600, textAlign: 'center', minWidth: 42 };
   }
 
   function hpTitle(p: Player): string {
     const pct = Math.round(((Number(p.hpActual) || 0) / (Number(p.hpMax) || 1)) * 100);
     return `${pct}%`;
+  }
+
+  function penaltyRemainingRounds(p?: Player | null): number {
+    if (!p || !p.activePenaltyEffects || p.activePenaltyEffects.length === 0) return 0;
+    return p.activePenaltyEffects.reduce((max, effect) => {
+      if (!effect) return max;
+      const value = Number(effect.value) || 0;
+      const remaining = Number(effect.remainingRounds) || 0;
+      if (value === 0 || remaining <= 0) return max;
+      return Math.max(max, remaining);
+    }, 0);
   }
 
   function computeTbPair(p?: Player | null): { main: number; offhand: number } {
@@ -1329,6 +1340,9 @@ export default function AdventureFightRound() {
                 <td style={p ? hpStyle(p) : undefined} title={p ? hpTitle(p) : undefined}>
                   <div style={{ fontSize: 12, fontWeight: 500 }}>{p ? hpTitle(p) : ''}</div>
                   <div>{p?.hpActual}</div>
+                  {Number(p?.hpLossPerRound ?? 0) !== 0 ? (
+                    <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p?.hpLossPerRound}/ rnd</div>
+                  ) : null}
                 </td>
                 <td>
                   {p?.isAlive ? (
@@ -1348,35 +1362,49 @@ export default function AdventureFightRound() {
                   )}
                 </td>
                 <td>
-                  {p?.isActive ? (
-                    <span title="Active" aria-label="Active">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="6" />
-                      </svg>
-                    </span>
-                  ) : (
-                    <span title="Inactive" aria-label="Inactive">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="6" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+                    {p?.isActive ? (
+                      <span title="Active" aria-label="Active">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="6" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Inactive" aria-label="Inactive">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#bbb" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="6" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </span>
+                    )}
+                    {(() => {
+                      const penalty = Number(p?.penaltyOfActions ?? 0);
+                      const remaining = penaltyRemainingRounds(p);
+                      if (penalty === 0) return null;
+                      const label = remaining > 0 ? `${penalty} / ${remaining} rnd` : `${penalty} pen`;
+                      return <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>{label}</span>;
+                    })()}
+                  </div>
                 </td>
                 <td>
-                  {p?.isStunned ? (
-                    <span title="Stunned" aria-label="Stunned">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
-                      </svg>
-                    </span>
-                  ) : (
-                    <span title="Not stunned" aria-label="Not stunned">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="8" />
-                      </svg>
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+                    {p?.isStunned ? (
+                      <span title="Stunned" aria-label="Stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#e11d48" stroke="#e11d48" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M13 2l-8 11h6l-2 9 8-12h-6z" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span title="Not stunned" aria-label="Not stunned">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="8" />
+                        </svg>
+                      </span>
+                    )}
+                    {(p?.stunnedForRounds ?? 0) > 0 ? (
+                      <span style={{ fontSize: 11, color: '#e11d48', fontWeight: 600 }}>+{p?.stunnedForRounds} rnd</span>
+                    ) : null}
+                  </div>
                 </td>
                 <td>{p?.target}</td>
                 <td>{(() => {
