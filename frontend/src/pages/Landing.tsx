@@ -523,7 +523,7 @@ export default function Landing() {
             <th rowSpan={2}><button onClick={() => toggleSort('xp')}>XP {sortKey==='xp' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('hpMax' as keyof Player)}>max HP {sortKey==='hpMax' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}>HP</th>
-            <th rowSpan={2}><button onClick={() => toggleSort('totalManaBonus' as keyof Player)}>Mana {sortKey==='totalManaBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2}><button onClick={() => toggleSort('currentManaBonus' as keyof Player)}>Mana {sortKey==='currentManaBonus' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}>Active</th>
             <th rowSpan={2}>Stunned</th>
             <th rowSpan={2}>Weapon/Activity</th>
@@ -677,7 +677,7 @@ export default function Landing() {
                   <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p.hpLossPerRound}/ rnd</div>
                 ) : null}
               </td>
-              <td className="right">{p.totalManaBonus ?? 0}</td>
+              <td className="right">{p.currentManaBonus ?? p.totalManaBonus ?? 0}</td>
               <td>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
                   {p.isActive ? (

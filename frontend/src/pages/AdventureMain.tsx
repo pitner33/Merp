@@ -946,7 +946,7 @@ export default function AdventureMain() {
                       <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p.hpLossPerRound}/ rnd</div>
                     ) : null}
                   </td>
-                  <td className="right">{p.totalManaBonus ?? 0}</td>
+                  <td className="right">{p.currentManaBonus ?? p.totalManaBonus ?? 0}</td>
                   <td>
                     {p.isAlive ? (
                       <span title="Alive" aria-label="Alive">
@@ -1200,11 +1200,34 @@ export default function AdventureMain() {
                         setWeaponSelections((prev) => ({ ...prev, [p.id]: String(weapon.id) }));
                       }}
                     >
-                      {weaponOptionsForPlayer(weaponOptionsByPlayer, p.id).map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
+                      {weaponOptionsForPlayer(weaponOptionsByPlayer, p.id).map((opt) => {
+                        const value = opt.value;
+                        let disabled = false;
+                        let notEnoughMana = false;
+                        if (value !== WEAPON_NONE_VALUE && value !== 'none') {
+                          const wid = Number(value);
+                          if (Number.isFinite(wid)) {
+                            const w = weaponById.get(wid);
+                            const cost = w && typeof w.manaCost === 'number' ? w.manaCost : 0;
+                            const currentMana = Number(p.totalManaBonus ?? 0);
+                            if (cost > currentMana) {
+                              disabled = true;
+                              notEnoughMana = true;
+                            }
+                          }
+                        }
+                        const label = opt.label;
+                        return (
+                          <option
+                            key={value}
+                            value={value}
+                            disabled={disabled}
+                            title={notEnoughMana ? 'Not enough Mana' : undefined}
+                          >
+                            {label}
+                          </option>
+                        );
+                      })}
                     </select>
                   </td>
                   <td>

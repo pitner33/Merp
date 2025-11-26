@@ -158,6 +158,71 @@ export default function AdventureFight() {
     };
   }, []);
 
+  // When rows and inventories are loaded (e.g., after returning from AdventureFightRound),
+  // immediately unequip any weapons that the player can no longer use because their
+  // current mana is below the weapon's manaCost. This also resets activity/attack/crit
+  // like selecting "None" would do, and updates the local weapon selection state.
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+    if (!inventoryByPlayerId || Object.keys(inventoryByPlayerId).length === 0) return;
+
+    let changed = false;
+    const nextRows = rows.map((r) => {
+      const playerId = typeof r.id === 'number' ? r.id : undefined;
+      if (playerId == null) return r;
+      const weapons = inventoryByPlayerId[playerId] ?? [];
+      if (!weapons || weapons.length === 0) return r;
+
+      const currentMana = Number((r as any).currentManaBonus ?? 0);
+      if (!Number.isFinite(currentMana)) return r;
+
+      const equippedWeaponId =
+        typeof (r as Player & { equippedWeaponId?: number | null }).equippedWeaponId === 'number'
+          ? r.equippedWeaponId
+          : null;
+      if (equippedWeaponId == null) return r;
+
+      const w = weapons.find((w) => w.id === equippedWeaponId);
+      if (!w) return r;
+      const cost = typeof w.manaCost === 'number' ? w.manaCost : 0;
+      if (cost <= currentMana) return r;
+
+      changed = true;
+      const fallbackAct = '_5DoNothing';
+      const fallbackAttack = 'none';
+      const fallbackCrit = 'none';
+      const nextActive = deriveActive(fallbackAct, r.isAlive, r.stunnedForRounds);
+
+      return {
+        ...r,
+        playerActivity: fallbackAct,
+        attackType: fallbackAttack,
+        critType: fallbackCrit,
+        shield: false,
+        isActive: nextActive,
+        tb: 0,
+        tbOffHand: 0,
+        tbUsedForDefense: 0,
+        equippedWeaponId: null,
+      } as Player;
+    });
+
+    if (!changed) return;
+
+    const nextSelections: Record<number, string> = { ...weaponSelections };
+    rows.forEach((r, idx) => {
+      if (nextRows[idx] !== r) {
+        const playerId = typeof r.id === 'number' ? r.id : undefined;
+        if (playerId != null) {
+          nextSelections[playerId] = WEAPON_NONE_VALUE;
+        }
+      }
+    });
+
+    setRows(nextRows);
+    setWeaponSelections(nextSelections);
+  }, [rows, inventoryByPlayerId, weaponSelections]);
+
   function showToast(message: string, x?: number, y?: number) {
     let nx = x;
     let ny = y;
@@ -748,6 +813,13 @@ export default function AdventureFight() {
                 setRoundCount(0);
               }
 
+              // Restore mana: set currentManaBonus back to totalManaBonus for playing players
+              try {
+                await fetch('http://localhost:8081/api/fight/reset-mana', { method: 'POST' });
+              } catch {
+                // Best-effort; UI will still reflect current backend state on next load
+              }
+
               const res = await fetch('http://localhost:8081/api/players/ordered');
               const fetched = res.ok ? await res.json() : rows;
               const sorted = [...fetched].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
@@ -1020,7 +1092,7 @@ export default function AdventureFight() {
                         <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p.hpLossPerRound}/ rnd</div>
                       ) : null}
                     </td>
-                    <td className="right">{p.totalManaBonus ?? 0}</td>
+                    <td className="right">{p.currentManaBonus ?? p.totalManaBonus ?? 0}</td>
                     <td>
                       {p.isAlive ? (
                         <span title="Alive" aria-label="Alive">
@@ -1277,11 +1349,34 @@ export default function AdventureFight() {
                           setWeaponSelections((prev) => ({ ...prev, [p.id]: String(weapon.id) }));
                         }}
                       >
-                        {weaponOptionsForPlayer(weaponOptionsByPlayer, p.id).map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
+                        {weaponOptionsForPlayer(weaponOptionsByPlayer, p.id).map((opt) => {
+                          const value = opt.value;
+                          let disabled = false;
+                          let notEnoughMana = false;
+                          if (value !== WEAPON_NONE_VALUE && value !== 'none') {
+                            const wid = Number(value);
+                            if (Number.isFinite(wid)) {
+                              const w = weaponById.get(wid);
+                              const cost = w && typeof w.manaCost === 'number' ? w.manaCost : 0;
+                              const currentMana = Number(p.currentManaBonus ?? 0);
+                              if (cost > currentMana) {
+                                disabled = true;
+                                notEnoughMana = true;
+                              }
+                            }
+                          }
+                          const label = opt.label;
+                          return (
+                            <option
+                              key={value}
+                              value={value}
+                              disabled={disabled}
+                              title={notEnoughMana ? 'Not enough Mana' : undefined}
+                            >
+                              {label}
+                            </option>
+                          );
+                        })}
                       </select>
                     </td>
                     <td>

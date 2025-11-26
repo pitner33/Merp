@@ -1055,8 +1055,13 @@ export default function SingleAttack() {
         const letter = resStr.slice(-1);
         if (letter === 'X') {
           const defenderId = defender.id ?? (players || []).find((pl) => String(pl.characterId) === defenderToken)?.id;
-          if (defenderId != null) {
-            const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId)}&result=${encodeURIComponent(resStr)}&critResult=${encodeURIComponent(0)}&critType=${encodeURIComponent('none')}`;
+          const attackerId = attacker.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+          if (defenderId != null && attackerId != null) {
+            const weapon = findCurrentWeapon();
+            const weaponIdQuery = weapon && typeof weapon.id === 'number'
+              ? `&weaponId=${encodeURIComponent(String(weapon.id))}`
+              : '';
+            const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId)}&attackerId=${encodeURIComponent(String(attackerId))}${weaponIdQuery}&result=${encodeURIComponent(resStr)}&critResult=${encodeURIComponent(0)}&critType=${encodeURIComponent('none')}`;
             const applyResp = await fetch(url, { method: 'POST' });
             if (!applyResp.ok) throw new Error('apply-attack failed');
             const dto = await applyResp.json();
@@ -1135,7 +1140,12 @@ export default function SingleAttack() {
 
       try {
         const defenderId = defender.id ?? (players || []).find((pl) => String(pl.characterId) === defenderToken)?.id;
-        const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId!)}&result=${encodeURIComponent(resultForBackend)}&critResult=${encodeURIComponent(modifiedCritResult)}&critType=${encodeURIComponent(attackerCrit || 'none')}`;
+        const attackerId = attacker.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+        const weapon = findCurrentWeapon();
+        const weaponIdQuery = weapon && typeof weapon.id === 'number'
+          ? `&weaponId=${encodeURIComponent(String(weapon.id))}`
+          : '';
+        const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId!)}&attackerId=${encodeURIComponent(String(attackerId!))}${weaponIdQuery}&result=${encodeURIComponent(resultForBackend)}&critResult=${encodeURIComponent(modifiedCritResult)}&critType=${encodeURIComponent(attackerCrit || 'none')}`;
         const resp = await fetch(url, { method: 'POST' });
         if (!resp.ok) throw new Error('apply-attack-with-crit failed');
         const dto = await resp.json();
@@ -1310,6 +1320,7 @@ export default function SingleAttack() {
             <th rowSpan={2}>XP</th>
             <th rowSpan={2}>max HP</th>
             <th rowSpan={2}>HP</th>
+            <th rowSpan={2}>Mana</th>
             <th rowSpan={2}>Alive</th>
             <th rowSpan={2}>Active</th>
             <th rowSpan={2}>Stunned</th>
@@ -1396,6 +1407,7 @@ export default function SingleAttack() {
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{attacker.hpLossPerRound}/ rnd</div>
                   ) : null}
                 </td>
+                <td className="right">{attacker.currentManaBonus ?? 0}</td>
                 <td>
                   {attacker.isAlive ? (
                     <span title="Alive" aria-label="Alive"><svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" /></svg></span>
@@ -1455,9 +1467,33 @@ export default function SingleAttack() {
                     onChange={(e) => handleWeaponChange(e.target.value)}
                     style={{ width: `${weaponSelectWidthCh}ch` }}
                   >
-                    {weaponOptionsForPlayer(weaponOptionsByPlayer, attacker?.id).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
+                    {weaponOptionsForPlayer(weaponOptionsByPlayer, attacker?.id).map((opt) => {
+                      const value = opt.value;
+                      let disabled = false;
+                      let notEnoughMana = false;
+                      if (attacker && value !== WEAPON_NONE_VALUE && value !== 'none') {
+                        const wid = Number(value);
+                        if (Number.isFinite(wid)) {
+                          const w = weaponById.get(wid);
+                          const cost = w && typeof w.manaCost === 'number' ? w.manaCost : 0;
+                          const currentMana = Number(attacker.currentManaBonus ?? 0);
+                          if (cost > currentMana) {
+                            disabled = true;
+                            notEnoughMana = true;
+                          }
+                        }
+                      }
+                      return (
+                        <option
+                          key={value}
+                          value={value}
+                          disabled={disabled}
+                          title={notEnoughMana ? 'Not enough Mana' : undefined}
+                        >
+                          {opt.label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </td>
                 <td>{labelActivity(attackerActivity || (attacker?.playerActivity as string | undefined))}</td>
@@ -1525,7 +1561,7 @@ export default function SingleAttack() {
                 <td className="right">{attacker.stealth}</td>
               </>
             ) : (
-              <td colSpan={36} style={{ color: '#888' }}>Select attacker…</td>
+              <td colSpan={37} style={{ color: '#888' }}>Select attacker…</td>
             )}
           </tr>
 
@@ -1549,6 +1585,7 @@ export default function SingleAttack() {
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{defender.hpLossPerRound}/ rnd</div>
                   ) : null}
                 </td>
+                <td className="right">{defender.currentManaBonus ?? 0}</td>
                 <td>
                   {defender.isAlive ? (
                     <span title="Alive" aria-label="Alive"><svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" /></svg></span>
@@ -1665,7 +1702,7 @@ export default function SingleAttack() {
                 <td className="right">{defender.stealth}</td>
               </>
             ) : (
-              <td colSpan={36} style={{ color: '#888' }}>{attacker ? 'Select target…' : ''}</td>
+              <td colSpan={37} style={{ color: '#888' }}>{attacker ? 'Select target…' : ''}</td>
             )}
           </tr>
         </tbody>

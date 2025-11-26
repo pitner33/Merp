@@ -76,6 +76,7 @@ public class Player {
     private Integer mdLenyeg;
     private Integer mdKapcsolat;
     private Integer totalManaBonus = 0;
+    private Integer currentManaBonus = 0;
     private Integer totalPoisonMdBonus = 0;
     private Integer totalDiseaseMdBonus = 0;
     private ArmorType armorType;
@@ -179,6 +180,7 @@ public class Player {
         this.hpMax = hpMax;
         this.hpActual = hpMax;
         this.totalManaBonus = mana;
+        this.currentManaBonus = mana;
         this.mm = 0;
         this.mmNone = mmNone;
         this.mmLeather = mmLeather;

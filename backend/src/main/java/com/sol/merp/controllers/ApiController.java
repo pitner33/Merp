@@ -485,6 +485,10 @@ public class ApiController {
         if (incoming.getMdLenyeg() == null) incoming.setMdLenyeg(0);
         if (incoming.getMdKapcsolat() == null) incoming.setMdKapcsolat(0);
         if (incoming.getTotalManaBonus() == null) incoming.setTotalManaBonus(0);
+        if (incoming.getCurrentManaBonus() == null) {
+            Integer mana = incoming.getTotalManaBonus();
+            incoming.setCurrentManaBonus(mana != null ? mana : 0);
+        }
         if (incoming.getTotalPoisonMdBonus() == null) incoming.setTotalPoisonMdBonus(0);
         if (incoming.getTotalDiseaseMdBonus() == null) incoming.setTotalDiseaseMdBonus(0);
         if (incoming.getStunnedForRounds() == null || incoming.getStunnedForRounds() < 0) incoming.setStunnedForRounds(0);
@@ -812,7 +816,9 @@ public class ApiController {
     public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyCritToTarget(@RequestParam(name = "defenderId") Long defenderId,
                                                                                @RequestParam(name = "result") String result,
                                                                                @RequestParam(name = "critResult") Integer critResult,
-                                                                               @RequestParam(name = "critType") CritType critType) {
+                                                                               @RequestParam(name = "critType") CritType critType,
+                                                                               @RequestParam(name = "attackerId", required = false) Long attackerId,
+                                                                               @RequestParam(name = "weaponId", required = false) Long weaponId) {
         if (defenderId == null || result == null || critResult == null || critType == null) {
             return ResponseEntity.badRequest().build();
         }
@@ -823,13 +829,21 @@ public class ApiController {
         Player defender = defenderOpt.get();
 
         Player attacker = null;
-        try {
-            java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
-            if (pair != null && pair.size() >= 1) attacker = pair.get(0);
-        } catch (Exception ignore) {}
-        if (attacker == null) {
-            attacker = new Player();
-            attacker.setAttackType(AttackType.none);
+        if (attackerId != null) {
+            Optional<Player> attackerOpt = playerRepository.findById(attackerId);
+            if (attackerOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            attacker = attackerOpt.get();
+        } else {
+            try {
+                java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+                if (pair != null && pair.size() >= 1) attacker = pair.get(0);
+            } catch (Exception ignore) {}
+            if (attacker == null) {
+                attacker = new Player();
+                attacker.setAttackType(AttackType.none);
+            }
         }
         attacker.setCritType(critType);
 
@@ -843,8 +857,23 @@ public class ApiController {
         else if ("E".equals(letter)) delta = 20;
         int rawRoll = critResult - delta;
 
+        // If a specific weaponId is provided (SingleAttack), temporarily override the
+        // equipped weapon so the shared mana-spend helper charges for the correct weapon,
+        // then restore the original equippedWeaponId afterwards.
+        Long originalEquippedId = attacker.getEquippedWeaponId();
+        boolean overrideEquipped = (weaponId != null);
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(weaponId);
+        }
+
         try { playerService.adventurersOrderedList(); } catch (Exception ignore) {}
         com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithCritRoll(attacker, defender, result, rawRoll);
+
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(originalEquippedId);
+            try { playerRepository.save(attacker); } catch (Exception ignore) {}
+        }
+
         return ResponseEntity.ok(dto);
     }
 
@@ -862,6 +891,23 @@ public class ApiController {
 
         com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithFailRoll(attacker, defender, failRoll);
         return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/fight/reset-mana")
+    public ResponseEntity<Void> resetManaForPlayingPlayers() {
+        List<Player> players = playerRepository.findAllByIsPlayingIsTrue();
+        if (players == null || players.isEmpty()) {
+            return ResponseEntity.ok().build();
+        }
+        for (Player p : players) {
+            Integer total = p.getTotalManaBonus();
+            if (total == null) {
+                total = 0;
+            }
+            p.setCurrentManaBonus(total);
+        }
+        playerRepository.saveAll(players);
+        return ResponseEntity.ok().build();
     }
 
     // Compute crit effects for a given crit letter and a provided roll (client-side dice)

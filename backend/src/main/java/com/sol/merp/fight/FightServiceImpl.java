@@ -11,6 +11,8 @@ import com.sol.merp.characters.PlayerService;
 import com.sol.merp.diceRoll.D100Roll;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.characters.PenaltyEffect;
+import com.sol.merp.weapons.Weapon;
+import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.googlesheetloader.MapsFromTabs;
 import com.sol.merp.modifiers.AttackModifierService;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
@@ -52,6 +54,9 @@ public class FightServiceImpl implements FightService {
     @Autowired
     NextTwoPlayersToFigthObject nextTwoPlayersToFigthObject;
 
+    @Autowired
+    WeaponRepository weaponRepository;
+
     private Integer computeTb(Player p) {
         if (p == null || p.getAttackType() == null) return p != null ? p.getTb() : null;
         switch (p.getAttackType()) {
@@ -91,6 +96,41 @@ public class FightServiceImpl implements FightService {
             default:
                 p.setTbOffHand(0);
                 return p.getTb();
+        }
+    }
+
+    /**
+     * Reduce the attacker's available mana based on the manaCost of the currently equipped weapon.
+     * This is used by both AdventureFightRound and SingleAttack flows via applyResolvedAttack*
+     * so we keep the logic centralized here.
+     */
+    private void spendManaForEquippedWeapon(Player attacker) {
+        if (attacker == null) {
+            return;
+        }
+
+        Long weaponId = attacker.getEquippedWeaponId();
+        if (weaponId == null || weaponRepository == null) {
+            return;
+        }
+
+        try {
+            Weapon weapon = weaponRepository.findById(weaponId).orElse(null);
+            if (weapon == null) {
+                return;
+            }
+            Integer cost = weapon.getManaCost();
+            if (cost == null || cost <= 0) {
+                return;
+            }
+
+            Integer current = attacker.getCurrentManaBonus();
+            if (current == null) current = 0;
+            int next = current - cost;
+            if (next < 0) next = 0;
+            attacker.setCurrentManaBonus(next);
+        } catch (Exception ignore) {
+            // Defensive: mana spending should never break combat resolution
         }
     }
 
@@ -799,6 +839,10 @@ TODO      */
         try { playerService.experienceCounterCrit(attackResultsDTO.getCrit()); } catch (Exception ignore) {}
         try { playerService.experienceCounterKill(); } catch (Exception ignore) {}
 
+        // Spend mana for the attacker based on their equipped weapon (if any)
+        spendManaForEquippedWeapon(attacker);
+
+        playerRepository.save(attacker);
         playerRepository.save(defender);
 
         return attackResultsDTO;
@@ -942,6 +986,10 @@ TODO      */
         playerService.experienceCounterCrit(attackResultsDTO.getCrit());
         playerService.experienceCounterKill();
 
+        // Spend mana for the attacker based on their equipped weapon (if any)
+        spendManaForEquippedWeapon(attacker);
+
+        playerRepository.save(attacker);
         playerRepository.save(defender);
 
         return attackResultsDTO;

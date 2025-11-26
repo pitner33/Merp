@@ -1342,7 +1342,7 @@ export default function AdventureFightRound() {
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p?.hpLossPerRound}/ rnd</div>
                   ) : null}
                 </td>
-                <td className="right">{p?.totalManaBonus ?? 0}</td>
+                <td className="right">{p?.currentManaBonus ?? 0}</td>
                 <td>
                   {p?.isAlive ? (
                     <span title="Alive" aria-label="Alive">

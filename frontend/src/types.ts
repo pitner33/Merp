@@ -17,6 +17,7 @@ export type Player = {
   hpMax: number;
   hpActual?: number;
   totalManaBonus?: number;
+  currentManaBonus?: number;
   mm?: number;
   mmNone?: number;
   mmLeather?: number;
