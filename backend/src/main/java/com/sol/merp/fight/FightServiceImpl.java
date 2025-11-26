@@ -842,7 +842,9 @@ TODO      */
         // Spend mana for the attacker based on their equipped weapon (if any)
         spendManaForEquippedWeapon(attacker);
 
-        playerRepository.save(attacker);
+        if (attacker != null && attacker.getId() != null) {
+            playerRepository.save(attacker);
+        }
         playerRepository.save(defender);
 
         return attackResultsDTO;
@@ -989,7 +991,9 @@ TODO      */
         // Spend mana for the attacker based on their equipped weapon (if any)
         spendManaForEquippedWeapon(attacker);
 
-        playerRepository.save(attacker);
+        if (attacker != null && attacker.getId() != null) {
+            playerRepository.save(attacker);
+        }
         playerRepository.save(defender);
 
         return attackResultsDTO;
