@@ -116,6 +116,25 @@ export default function MM() {
     return `${pct}%`;
   }
 
+  function computeMmForPlayer(p?: Player | null, armorOverride?: string | null): number {
+    if (!p) return 0;
+    const base = p.mm ?? 0;
+    const armor = (armorOverride ?? p.armorType ?? 'none') as string;
+    switch (armor) {
+      case 'leather':
+        return p.mmLeather ?? base;
+      case 'heavyLeather':
+        return p.mmHeavyLeather ?? base;
+      case 'chainmail':
+        return p.mmChainmail ?? base;
+      case 'plate':
+        return p.mmPlate ?? base;
+      case 'none':
+      default:
+        return p.mmNone ?? base;
+    }
+  }
+
   function penaltyRemainingRounds(p?: Player | null): number {
     if (!p || !p.activePenaltyEffects || p.activePenaltyEffects.length === 0) return 0;
     return p.activePenaltyEffects.reduce((max, effect) => {
@@ -555,7 +574,7 @@ export default function MM() {
     if (openTotal == null) return undefined;
     const a = attacker as Player | null;
     if (mmType === 'Movement') {
-      const mmBonus = Number(a?.mm) || 0;
+      const mmBonus = computeMmForPlayer(a, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined);
       const playerPenalty = -Math.abs(Number(a?.penaltyOfActions) || 0);
       let sum = 0;
       sum += mmBonus; // MM bonus from player attribute
@@ -733,14 +752,16 @@ export default function MM() {
               <th rowSpan={2}>XP</th>
               <th rowSpan={2}>max HP</th>
               <th rowSpan={2}>HP</th>
+              <th rowSpan={2}>Mana</th>
               <th rowSpan={2}>Alive</th>
               <th rowSpan={2}>Active</th>
               <th rowSpan={2}>Stunned</th>
               <th rowSpan={2}>MM type</th>
               <th rowSpan={2}>Maneuver type</th>
               <th rowSpan={2}>Difficulty</th>
-              <th rowSpan={2}>Penalty</th>
+              <th rowSpan={2}>Armor</th>
               <th rowSpan={2}>MM</th>
+              <th rowSpan={2}>Penalty</th>
               <th rowSpan={2}>AGI Bonus</th>
               <th rowSpan={2}>Perception</th>
               <th rowSpan={2}>Tracking</th>
@@ -807,6 +828,7 @@ export default function MM() {
                       <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{attacker.hpLossPerRound}/ rnd</div>
                     ) : null}
                   </td>
+                  <td className="right">{attacker.currentManaBonus}</td>
                   <td>
                     {attacker.isAlive ? (
                       <span title="Alive" aria-label="Alive"><svg width="16" height="16" viewBox="0 0 24 24" fill="#2fa84f" stroke="#2fa84f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-6-4.35-9-8.25C1 10 2.5 6 6.5 6c2.09 0 3.57 1.19 4.5 2.44C11.93 7.19 13.41 6 15.5 6 19.5 6 21 10 21 12.75 18 16.65 12 21 12 21z" /></svg></span>
@@ -877,8 +899,19 @@ export default function MM() {
                     </select>
                   </td>
                   
+                  <td>
+                    <select
+                      value={attackerArmor || ''}
+                      onChange={(e) => setAttackerArmor(e.target.value)}
+                      style={{ width: `${armorWidthCh + 2}ch` }}
+                    >
+                      {armorOptions.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="right">{computeMmForPlayer(attacker, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined)}</td>
                   <td className="right">{attacker.penaltyOfActions}</td>
-                  <td className="right">{attacker.mm}</td>
                   <td className="right">{attacker.agilityBonus}</td>
                   <td className="right">{attacker.perception}</td>
                   <td className="right">{attacker.tracking}</td>
@@ -930,9 +963,9 @@ export default function MM() {
                   </thead>
                   <tbody>
                     <tr>
-                      <td>{movementLabel('MM bonus (from player attribute)', Number(attacker?.mm) || 0)}</td>
+                      <td>{movementLabel('MM bonus (from player attribute)', computeMmForPlayer(attacker, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined))}</td>
                       <td>
-                        <input type="number" value={Number(attacker?.mm) || 0} disabled aria-label="MM bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
+                        <input type="number" value={computeMmForPlayer(attacker, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined)} disabled aria-label="MM bonus (from player)" style={{ width: 80, textAlign: 'right' }} />
                       </td>
                     </tr>
                     {maneuverType === 'Stealth' && (
@@ -1280,7 +1313,7 @@ export default function MM() {
                   {(() => {
                     if (mmType === 'Movement') {
                       const a = attacker as Player | null;
-                      const mmBonus = Number(a?.mm) || 0;
+                      const mmBonus = computeMmForPlayer(a, attackerArmor && attackerArmor !== '' ? attackerArmor : undefined);
                       const specProf = Math.floor(Number(mod.specialProficiencyBonus) || 0);
                       const stealthBonus = maneuverType === 'Stealth' ? (Number((attacker as any)?.stealth) || 0) : 0;
                       const stunned = mod.playerStunned ? -50 : 0;

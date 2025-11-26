@@ -118,6 +118,8 @@ export default function Crit() {
     runes: '',
     influence: '',
     stealth: '',
+    totalManaBonus: 0,
+    currentManaBonus: 0,
   } as const;
   const [p, setP] = useState<Player | typeof pNone>(pNone);
 
@@ -521,6 +523,7 @@ export default function Crit() {
             <th rowSpan={2}>XP</th>
             <th rowSpan={2}>max HP</th>
             <th rowSpan={2}>HP</th>
+            <th rowSpan={2}>Mana</th>
             <th rowSpan={2}>Alive</th>
             <th rowSpan={2}>Active</th>
             <th rowSpan={2}>Stunned</th>
@@ -602,6 +605,7 @@ export default function Crit() {
                 <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p.hpLossPerRound}/ rnd</div>
               ) : null}
             </td>
+            <td className="right">{p.currentManaBonus}</td>
             <td>
               {p.isAlive ? (
                 <span title="Alive" aria-label="Alive">

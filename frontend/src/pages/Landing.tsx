@@ -62,11 +62,14 @@ export default function Landing() {
   }
 
   function isRevived(p: Player): boolean {
+    const totalMana = Number(p.totalManaBonus ?? 0);
+    const currentMana = Number(p.currentManaBonus ?? totalMana);
     return (
       Number(p.hpActual) === Number(p.hpMax) &&
       (p.stunnedForRounds ?? 0) === 0 &&
       (p.penaltyOfActions ?? 0) === 0 &&
-      (p.hpLossPerRound ?? 0) === 0
+      (p.hpLossPerRound ?? 0) === 0 &&
+      currentMana >= totalMana
     );
   }
 

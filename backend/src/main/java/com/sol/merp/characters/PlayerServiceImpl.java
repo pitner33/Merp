@@ -120,6 +120,11 @@ public class PlayerServiceImpl implements PlayerService {
         player.setIsStunned(false);
         player.setStunnedForRounds(0);
         player.setHpActual(player.getHpMax());
+        Integer mana = player.getTotalManaBonus();
+        if (mana == null) {
+            mana = 0;
+        }
+        player.setCurrentManaBonus(mana);
         player.setTbUsedForDefense(0);
         // Clear penalties and ongoing effects fully (ElementCollection must be cleared on managed list)
         if (player.getActivePenaltyEffects() != null) {
