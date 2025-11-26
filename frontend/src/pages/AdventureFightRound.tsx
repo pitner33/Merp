@@ -412,6 +412,33 @@ export default function AdventureFightRound() {
     } catch {}
   }
 
+  async function clearTargetForStunnedPlayer(playerId?: number | string | null): Promise<void> {
+    try {
+      if (playerId == null) return;
+      const res = await fetch(`http://localhost:8081/api/players/${playerId}`);
+      if (!res.ok) return;
+      const player = (await res.json()) as Player;
+      const stunned = !!player.isStunned || (Number((player as any).stunnedForRounds) || 0) > 0;
+      if (!stunned) return;
+
+      const payload: Player[] = [
+        {
+          ...player,
+          target: 'none',
+        },
+      ];
+
+      const upd = await fetch('http://localhost:8081/api/players/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!upd.ok) return;
+    } catch {
+      // best-effort; do not break the round flow on failure
+    }
+  }
+
   // Auto-resolve: when the previous Resolve button would become active, trigger resolution automatically (once per open sequence)
   useEffect(() => {
     const openStarted = openTotal != null && openSign !== 0;
@@ -585,9 +612,14 @@ export default function AdventureFightRound() {
         const resp = await fetch(`http://localhost:8081/api/fight/apply-attack-with-fail?failRoll=${nextTotal}`, { method: 'POST' });
         if (!resp.ok) throw new Error('apply-attack-with-fail failed');
         const dto = await resp.json();
+        const stunnedRounds = Number((dto as any)?.failResultStunnedForRounds ?? 0);
         setFailDto(dto);
         setFailEnabled(false);
         await refreshPairFromBackend();
+        if (stunnedRounds > 0 && attacker?.id != null) {
+          await clearTargetForStunnedPlayer(attacker.id);
+          setAttackerRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
+        }
         if (isOffHandSequence) {
           markOffHandComplete();
         } else {
@@ -1147,6 +1179,7 @@ export default function AdventureFightRound() {
       const resp = await fetch(`http://localhost:8081/api/fight/apply-attack-with-crit?result=${encodeURIComponent(resultForBackend)}&critRoll=${cappedRoll}`, { method: 'POST' });
       if (!resp.ok) throw new Error('apply-attack-with-crit failed');
       const dto = await resp.json();
+      const stunnedRounds = Number(dto?.critResultStunnedForRounds ?? 0);
       const capSource = (capAppliedRoll != null || capAppliedLetter) ? capSourceRaw ?? null : null;
       setCritDto({
         ...dto,
@@ -1156,6 +1189,10 @@ export default function AdventureFightRound() {
       });
       setCritEnabled(false);
       await refreshPairFromBackend();
+      if (stunnedRounds > 0 && defender?.id != null) {
+        await clearTargetForStunnedPlayer(defender.id);
+        setDefenderRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
+      }
       if (isOffHandSequence) {
         markOffHandComplete();
       } else {
