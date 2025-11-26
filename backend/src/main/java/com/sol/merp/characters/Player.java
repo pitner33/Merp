@@ -101,7 +101,7 @@ public class Player {
     private Integer firstAid = 0;
     private Integer cooking = 0;
     private Integer ropes = 0;
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "player_active_penalty_effects", joinColumns = @JoinColumn(name = "player_id"))
     private List<PenaltyEffect> activePenaltyEffects = new ArrayList<>();
 

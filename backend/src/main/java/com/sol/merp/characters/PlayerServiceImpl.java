@@ -395,9 +395,10 @@ public class PlayerServiceImpl implements PlayerService {
         if (player.getHpActual() == null) player.setHpActual(0D);
         if (player.getStunnedForRounds() == null) player.setStunnedForRounds(0);
 
-        // If already marked dead, enforce dead invariants
+        // If already marked dead, enforce dead invariants (including clearing weapon/target)
         if (Boolean.FALSE.equals(player.getIsAlive())) {
             player.setHpActual(0D);
+            player.setIsAlive(false);
             player.setIsActive(false);
             player.setIsStunned(false);
             player.setStunnedForRounds(0);
@@ -408,6 +409,7 @@ public class PlayerServiceImpl implements PlayerService {
             player.setTb(0);
             player.setTbOffHand(0);
             player.setTbUsedForDefense(0);
+            player.setEquippedWeaponId(null);
         }
 
         // HP reaching 0 -> dead, and enforce dead invariants
@@ -424,36 +426,46 @@ public class PlayerServiceImpl implements PlayerService {
             player.setTb(0);
             player.setTbOffHand(0);
             player.setTbUsedForDefense(0);
+            player.setEquippedWeaponId(null);
         }
 
-        // Stunned logic
-        if (player.getStunnedForRounds() <= 0) {
-            player.setStunnedForRounds(0);
-            player.setIsStunned(false);
-        } else {
-            player.setIsStunned(true);
-            player.setPlayerActivity(PlayerActivity._5DoNothing);
-            player.setIsActive(false);
-        }
+        // Non-dead flows
+        if (Boolean.TRUE.equals(player.getIsAlive())) {
+            // Stunned logic: keep stunned flag, but do not override activity/attack/crit/target here
+            if (player.getStunnedForRounds() <= 0) {
+                player.setStunnedForRounds(0);
+                player.setIsStunned(false);
+            } else {
+                player.setIsStunned(true);
+            }
 
-        // Target none -> default to DoNothing (unless explicitly PrepareMagic)
-        if (player.getTarget() == PlayerTarget.none && player.getPlayerActivity() != PlayerActivity._4PrepareMagic) {
-            player.setPlayerActivity(PlayerActivity._5DoNothing);
-        }
+            // Ensure activity is non-null
+            PlayerActivity act = player.getPlayerActivity();
+            if (act == null) {
+                act = PlayerActivity._5DoNothing;
+                player.setPlayerActivity(act);
+            }
 
-        // Activity rules: DoNothing -> Attack none, Crit none; also affects active flag
-        if (player.getPlayerActivity() == PlayerActivity._5DoNothing) {
-            player.setAttackType(AttackType.none);
-            player.setCritType(CritType.none);
-            player.setIsActive(false);
-        } else if (player.getPlayerActivity() == PlayerActivity._4PrepareMagic) {
-            player.setIsActive(false);
-        } else {
-            player.setIsActive(true);
-        }
+            boolean stunned = Boolean.TRUE.equals(player.getIsStunned());
+            boolean idleByActivity = act == PlayerActivity._4PrepareMagic || act == PlayerActivity._5DoNothing;
 
-        // Set TB by attack selection
-        setTbBasedOnAttackType(player);
+            // isActive is derived purely from alive/stunned/activity
+            player.setIsActive(!stunned && !idleByActivity);
+
+            // For DoNothing we still neutralize attack/crit to keep invariant consistent,
+            // but we no longer derive these fields from target or other flags.
+            if (act == PlayerActivity._5DoNothing) {
+                player.setAttackType(AttackType.none);
+                player.setCritType(CritType.none);
+            }
+
+            // Force TB/TBOff/TBUsedForDefense to 0 when activity is PrepareMagic/DoNothing
+            if (idleByActivity) {
+                player.setTb(0);
+                player.setTbOffHand(0);
+                player.setTbUsedForDefense(0);
+            }
+        }
 
         // Set MM by armor selection
         setMmBasedOnArmorType(player);

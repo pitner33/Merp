@@ -528,6 +528,9 @@ public class ApiController {
             }
         }
 
+        // If a weapon is equipped on creation, prefer its combat defaults
+        applyEquippedWeaponDefaults(incoming, equippedWeapon);
+
         Integer computedTb = computeTb(incoming, equippedWeapon);
         incoming.setTb(computedTb);
 
@@ -987,6 +990,9 @@ public class ApiController {
                 }
             }
 
+            // If a weapon is equipped, prefer its combat defaults **only** when the fields are missing
+            applyEquippedWeaponDefaults(incoming, equippedWeapon);
+
             // Compute and set main/off-hand TB columns based on current attack type, detailed TB fields, and weapon bonuses
             Integer computedTb = computeTb(incoming, equippedWeapon);
             incoming.setTb(computedTb);
@@ -1038,29 +1044,9 @@ public class ApiController {
             if (incoming.getTbTargetMagic() == null || incoming.getTbTargetMagic() < 0) incoming.setTbTargetMagic(0);
             if (incoming.getDualWield() == null || incoming.getDualWield() < 0) incoming.setDualWield(0);
 
-            // 4) Derive isActive from activity if alive
-            if (Boolean.TRUE.equals(incoming.getIsAlive())) {
-                boolean notActing = incoming.getPlayerActivity() == PlayerActivity._4PrepareMagic ||
-                        incoming.getPlayerActivity() == PlayerActivity._5DoNothing;
-                if (notActing) {
-                    incoming.setIsActive(false);
-                    // When not acting: enforce neutral combat state
-                    incoming.setAttackType(AttackType.none);
-                    incoming.setTarget(PlayerTarget.none);
-                    incoming.setTb(0);
-                    incoming.setTbOffHand(0);
-                } else {
-                    incoming.setIsActive(true);
-                }
-            }
-            // If attack type is none, enforce neutral combat state
-            if (incoming.getAttackType() == AttackType.none) {
-                incoming.setTarget(PlayerTarget.none);
-                incoming.setTb(0);
-                incoming.setTbUsedForDefense(0);
-                incoming.setTbOffHand(0);
-            }
-            // Coerce null enums to 'none' to satisfy NOT NULL/CHECKs
+            // 4) Coerce null enums to 'none' to satisfy NOT NULL/CHECKs.
+            // Detailed combat invariants (including isActive, TB by attack type,
+            // and dead/stunned handling) are derived in PlayerService.checkAndSetStats.
             if (incoming.getAttackType() == null) incoming.setAttackType(AttackType.none);
             if (incoming.getCritType() == null) incoming.setCritType(CritType.none);
             if (incoming.getArmorType() == null) incoming.setArmorType(com.sol.merp.attributes.ArmorType.none);
@@ -1237,6 +1223,39 @@ public class ApiController {
         int finalOff = off + bonusOff;
         p.setTbOffHand(finalOff);
         return finalMain;
+    }
+
+    /**
+     * Apply defaults from the equipped weapon onto the Player's combat fields.
+     *
+     * Semantics (aligned with frontend):
+     * - If {@code weapon} is null, this is a no-op.
+     * - If player.activity/attack/crit are already set, we respect them and do not
+     *   blindly override. Weapon fields are only used when the corresponding
+     *   player fields are null.
+     * - When a non-null weapon is present, its activityType/attackType/critType
+     *   act as defaults for a still-uninitialized Player; afterwards the Player
+     *   holds the canonical values.
+     */
+    private void applyEquippedWeaponDefaults(Player p, Weapon weapon) {
+        if (p == null || weapon == null) {
+            return;
+        }
+
+        // Activity
+        if (p.getPlayerActivity() == null && weapon.getActivityType() != null) {
+            p.setPlayerActivity(weapon.getActivityType());
+        }
+
+        // Attack type
+        if (p.getAttackType() == null && weapon.getAttackType() != null) {
+            p.setAttackType(weapon.getAttackType());
+        }
+
+        // Crit type
+        if (p.getCritType() == null && weapon.getCritType() != null) {
+            p.setCritType(weapon.getCritType());
+        }
     }
 
     public static class BulkUpdateResult {

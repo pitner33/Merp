@@ -244,7 +244,7 @@ export default function AdventureMain() {
     const match = source.match(/^(JK|NJK)(\d{1,2})$/);
     if (!match) return 'none';
     const num = Number(match[2]);
-    if (!Number.isFinite(num) || num < 1 || num > 15) return 'none';
+    if (!Number.isFinite(num) || num < 1 || num > 30) return 'none';
     return `${match[1]}${num.toString().padStart(2, '0')}`;
   }
 
@@ -448,12 +448,6 @@ export default function AdventureMain() {
       default:
         return ['none'];
     }
-  }
-
-  function allowedActivitiesByTarget(target?: string): string[] {
-    const all = ['_1PerformMagic', '_2RangedAttack', '_3PhisicalAttackOrMovement', '_4PrepareMagic', '_5DoNothing'];
-    if (!target) return ['_5DoNothing', '_4PrepareMagic'];
-    return all;
   }
 
   const shieldAllowedFor: Record<string, boolean> = {
@@ -666,24 +660,27 @@ export default function AdventureMain() {
           onClick={async () => {
             try {
               const payload = rows.map((r) => {
-                const candidate = r.target ?? 'none';
+                const forceNoneTarget = r.isAlive === false || (r.stunnedForRounds ?? 0) > 0;
+                const candidate = forceNoneTarget ? 'none' : (r.target ?? 'none');
                 const targetToken = normalizePlayerTargetToken(candidate, r.characterId);
-                let act = r.playerActivity;
-                if (targetToken === 'none' && act !== '_4PrepareMagic') act = '_5DoNothing';
-                let atk = r.attackType;
-                let crit = r.critType;
-                if (act === '_5DoNothing') { atk = 'none'; crit = 'none'; }
+                const act = (r.playerActivity as string) ?? '_5DoNothing';
+                const atk = (r.attackType as string) ?? 'none';
+                const crit = (r.critType as string) ?? 'none';
                 const pair = computeTbPair({ ...r, attackType: atk } as Player);
-                const tbVal = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.main;
-                const tbOff = (act === '_4PrepareMagic' || act === '_5DoNothing') ? 0 : pair.offhand;
+                const inactiveByActivity = act === '_4PrepareMagic' || act === '_5DoNothing';
+                const tbVal = inactiveByActivity ? 0 : pair.main;
+                const tbOff = inactiveByActivity ? 0 : pair.offhand;
                 const isActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
                 const maxDef = Math.floor(Math.max(0, tbVal) / 2);
-                const nextDef = tbVal < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                const nextDef = inactiveByActivity || tbVal < 0 ? 0 : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
                 const weaponToken = weaponValueForPlayer(r);
                 const parsedWeaponId = Number(weaponToken);
-                const equippedWeaponId = weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
+                let equippedWeaponId = weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
                   ? parsedWeaponId
                   : null;
+                if (r.isAlive === false) {
+                  equippedWeaponId = null;
+                }
                 return {
                   ...r,
                   playerActivity: act,
@@ -1014,18 +1011,31 @@ export default function AdventureMain() {
                   </td>
                   <td>
                     {(() => {
-                      const opts = [
+                      const cannotTarget = p.isAlive === false || (p.stunnedForRounds ?? 0) > 0;
+
+                      const baseOpts = [
                         { value: 'none', label: 'none' },
                         { value: 'self', label: 'self' },
                         ...rows
                           .filter((o) => o.id !== p.id)
                           .slice()
                           .sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
-                          .map((o) => ({ value: o.characterId || '', label: o.characterId || '', dead: o.isAlive === false, stunned: (o.stunnedForRounds ?? 0) > 0 })),
+                          .map((o) => ({
+                            value: o.characterId || '',
+                            label: o.characterId || '',
+                            dead: o.isAlive === false,
+                            stunned: (o.stunnedForRounds ?? 0) > 0,
+                          })),
                       ];
+
+                      const opts = cannotTarget ? [{ value: 'none', label: 'none' }] : baseOpts;
+                      const valueToken = cannotTarget
+                        ? 'none'
+                        : displayTargetToken(p.target as string | undefined, p.characterId);
+
                       return (
                         <TargetDropdown
-                          valueToken={displayTargetToken(p.target as string | undefined, p.characterId)}
+                          valueToken={valueToken}
                           selfId={p.characterId}
                           widthCh={targetWidthCh + 6}
                           options={opts}
@@ -1035,42 +1045,76 @@ export default function AdventureMain() {
                             setRows((prev) =>
                               prev.map((r) => {
                                 if (r.id !== p.id) return r;
-                                let nextTarget: string | undefined;
-                                if (value === 'none') nextTarget = undefined;
-                                else if (value === 'self') nextTarget = r.characterId;
-                                else nextTarget = value;
 
-                                const allowedActs = allowedActivitiesByTarget(nextTarget);
-                                const enforcedAct = r.playerActivity && allowedActs.includes(r.playerActivity) ? r.playerActivity : allowedActs[0];
-                                const allowedAttacks = attacksByActivity(enforcedAct, r);
-                                const nextAttack = allowedAttacks.includes(r.attackType || '') ? (r.attackType as string) : allowedAttacks[0];
-                                const allowedCrits = critByAttack[nextAttack] ?? ['none'];
-                                const nextCrit = r.critType && allowedCrits.includes(r.critType) ? r.critType : 'none';
-                                const nextShield = canUseShield(nextAttack) ? r.shield : false;
-                                const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                                const pair = computeTbPair({ ...r, attackType: nextAttack } as Player);
-                                const nextTb = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.main;
-                                const nextTbOff = (enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing') ? 0 : pair.offhand;
+                                const cannotTargetRow = r.isAlive === false || (r.stunnedForRounds ?? 0) > 0;
+                                let nextTarget: string | undefined;
+                                if (cannotTargetRow) {
+                                  nextTarget = undefined;
+                                } else if (value === 'none') {
+                                  nextTarget = undefined;
+                                } else if (value === 'self') {
+                                  nextTarget = r.characterId;
+                                } else {
+                                  nextTarget = value;
+                                }
+
+                                let act = (r.playerActivity as string) ?? '_5DoNothing';
+                                let atk = (r.attackType as string) ?? 'none';
+                                let crit = (r.critType as string) ?? 'none';
+
+                                // Special case: re-arm a previously neutral character when a new target is chosen
+                                // and a weapon is equipped. This covers the "stunned, then recovered" flow
+                                // without generally coupling target to activity/attack/crit.
+                                const justGainedTarget = nextTarget != null;
+                                const wasNeutralActivity = act === '_5DoNothing' || act === '_4PrepareMagic';
+                                const wasCompletelyNeutral =
+                                  wasNeutralActivity &&
+                                  (((r.attackType as string | undefined) ?? 'none') === 'none') &&
+                                  (((r.critType as string | undefined) ?? 'none') === 'none');
+                                const notStunned = (r.stunnedForRounds ?? 0) <= 0;
+                                const alive = r.isAlive !== false;
+
+                                if (justGainedTarget && alive && notStunned && wasCompletelyNeutral) {
+                                  const weaponToken = weaponValueForPlayer(r);
+                                  if (weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none') {
+                                    const weaponId = Number(weaponToken);
+                                    if (Number.isFinite(weaponId)) {
+                                      const weapon = weaponById.get(weaponId);
+                                      if (weapon) {
+                                        act = weapon.activityType ?? act ?? '_3PhisicalAttackOrMovement';
+                                        atk = weapon.attackType ?? atk ?? 'none';
+                                        crit = weapon.critType ?? crit ?? 'none';
+                                      }
+                                    }
+                                  }
+                                }
+
+                                const pair = computeTbPair({ ...r, attackType: atk } as Player);
+                                const inactiveByActivity = act === '_4PrepareMagic' || act === '_5DoNothing';
+                                const nextTb = inactiveByActivity ? 0 : pair.main;
+                                const nextTbOff = inactiveByActivity ? 0 : pair.offhand;
+                                const nextActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                                const maxDef = Math.floor(Math.max(0, nextTb) / 2);
+                                const nextDef =
+                                  inactiveByActivity || nextTb < 0
+                                    ? 0
+                                    : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                                const nextShield = canUseShield(atk) ? r.shield : false;
+
                                 return {
                                   ...r,
                                   target: nextTarget,
-                                  playerActivity: enforcedAct,
-                                  attackType: nextAttack,
-                                  critType: nextCrit,
-                                  shield: nextShield,
+                                  playerActivity: act,
+                                  attackType: atk,
+                                  critType: crit,
                                   isActive: nextActive,
+                                  shield: nextShield,
                                   tb: nextTb,
                                   tbOffHand: nextTbOff,
-                                  tbUsedForDefense: 0,
+                                  tbUsedForDefense: nextDef,
                                 };
                               })
                             );
-                            setWeaponSelections((prev) => {
-                              const next = { ...prev } as Record<number, string>;
-                              if (value === 'none') next[p.id] = WEAPON_NONE_VALUE;
-                              else delete next[p.id];
-                              return next;
-                            });
                             setOpenTargetRowId(null);
                           }}
                         />
@@ -1087,16 +1131,11 @@ export default function AdventureMain() {
                           setRows((prev) =>
                             prev.map((r) => {
                               if (r.id !== p.id) return r;
-                              const allowedActs = allowedActivitiesByTarget(r.target);
-                              const fallbackAct = allowedActs.includes('_5DoNothing') ? '_5DoNothing' : allowedActs[0];
-                              const allowedAttacks = attacksByActivity(fallbackAct, r);
-                              const fallbackAttack = allowedAttacks.includes('none') ? 'none' : allowedAttacks[0];
-                              const allowedCrits = critByAttack[fallbackAttack] ?? ['none'];
-                              const fallbackCrit = allowedCrits.includes('none') ? 'none' : allowedCrits[0];
-                              const pair = computeTbPair({ ...r, attackType: fallbackAttack } as Player);
-                              const inactive = fallbackAct === '_4PrepareMagic' || fallbackAct === '_5DoNothing';
-                              const nextTb = inactive ? 0 : pair.main;
-                              const nextTbOff = inactive ? 0 : pair.offhand;
+                              const fallbackAct = '_5DoNothing';
+                              const fallbackAttack = 'none';
+                              const fallbackCrit = 'none';
+                              const nextTb = 0;
+                              const nextTbOff = 0;
                               const nextActive = deriveActive(fallbackAct, r.isAlive, r.stunnedForRounds);
                               return {
                                 ...r,
@@ -1130,31 +1169,30 @@ export default function AdventureMain() {
                         setRows((prev) =>
                           prev.map((r) => {
                             if (r.id !== p.id) return r;
-                            const allowedActs = allowedActivitiesByTarget(r.target);
-                            const desiredAct = weapon.activityType ?? allowedActs[0];
-                            const enforcedAct = desiredAct && allowedActs.includes(desiredAct) ? desiredAct : allowedActs[0];
-                            const allowedAttacks = attacksByActivity(enforcedAct, r);
-                            const desiredAttack = weapon.attackType ?? allowedAttacks[0];
-                            const enforcedAttack = desiredAttack && allowedAttacks.includes(desiredAttack) ? desiredAttack : allowedAttacks[0];
-                            const allowedCrits = critByAttack[enforcedAttack] ?? ['none'];
-                            const desiredCrit = weapon.critType ?? allowedCrits[0];
-                            const enforcedCrit = desiredCrit && allowedCrits.includes(desiredCrit) ? desiredCrit : allowedCrits[0];
-                            const nextShield = canUseShield(enforcedAttack) ? r.shield : false;
-                            const nextActive = deriveActive(enforcedAct, r.isAlive, r.stunnedForRounds);
-                            const pair = computeTbPair({ ...r, attackType: enforcedAttack } as Player);
-                            const inactive = enforcedAct === '_4PrepareMagic' || enforcedAct === '_5DoNothing';
-                            const nextTb = inactive ? 0 : pair.main;
-                            const nextTbOff = inactive ? 0 : pair.offhand;
+                            const act = weapon.activityType ?? (r.playerActivity as string) ?? '_3PhisicalAttackOrMovement';
+                            const atk = weapon.attackType ?? (r.attackType as string) ?? 'none';
+                            const crit = weapon.critType ?? (r.critType as string) ?? 'none';
+                            const pair = computeTbPair({ ...r, attackType: atk } as Player);
+                            const inactiveByActivity = act === '_4PrepareMagic' || act === '_5DoNothing';
+                            const nextTb = inactiveByActivity ? 0 : pair.main;
+                            const nextTbOff = inactiveByActivity ? 0 : pair.offhand;
+                            const nextActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
+                            const maxDef = Math.floor(Math.max(0, nextTb) / 2);
+                            const nextDef =
+                              inactiveByActivity || nextTb < 0
+                                ? 0
+                                : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
+                            const nextShield = canUseShield(atk) ? r.shield : false;
                             return {
                               ...r,
-                              playerActivity: enforcedAct,
-                              attackType: enforcedAttack,
-                              critType: enforcedCrit,
+                              playerActivity: act,
+                              attackType: atk,
+                              critType: crit,
                               shield: nextShield,
                               isActive: nextActive,
                               tb: nextTb,
                               tbOffHand: nextTbOff,
-                              tbUsedForDefense: 0,
+                              tbUsedForDefense: nextDef,
                               equippedWeaponId: weapon.id,
                             };
                           })
@@ -1171,25 +1209,20 @@ export default function AdventureMain() {
                   </td>
                   <td>
                     {(() => {
-                      const allowedActs = allowedActivitiesByTarget(p.target);
-                      const curAct = (p.playerActivity && allowedActs.includes(p.playerActivity)) ? p.playerActivity : allowedActs[0];
-                      return <span>{activityLabel(curAct)}</span>;
+                      const act = (p.playerActivity as string) || '_5DoNothing';
+                      return <span>{activityLabel(act)}</span>;
                     })()}
                   </td>
                   <td>
                     {(() => {
-                      const allowed = attacksByActivity(p.playerActivity, p);
-                      const curAttack = allowed.includes(p.attackType || '') ? (p.attackType as string) : allowed[0];
-                      return <span>{attackLabel(curAttack)}</span>;
+                      const atk = (p.attackType as string) || 'none';
+                      return <span>{attackLabel(atk)}</span>;
                     })()}
                   </td>
                   <td>
                     {(() => {
-                      const allowedAttacks = attacksByActivity(p.playerActivity, p);
-                      const curAttack = allowedAttacks.includes(p.attackType || '') ? (p.attackType as string) : allowedAttacks[0];
-                      const allowedCrits = critByAttack[curAttack ?? 'none'] ?? ['none'];
-                      const curCrit = p.critType && allowedCrits.includes(p.critType) ? p.critType : 'none';
-                      return <span>{critLabel(curCrit)}</span>;
+                      const crit = (p.critType as string) || 'none';
+                      return <span>{critLabel(crit)}</span>;
                     })()}
                   </td>
                   <td>
@@ -1212,24 +1245,33 @@ export default function AdventureMain() {
                     </select>
                   </td>
                   <td className="right">{computeMmForPlayer(p)}</td>
-                  <td className="right">{(() => computeTbPair(p).main)()}</td>
-                  <td className="right">{(() => computeTbPair(p).offhand)()}</td>
+                  <td className="right">{(() => {
+                    const inactive = p.playerActivity === '_4PrepareMagic' || p.playerActivity === '_5DoNothing';
+                    if (inactive) return 0;
+                    return computeTbPair(p).main;
+                  })()}</td>
+                  <td className="right">{(() => {
+                    const inactive = p.playerActivity === '_4PrepareMagic' || p.playerActivity === '_5DoNothing';
+                    if (inactive) return 0;
+                    return computeTbPair(p).offhand;
+                  })()}</td>
                   <td>
                     {(() => {
-                      const tb = computeTbPair(p).main;
-                      const neg = tb < 0;
-                      const max = Math.floor(Math.max(0, tb) * 0.5);
-                      const value = neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
+                      const inactive = p.playerActivity === '_4PrepareMagic' || p.playerActivity === '_5DoNothing';
+                      const tbBase = inactive ? 0 : computeTbPair(p).main;
+                      const neg = tbBase < 0;
+                      const max = Math.floor(Math.max(0, tbBase) * 0.5);
+                      const value = inactive || neg ? 0 : Math.min(Math.max(0, p.tbUsedForDefense ?? 0), max);
                       return (
                         <input
                           type="number"
                           min={0}
                           max={max}
                           step={1}
-                          disabled={neg}
+                          disabled={inactive || neg}
                           value={value}
                           onChange={(e) => {
-                            if (neg) return;
+                            if (inactive || neg) return;
                             const raw = Number(e.target.value);
                             const val = Number.isFinite(raw) ? Math.min(Math.max(0, Math.floor(raw)), max) : 0;
                             setRows((prev) =>

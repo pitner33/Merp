@@ -1277,6 +1277,7 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>XP</th>
               <th rowSpan={2}>max HP</th>
               <th rowSpan={2}>HP</th>
+              <th rowSpan={2}>Mana</th>
               <th rowSpan={2}>Alive</th>
               <th rowSpan={2}>Active</th>
               <th rowSpan={2}>Stunned</th>
@@ -1286,16 +1287,13 @@ export default function AdventureFightRound() {
               <th rowSpan={2}>Attack</th>
               <th rowSpan={2}>Crit</th>
               <th rowSpan={2}>Armor</th>
+              <th rowSpan={2}>MM</th>
               <th rowSpan={2}>TB</th>
               <th rowSpan={2}>TB OH</th>
               <th rowSpan={2}>TB for Defense</th>
               <th rowSpan={2}>VB</th>
               <th rowSpan={2}>Shield</th>
               <th rowSpan={2}>Dual Wield</th>
-              <th rowSpan={2}>Stunned Rounds</th>
-              <th rowSpan={2}>Penalty</th>
-              <th rowSpan={2}>HP Loss/Round</th>
-              <th rowSpan={2}>MM</th>
               <th rowSpan={2}>AGI Bonus</th>
               <th colSpan={2} style={{ textAlign: 'center' }}>MD</th>
               <th rowSpan={2}>Perception</th>
@@ -1344,6 +1342,7 @@ export default function AdventureFightRound() {
                     <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>{p?.hpLossPerRound}/ rnd</div>
                   ) : null}
                 </td>
+                <td className="right">{p?.totalManaBonus ?? 0}</td>
                 <td>
                   {p?.isAlive ? (
                     <span title="Alive" aria-label="Alive">
@@ -1417,6 +1416,7 @@ export default function AdventureFightRound() {
                 <td>{labelAttack(p?.attackType as any)}</td>
                 <td>{labelCrit(p?.critType as any)}</td>
                 <td>{labelArmor(p?.armorType as any)}</td>
+                <td className="right">{p?.mm}</td>
                 <td className="right">{p ? computeTb(p) : ''}</td>
                 <td className="right">{p ? computeTbPair(p).offhand : ''}</td>
                 <td className="right">{p?.tbUsedForDefense}</td>
@@ -1439,10 +1439,6 @@ export default function AdventureFightRound() {
                   )}
                 </td>
                 <td className="right">{p?.dualWield ?? 0}</td>
-                <td className="right">{p?.stunnedForRounds}</td>
-                <td className="right">{p?.penaltyOfActions}</td>
-                <td className="right">{p?.hpLossPerRound}</td>
-                <td className="right">{p?.mm}</td>
                 <td className="right">{p?.agilityBonus}</td>
                 <td className="right">{p?.mdLenyeg}</td>
                 <td className="right">{p?.mdKapcsolat}</td>

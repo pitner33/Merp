@@ -264,7 +264,9 @@ export default function Crit() {
   }
 
   const idWidthCh = (() => {
-    const list = players && players.length > 0 ? players : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 }];
+    const list = players && players.length > 0
+      ? (players as any[]).filter((pl) => pl && pl.isPlaying)
+      : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 }];
     const labels = ['None'].concat(
       list.map((pl: any) => {
         const dead = pl.isAlive === false;
@@ -570,7 +572,10 @@ export default function Crit() {
                 aria-label="Character ID"
               >
                 <option value="none">None</option>
-                {(players && players.length > 0 ? players : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 }]).map((pl: any) => {
+                {(players && players.length > 0
+                  ? (players as any[]).filter((pl) => pl && pl.isPlaying)
+                  : [{ characterId: 'JK1', name: 'JK1', isAlive: true, stunnedForRounds: 0 }]
+                ).map((pl: any) => {
                   const dead = pl.isAlive === false;
                   const stunned = (pl.stunnedForRounds ?? 0) > 0;
                   const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
@@ -721,6 +726,11 @@ export default function Crit() {
                 setCritRolling(true);
                 let localInterval: number | null = null;
                 try {
+                  // Animate dice faces while waiting for backend roll
+                  localInterval = window.setInterval(() => {
+                    setCritTensFace((prev) => (prev + 1) % 10);
+                    setCritOnesFace((prev) => (prev + 1) % 10);
+                  }, 50);
                   const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
                     if (!r.ok) throw new Error('Dice roll failed');
                     return r.json();
