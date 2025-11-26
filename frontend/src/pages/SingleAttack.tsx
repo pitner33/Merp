@@ -373,6 +373,10 @@ export default function SingleAttack() {
     const attack = (attackerAttack ?? attacker?.attackType ?? null) as string | null;
     const crit = (attackerCrit ?? attacker?.critType ?? null) as string | null;
 
+    if (attackerWeaponSelection === WEAPON_NONE_VALUE) {
+      return;
+    }
+
     if (attackerWeaponSelection && attackerWeaponSelection !== WEAPON_NONE_VALUE) {
       const weaponId = Number(attackerWeaponSelection);
       const weapon = Number.isFinite(weaponId) ? weaponById.get(weaponId) : undefined;
@@ -397,6 +401,28 @@ export default function SingleAttack() {
     const next = match ? String(match.id) : WEAPON_NONE_VALUE;
     setAttackerWeaponSelection((prev) => (prev === next ? prev : next));
   }, [attackerActivity, attackerAttack, attackerCrit, attacker?.playerActivity, attacker?.attackType, attacker?.critType, attackerWeaponSelection, attacker?.id, inventoryByPlayerId, weaponById]);
+
+  useEffect(() => {
+    if (!attacker) return;
+    const playerId = typeof attacker.id === 'number' ? attacker.id : null;
+    if (playerId == null || !Number.isFinite(playerId)) return;
+
+    const currentMana = Number(attacker.currentManaBonus ?? 0);
+    if (!Number.isFinite(currentMana)) return;
+
+    const token = attackerWeaponSelection ?? attackerWeaponValue;
+    if (!token || token === WEAPON_NONE_VALUE || token === 'none') return;
+
+    const weaponId = Number(token);
+    if (!Number.isFinite(weaponId)) return;
+    const weapon = weaponById.get(weaponId);
+    if (!weapon) return;
+
+    const cost = typeof (weapon as any).manaCost === 'number' ? (weapon as any).manaCost : 0;
+    if (cost <= currentMana) return;
+
+    handleWeaponChange(WEAPON_NONE_VALUE);
+  }, [attacker, attackerWeaponSelection, attackerWeaponValue, weaponById]);
 
   // Reset rolling on key changes
   function resetRollSequence() {
