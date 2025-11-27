@@ -768,6 +768,10 @@ export default function AdventureFight() {
                 // Best-effort; UI will still reflect current backend state on next load
               }
 
+              try {
+                await fetch('http://localhost:8081/api/fight/reset-defense', { method: 'POST' });
+              } catch {}
+
               const res = await fetch('http://localhost:8081/api/players/ordered');
               const fetched = res.ok ? await res.json() : rows;
               const sorted = [...fetched].sort((a: Player, b: Player) => (a.characterId || '').localeCompare(b.characterId || ''));
@@ -1274,11 +1278,6 @@ export default function AdventureFight() {
                               const nextTb = inactiveByActivity ? 0 : pair.main;
                               const nextTbOff = inactiveByActivity ? 0 : pair.offhand;
                               const nextActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
-                              const maxDef = Math.floor(Math.max(0, nextTb) / 2);
-                              const nextDef =
-                                inactiveByActivity || nextTb < 0
-                                  ? 0
-                                  : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
                               const nextShield = canUseShield(atk) ? r.shield : false;
                               return {
                                 ...r,
@@ -1289,7 +1288,7 @@ export default function AdventureFight() {
                                 isActive: nextActive,
                                 tb: nextTb,
                                 tbOffHand: nextTbOff,
-                                tbUsedForDefense: nextDef,
+                                tbUsedForDefense: 0,
                                 equippedWeaponId: weapon.id,
                               };
                             })

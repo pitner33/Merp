@@ -1127,11 +1127,6 @@ export default function AdventureMain() {
                             const nextTb = inactiveByActivity ? 0 : pair.main;
                             const nextTbOff = inactiveByActivity ? 0 : pair.offhand;
                             const nextActive = deriveActive(act, r.isAlive, r.stunnedForRounds);
-                            const maxDef = Math.floor(Math.max(0, nextTb) / 2);
-                            const nextDef =
-                              inactiveByActivity || nextTb < 0
-                                ? 0
-                                : Math.min(Math.max(0, r.tbUsedForDefense ?? 0), maxDef);
                             const nextShield = canUseShield(atk) ? r.shield : false;
                             return {
                               ...r,
@@ -1142,7 +1137,7 @@ export default function AdventureMain() {
                               isActive: nextActive,
                               tb: nextTb,
                               tbOffHand: nextTbOff,
-                              tbUsedForDefense: nextDef,
+                              tbUsedForDefense: 0,
                               equippedWeaponId: weapon.id,
                             };
                           })

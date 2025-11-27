@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Player } from '../types';
@@ -1163,22 +1163,26 @@ export default function AdventureFightRound() {
         })()}
       </h1>
       <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center' }}>
-        <Link to="/adventure/fight">
-          <button
-            type="button"
-            style={{
-              background: '#2f5597',
-              color: '#ffffff',
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
-          >
-            Back to Fight
-          </button>
-        </Link>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await fetch('http://localhost:8081/api/fight/reset-defense', { method: 'POST' });
+            } catch {}
+            navigate('/adventure/fight');
+          }}
+          style={{
+            background: '#2f5597',
+            color: '#ffffff',
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: 700,
+          }}
+        >
+          Back to Fight
+        </button>
         <button
           type="button"
           onClick={async () => {

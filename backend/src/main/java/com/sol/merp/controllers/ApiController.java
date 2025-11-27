@@ -1222,9 +1222,29 @@ public class ApiController {
         // If no more attackers this round -> end-of-round hook (stun tick)
         if (result == null || result.getNextTwoPlayersToFight() == null || result.getNextTwoPlayersToFight().size() < 2) {
             fightServiceImpl.decreaseStunnedAtEndOfRound();
+            List<Player> playing = playerRepository.findAllByIsPlayingIsTrue();
+            if (playing != null && !playing.isEmpty()) {
+                for (Player p : playing) {
+                    p.setTbUsedForDefense(0);
+                }
+                playerRepository.saveAll(playing);
+            }
             playerService.adventurersOrderedList();
         }
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/fight/reset-defense")
+    public ResponseEntity<Void> resetDefenseForPlayingPlayers() {
+        List<Player> playing = playerRepository.findAllByIsPlayingIsTrue();
+        if (playing == null || playing.isEmpty()) {
+            return ResponseEntity.ok().build();
+        }
+        for (Player p : playing) {
+            p.setTbUsedForDefense(0);
+        }
+        playerRepository.saveAll(playing);
+        return ResponseEntity.ok().build();
     }
 
     /**
