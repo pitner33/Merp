@@ -1099,6 +1099,55 @@ export default function CreateCharacterLevelUp() {
     }));
   }
 
+  function handleSpellChanceInputChange(index: number, rawValue: string) {
+    const currentRow = spellLists[index];
+    if (!currentRow) {
+      handleSpellListChange(index, { chance: rawValue });
+      return;
+    }
+    const previousNumeric = Number(currentRow.chance);
+    const nextNumeric = Number(rawValue);
+    if (Number.isFinite(previousNumeric) && Number.isFinite(nextNumeric)) {
+      const diff = nextNumeric - previousNumeric;
+      if (diff === 1 || diff === -1) {
+        const isIncrease = diff > 0;
+
+        // For increase actions, require at least 1 available spell skill point
+        if (isIncrease) {
+          const available = skillPoints.spells;
+          if (!Number.isFinite(available) || available <= 0) {
+            // No points to spend – keep the current value
+            handleSpellListChange(index, { chance: String(previousNumeric) });
+            return;
+          }
+        }
+
+        // For decrease actions when the current value is below 20, keep the value unchanged
+        if (!isIncrease && previousNumeric < 20) {
+          handleSpellListChange(index, { chance: String(previousNumeric) });
+          return;
+        }
+
+        const adjusted = previousNumeric + (isIncrease ? 20 : -20);
+        const clamped = Math.min(100, Math.max(0, Math.floor(adjusted)));
+
+        if (clamped === previousNumeric) {
+          // No effective change to chance – do not adjust skill points
+          handleSpellListChange(index, { chance: String(previousNumeric) });
+          return;
+        }
+
+        handleSpellListChange(index, { chance: String(clamped) });
+        setSkillPoints((prev) => ({
+          ...prev,
+          spells: Math.max(0, prev.spells + (isIncrease ? -1 : 1))
+        }));
+        return;
+      }
+    }
+    handleSpellListChange(index, { chance: rawValue });
+  }
+
   function handleUseSpellSkillPoints() {
     const available = skillPoints.spells;
     if (!Number.isFinite(available) || available <= 0) {
@@ -1707,14 +1756,7 @@ export default function CreateCharacterLevelUp() {
             font-size: 14px;
             color: ${COLORS.textPrimary};
             background: ${COLORS.surface};
-          }
-          .spell-table input[type="number"]::-webkit-outer-spin-button,
-          .spell-table input[type="number"]::-webkit-inner-spin-button {
-            margin: 0;
-            -webkit-appearance: none;
-          }
-          .spell-table input[type="number"] {
-            -moz-appearance: textfield;
+            text-align: center;
           }
           .spell-table .center {
             text-align: center;
@@ -1747,14 +1789,7 @@ export default function CreateCharacterLevelUp() {
             font-size: 14px;
             color: ${COLORS.textPrimary};
             background: ${COLORS.surface};
-          }
-          .languages-table input[type="number"]::-webkit-outer-spin-button,
-          .languages-table input[type="number"]::-webkit-inner-spin-button {
-            margin: 0;
-            -webkit-appearance: none;
-          }
-          .languages-table input[type="number"] {
-            -moz-appearance: textfield;
+            text-align: center;
           }
           .skill-table {
             width: 100%;
@@ -2125,7 +2160,7 @@ export default function CreateCharacterLevelUp() {
                             min={0}
                             max={100}
                             value={row.chance}
-                            onChange={(event) => handleSpellListChange(index, { chance: event.target.value })}
+                            onChange={(event) => handleSpellChanceInputChange(index, event.target.value)}
                             placeholder="0-100"
                             aria-label={`Spell list ${index + 1} chance`}
                             readOnly={row.learnt}
@@ -2165,7 +2200,7 @@ export default function CreateCharacterLevelUp() {
                   <thead>
                     <tr>
                       <th style={{ width: '70%' }}>Language</th>
-                      <th style={{ width: '30%' }}>Level (0-5)</th>
+                      <th style={{ width: '30%', textAlign: 'center' }}>Level (0-5)</th>
                     </tr>
                   </thead>
                   <tbody>
