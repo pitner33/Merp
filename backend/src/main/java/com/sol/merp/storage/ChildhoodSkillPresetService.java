@@ -28,21 +28,21 @@ public class ChildhoodSkillPresetService {
         this.jdbc = jdbc;
     }
 
-    public Optional<Map<String, Integer>> findChildhoodSkills(Race race) {
+    public Optional<ChildhoodSkillsData> findChildhoodSkills(Race race) {
         if (race == null) {
             return Optional.empty();
         }
         return findChildhoodSkillsByKey(buildLookupKey(race));
     }
 
-    public Optional<Map<String, Integer>> findChildhoodSkillsByKey(String rawKey) {
+    public Optional<ChildhoodSkillsData> findChildhoodSkillsByKey(String rawKey) {
         String lookupKey = normalizeKey(rawKey);
         if (lookupKey == null) {
             return Optional.empty();
         }
         String tableName = resolveTableName();
         try {
-            Map<String, Integer> result = jdbc.query(
+            ChildhoodSkillsData result = jdbc.query(
                     "SELECT * FROM " + tableName + " WHERE UPPER(COL1) = ?",
                     ps -> ps.setString(1, lookupKey),
                     rs -> rs.next() ? extractChildhoodSkills(rs) : null
@@ -54,7 +54,7 @@ public class ChildhoodSkillPresetService {
         return Optional.empty();
     }
 
-    private Map<String, Integer> extractChildhoodSkills(ResultSet rs) throws SQLException {
+    private ChildhoodSkillsData extractChildhoodSkills(ResultSet rs) throws SQLException {
         Map<String, Integer> result = new LinkedHashMap<>();
         for (int i = 0; i < SkillTableColumnOrder.SKILL_SEQUENCE.size(); i++) {
             int columnIndex = i + 2; // COL2..COL33
@@ -62,7 +62,10 @@ public class ChildhoodSkillPresetService {
             Integer value = parseInteger(rs.getString(columnName));
             result.put(SkillTableColumnOrder.SKILL_SEQUENCE.get(i), value);
         }
-        return result;
+        int spellLearningChancePercent = parseInteger(rs.getString("COL34"));
+        int languageLevels = parseInteger(rs.getString("COL35"));
+        int backgroundPossibilities = parseInteger(rs.getString("COL36"));
+        return new ChildhoodSkillsData(result, spellLearningChancePercent, languageLevels, backgroundPossibilities);
     }
 
     private Integer parseInteger(String text) {
@@ -78,6 +81,39 @@ public class ChildhoodSkillPresetService {
             // ignore malformed values
         }
         return 0;
+    }
+
+    public static class ChildhoodSkillsData {
+        private final Map<String, Integer> skills;
+        private final int spellLearningChancePercent;
+        private final int languageLevels;
+        private final int backgroundPossibilities;
+
+        public ChildhoodSkillsData(Map<String, Integer> skills,
+                                   int spellLearningChancePercent,
+                                   int languageLevels,
+                                   int backgroundPossibilities) {
+            this.skills = skills;
+            this.spellLearningChancePercent = spellLearningChancePercent;
+            this.languageLevels = languageLevels;
+            this.backgroundPossibilities = backgroundPossibilities;
+        }
+
+        public Map<String, Integer> getSkills() {
+            return skills;
+        }
+
+        public int getSpellLearningChancePercent() {
+            return spellLearningChancePercent;
+        }
+
+        public int getLanguageLevels() {
+            return languageLevels;
+        }
+
+        public int getBackgroundPossibilities() {
+            return backgroundPossibilities;
+        }
     }
 
     private String buildLookupKey(Race race) {

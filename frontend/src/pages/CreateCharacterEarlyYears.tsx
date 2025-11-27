@@ -230,6 +230,38 @@ type SkillRowState = {
   manualLevelInput: string;
 };
 
+type ChildhoodMetaState = {
+  spellLearningChancePercent: number | null;
+  languageLevels: number | null;
+  backgroundPossibilities: number | null;
+};
+
+type ChildhoodSkillsResponse = {
+  skills?: Record<string, unknown> | null;
+  spellLearningChancePercent?: number | null;
+  languageLevels?: number | null;
+  backgroundPossibilities?: number | null;
+};
+
+function createEmptyChildhoodMeta(): ChildhoodMetaState {
+  return {
+    spellLearningChancePercent: null,
+    languageLevels: null,
+    backgroundPossibilities: null
+  };
+}
+
+function normalizeChildhoodMetaValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const API_ROOT = API_BASE.replace(/\/$/, '');
 const RACE_BONUS_ENDPOINT = (raceKey: string) => `${API_ROOT}/attributes/race-bonuses/${encodeURIComponent(raceKey)}`;
@@ -352,6 +384,7 @@ export default function CreateCharacterEarlyYears() {
     })
   );
   const characterLevel = 1;
+  const [childhoodMeta, setChildhoodMeta] = useState<ChildhoodMetaState>(() => createEmptyChildhoodMeta());
 
   const attributeRowMap = useMemo(() => {
     const map = new Map<AttributeKey, AttributeRow>();
@@ -1014,6 +1047,7 @@ export default function CreateCharacterEarlyYears() {
     const raceKey = baseData.race?.trim();
     if (!raceKey) {
       setRaceBonusError(null);
+      setChildhoodMeta(createEmptyChildhoodMeta());
       setAttributeRows((prev) => prev.map((row) => {
         if (row.normalBonus == null && row.totalBonus == null && row.raceBonus == null) {
           return row;
@@ -1082,6 +1116,7 @@ export default function CreateCharacterEarlyYears() {
         if (cancelled) return;
 
         if (childhoodResponse.status === 404) {
+          setChildhoodMeta(createEmptyChildhoodMeta());
           setSkillRows((prev) => prev.map((row, index) => {
             const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
             const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
@@ -1097,14 +1132,21 @@ export default function CreateCharacterEarlyYears() {
         } else if (!childhoodResponse.ok) {
           throw new Error(`Failed to load childhood skills for ${raceKey}`);
         } else {
-          const childhoodData = await childhoodResponse.json() as Record<string, unknown>;
-          applyChildhoodSkillPreset(childhoodData);
+          const childhoodData = await childhoodResponse.json() as ChildhoodSkillsResponse;
+          const skillMap = (childhoodData?.skills ?? {}) as Record<string, unknown>;
+          applyChildhoodSkillPreset(skillMap);
+          setChildhoodMeta({
+            spellLearningChancePercent: normalizeChildhoodMetaValue(childhoodData?.spellLearningChancePercent),
+            languageLevels: normalizeChildhoodMetaValue(childhoodData?.languageLevels),
+            backgroundPossibilities: normalizeChildhoodMetaValue(childhoodData?.backgroundPossibilities)
+          });
         }
       } catch (error) {
         if (!cancelled) {
           setRaceBonusError(error instanceof Error ? error.message : 'Failed to load race bonuses.');
         }
         if (!cancelled) {
+          setChildhoodMeta(createEmptyChildhoodMeta());
           setSkillRows((prev) => prev.map((row, index) => {
             const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
             const isHpMax = definition?.name === HP_MAX_SKILL_NAME;
@@ -1661,7 +1703,28 @@ export default function CreateCharacterEarlyYears() {
         <h2 className="early-years-title">Foundational Information</h2>
         <div className="panel-grid cols-3">
           <section className="panel">
-            <h3>Character Base Data</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <h3>Character Base Data</h3>
+              <div className="field field-inline" style={{ marginLeft: 'auto' }}>
+                <label>Background Possibilities</label>
+                <span
+                  style={{
+                    minWidth: 48,
+                    textAlign: 'right',
+                    fontWeight: 700,
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    background: '#fff',
+                    display: 'inline-flex',
+                    justifyContent: 'flex-end',
+                    color: COLORS.primary
+                  }}
+                >
+                  {childhoodMeta.backgroundPossibilities ?? '-'}
+                </span>
+              </div>
+            </div>
             {metaLoading && <p className="meta-state">Loading metadata…</p>}
             {metaError && <p className="meta-state error">{metaError}</p>}
             <div className="base-data-form">
@@ -1861,7 +1924,28 @@ export default function CreateCharacterEarlyYears() {
             </div>
           </section>
           <section className="panel">
-            <h3>Spell Lists</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <h3>Spell Lists</h3>
+              <div className="field field-inline" style={{ marginLeft: 'auto' }}>
+                <label>Spell learning chance %</label>
+                <span
+                  style={{
+                    minWidth: 48,
+                    textAlign: 'right',
+                    fontWeight: 700,
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    background: '#fff',
+                    display: 'inline-flex',
+                    justifyContent: 'flex-end',
+                    color: COLORS.primary
+                  }}
+                >
+                  {childhoodMeta.spellLearningChancePercent ?? '-'}
+                </span>
+              </div>
+            </div>
             <table className="spell-table">
               <thead>
                 <tr>
@@ -1907,7 +1991,28 @@ export default function CreateCharacterEarlyYears() {
             </table>
           </section>
           <section className="panel">
-            <h3>Languages</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <h3>Languages</h3>
+              <div className="field field-inline" style={{ marginLeft: 'auto' }}>
+                <label>Language levels</label>
+                <span
+                  style={{
+                    minWidth: 48,
+                    textAlign: 'right',
+                    fontWeight: 700,
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 6,
+                    padding: '4px 8px',
+                    background: '#fff',
+                    display: 'inline-flex',
+                    justifyContent: 'flex-end',
+                    color: COLORS.primary
+                  }}
+                >
+                  {childhoodMeta.languageLevels ?? '-'}
+                </span>
+              </div>
+            </div>
             <table className="languages-table">
               <thead>
                 <tr>

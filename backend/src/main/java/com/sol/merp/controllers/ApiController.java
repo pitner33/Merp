@@ -27,6 +27,7 @@ import com.sol.merp.inventory.PlayerInventoryItem;
 import com.sol.merp.weapons.Weapon;
 import com.sol.merp.weapons.WeaponRepository;
 import com.sol.merp.storage.ChildhoodSkillPresetService;
+import com.sol.merp.storage.ChildhoodSkillPresetService.ChildhoodSkillsData;
 import com.sol.merp.storage.ClassLevellingSkillPointsService;
 import com.sol.merp.storage.ClassSkillBonusService;
 import com.sol.merp.storage.NormalBonusService;
@@ -163,19 +164,19 @@ public class ApiController {
     }
 
     @GetMapping("/attributes/childhood-skills/{raceKey}")
-    public ResponseEntity<Map<String, Integer>> getChildhoodSkills(@PathVariable("raceKey") String raceKey) {
+    public ResponseEntity<ChildhoodSkillsResponse> getChildhoodSkills(@PathVariable("raceKey") String raceKey) {
         if (raceKey == null || raceKey.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
 
-        Optional<Map<String, Integer>> byEnum = resolveRace(raceKey)
+        Optional<ChildhoodSkillsData> byEnum = resolveRace(raceKey)
                 .flatMap(childhoodSkillPresetService::findChildhoodSkills);
         if (byEnum.isPresent()) {
-            return ResponseEntity.ok(byEnum.get());
+            return ResponseEntity.ok(toChildhoodSkillsResponse(byEnum.get()));
         }
 
-        Optional<Map<String, Integer>> byKey = childhoodSkillPresetService.findChildhoodSkillsByKey(raceKey);
-        return byKey.map(ResponseEntity::ok)
+        Optional<ChildhoodSkillsData> byKey = childhoodSkillPresetService.findChildhoodSkillsByKey(raceKey);
+        return byKey.map(data -> ResponseEntity.ok(toChildhoodSkillsResponse(data)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
@@ -262,6 +263,51 @@ public class ApiController {
             }
         }
         return Optional.empty();
+    }
+
+    private ChildhoodSkillsResponse toChildhoodSkillsResponse(ChildhoodSkillsData data) {
+        if (data == null) {
+            return null;
+        }
+        return new ChildhoodSkillsResponse(
+                data.getSkills(),
+                data.getSpellLearningChancePercent(),
+                data.getLanguageLevels(),
+                data.getBackgroundPossibilities()
+        );
+    }
+
+    public static class ChildhoodSkillsResponse {
+        private final Map<String, Integer> skills;
+        private final int spellLearningChancePercent;
+        private final int languageLevels;
+        private final int backgroundPossibilities;
+
+        public ChildhoodSkillsResponse(Map<String, Integer> skills,
+                                       int spellLearningChancePercent,
+                                       int languageLevels,
+                                       int backgroundPossibilities) {
+            this.skills = skills;
+            this.spellLearningChancePercent = spellLearningChancePercent;
+            this.languageLevels = languageLevels;
+            this.backgroundPossibilities = backgroundPossibilities;
+        }
+
+        public Map<String, Integer> getSkills() {
+            return skills;
+        }
+
+        public int getSpellLearningChancePercent() {
+            return spellLearningChancePercent;
+        }
+
+        public int getLanguageLevels() {
+            return languageLevels;
+        }
+
+        public int getBackgroundPossibilities() {
+            return backgroundPossibilities;
+        }
     }
 
     private Optional<PlayerClass> resolvePlayerClass(String raw) {
