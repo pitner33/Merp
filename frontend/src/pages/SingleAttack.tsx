@@ -14,8 +14,8 @@ import {
   type WeaponOption,
 } from '../utils/weapons';
 import { isXpOverCap, formatXp } from '../utils/xp';
-import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 import { formatRaceDisplayName } from '../utils/race';
+import { computeTbPair as computeTbPairCore } from '../utils/tb';
 
 type CritResultDto = (
   {
@@ -548,57 +548,8 @@ export default function SingleAttack() {
       }
     }
 
-    const attackType = (p.attackType ?? 'slashing') as string;
-    let main = 0;
-    let offHand = 0;
-    switch (attackType) {
-      case 'none':
-        main = 0;
-        offHand = 0;
-        break;
-      case 'slashing':
-        main = p.tb1HSlashing ?? 0;
-        offHand = 0;
-        break;
-      case 'blunt':
-        main = p.tb1HBlunt ?? 0;
-        offHand = 0;
-        break;
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbUnarmed ?? 0;
-        offHand = 0;
-        break;
-      case 'dualWield': {
-        const isBlunt = p.critType === 'blunt';
-        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
-        main = computeDualWieldMainTb(base1H, p.dualWield);
-        offHand = computeDualWieldOffHandTb(base1H, p.dualWield);
-        break;
-      }
-      case 'twoHanded':
-        main = p.tbTwoHanded ?? 0;
-        offHand = 0;
-        break;
-      case 'ranged':
-        main = p.tbRanged ?? 0;
-        offHand = 0;
-        break;
-      case 'baseMagic':
-      case 'magicBall':
-        main = p.tbBaseMagic ?? 0;
-        offHand = 0;
-        break;
-      case 'magicProjectile':
-        main = p.tbTargetMagic ?? 0;
-        offHand = 0;
-        break;
-      default:
-        main = p.tb ?? 0;
-        offHand = 0;
-        break;
-    }
-    return { main: main + bonusMain, offHand: offHand + bonusOff };
+    const pair = computeTbPairCore(p, bonusMain, bonusOff);
+    return { main: pair.main, offHand: pair.offhand };
   }
 
   const CRIT_LETTER_ORDER = ['X', 'T', 'A', 'B', 'C', 'D', 'E'] as const;

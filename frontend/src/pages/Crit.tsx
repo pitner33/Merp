@@ -4,8 +4,8 @@ import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { fetchInventory } from '../api/inventory';
 import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
-import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 import { formatRaceDisplayName } from '../utils/race';
+import { computeTbPair as computeTbPairCore } from '../utils/tb';
 
 export default function Crit() {
   const navigate = useNavigate();
@@ -334,61 +334,11 @@ export default function Crit() {
 
   function computeTbPair(player?: Player | typeof pNone): { main: number; offhand: number } {
     if (!player || !player.attackType) return { main: 0, offhand: 0 };
-    const weapon = findEquippedWeapon(player);
+    const weapon = findEquippedWeapon(player as Player);
     const bonusMain = weapon?.extraTBMH ?? 0;
     const bonusOff = weapon?.extraTBOH ?? 0;
 
-    const attackType = (player.attackType ?? 'slashing') as string;
-    let main = 0;
-    let offhand = 0;
-    switch (attackType) {
-      case 'none':
-        main = 0;
-        offhand = 0;
-        break;
-      case 'slashing':
-        main = (player as Player).tb1HSlashing ?? 0;
-        offhand = 0;
-        break;
-      case 'blunt':
-        main = (player as Player).tb1HBlunt ?? 0;
-        offhand = 0;
-        break;
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = (player as Player).tbUnarmed ?? 0;
-        offhand = 0;
-        break;
-      case 'dualWield': {
-        const isBlunt = (player as Player).critType === 'blunt';
-        const base1H = isBlunt ? ((player as Player).tb1HBlunt ?? 0) : ((player as Player).tb1HSlashing ?? 0);
-        main = computeDualWieldMainTb(base1H, (player as Player).dualWield);
-        offhand = computeDualWieldOffHandTb(base1H, (player as Player).dualWield);
-        break;
-      }
-      case 'twoHanded':
-        main = (player as Player).tbTwoHanded ?? 0;
-        offhand = 0;
-        break;
-      case 'ranged':
-        main = (player as Player).tbRanged ?? 0;
-        offhand = 0;
-        break;
-      case 'baseMagic':
-      case 'magicBall':
-        main = (player as Player).tbBaseMagic ?? 0;
-        offhand = 0;
-        break;
-      case 'magicProjectile':
-        main = (player as Player).tbTargetMagic ?? 0;
-        offhand = 0;
-        break;
-      default:
-        main = (player as Player).tb ?? 0;
-        offhand = 0;
-        break;
-    }
-    return { main: main + bonusMain, offhand: offhand + bonusOff };
+    return computeTbPairCore(player as Player, bonusMain, bonusOff);
   }
 
   return (

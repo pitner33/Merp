@@ -4,9 +4,9 @@ import type { CSSProperties } from 'react';
 import type { Player } from '../types';
 import { fetchInventory } from '../api/inventory';
 import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
-import { computeDualWieldMainTb, computeDualWieldOffHandTb } from '../utils/dualWield';
 import { isXpOverCap, formatXp } from '../utils/xp';
 import { formatRaceDisplayName } from '../utils/race';
+import { computeTbPair as computeTbPairCore } from '../utils/tb';
 
 export default function AdventureFightRound() {
   const location = useLocation();
@@ -497,59 +497,7 @@ export default function AdventureFightRound() {
     const bonusMain = weapon?.extraTBMH ?? 0;
     const bonusOff = weapon?.extraTBOH ?? 0;
 
-    const attackType = (p.attackType ?? 'slashing') as string;
-    let main = 0;
-    let offhand = 0;
-    switch (attackType) {
-      case 'none':
-        main = 0;
-        offhand = 0;
-        break;
-      case 'slashing':
-        main = p.tb1HSlashing ?? 0;
-        offhand = 0;
-        break;
-      case 'blunt':
-        main = p.tb1HBlunt ?? 0;
-        offhand = 0;
-        break;
-      case 'clawsAndFangs':
-      case 'grabOrBalance':
-        main = p.tbUnarmed ?? 0;
-        offhand = 0;
-        break;
-      case 'dualWield': {
-        const isBlunt = p.critType === 'blunt';
-        const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
-        main = computeDualWieldMainTb(base1H, p.dualWield);
-        offhand = computeDualWieldOffHandTb(base1H, p.dualWield);
-        break;
-      }
-      case 'twoHanded':
-        main = p.tbTwoHanded ?? 0;
-        offhand = 0;
-        break;
-      case 'ranged':
-        main = p.tbRanged ?? 0;
-        offhand = 0;
-        break;
-      case 'baseMagic':
-      case 'magicBall':
-        main = p.tbBaseMagic ?? 0;
-        offhand = 0;
-        break;
-      case 'magicProjectile':
-        main = p.tbTargetMagic ?? 0;
-        offhand = 0;
-        break;
-      default:
-        main = p.tb ?? 0;
-        offhand = 0;
-        break;
-    }
-    main += bonusMain;
-    offhand += bonusOff;
-    return { main, offhand };
+    return computeTbPairCore(p, bonusMain, bonusOff);
   }
 
   function computeTb(p: Player): number {

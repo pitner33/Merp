@@ -17,7 +17,6 @@ import com.sol.merp.characters.PlayerService;
 import com.sol.merp.characters.NextTwoPlayersToFigthObject;
 import com.sol.merp.fight.Round;
 import com.sol.merp.fight.FightServiceImpl;
-import com.sol.merp.fight.DualWieldCalculator;
 import com.sol.merp.charactercreation.EarlyYearsProfileService;
 import com.sol.merp.dto.AttackResultsDTO;
 import com.sol.merp.dto.EarlyYearsProfileDto;
@@ -535,8 +534,14 @@ public class ApiController {
         // If a weapon is equipped on creation, prefer its combat defaults
         applyEquippedWeaponDefaults(incoming, equippedWeapon);
 
-        Integer computedTb = computeTb(incoming, equippedWeapon);
-        incoming.setTb(computedTb);
+        // Compute base TB/TBOffHand from attackType and detailed TB fields, then apply weapon bonuses
+        playerService.setTbBasedOnAttackType(incoming);
+        int baseMain = incoming.getTb() != null ? incoming.getTb() : 0;
+        int baseOff = incoming.getTbOffHand() != null ? incoming.getTbOffHand() : 0;
+        int bonusMain = equippedWeapon != null && equippedWeapon.getExtraTBMH() != null ? equippedWeapon.getExtraTBMH() : 0;
+        int bonusOff = equippedWeapon != null && equippedWeapon.getExtraTBOH() != null ? equippedWeapon.getExtraTBOH() : 0;
+        incoming.setTb(baseMain + bonusMain);
+        incoming.setTbOffHand(baseOff + bonusOff);
 
         Integer tbUsed = incoming.getTbUsedForDefense();
         if (tbUsed == null) tbUsed = 0;
@@ -1035,13 +1040,17 @@ public class ApiController {
                     incoming.setEquippedWeaponId(null);
                 }
             }
-
             // If a weapon is equipped, prefer its combat defaults **only** when the fields are missing
             applyEquippedWeaponDefaults(incoming, equippedWeapon);
 
-            // Compute and set main/off-hand TB columns based on current attack type, detailed TB fields, and weapon bonuses
-            Integer computedTb = computeTb(incoming, equippedWeapon);
-            incoming.setTb(computedTb);
+            // Compute base TB/TBOffHand from attackType and detailed TB fields, then apply weapon bonuses
+            playerService.setTbBasedOnAttackType(incoming);
+            int baseMain = incoming.getTb() != null ? incoming.getTb() : 0;
+            int baseOff = incoming.getTbOffHand() != null ? incoming.getTbOffHand() : 0;
+            int bonusMain = equippedWeapon != null && equippedWeapon.getExtraTBMH() != null ? equippedWeapon.getExtraTBMH() : 0;
+            int bonusOff = equippedWeapon != null && equippedWeapon.getExtraTBOH() != null ? equippedWeapon.getExtraTBOH() : 0;
+            incoming.setTb(baseMain + bonusMain);
+            incoming.setTbOffHand(baseOff + bonusOff);
 
             // Normalize fields to satisfy DB CHECK constraints before persisting
             // 1) TB used for defense: [0, tb/2], and if TB < 0 -> 0 immediately
@@ -1216,70 +1225,6 @@ public class ApiController {
             playerService.adventurersOrderedList();
         }
         return ResponseEntity.ok(result);
-    }
-
-    private Integer computeTb(Player p, Weapon weapon) {
-        if (p == null) {
-            return null;
-        }
-        AttackType attackType = p.getAttackType();
-        if (attackType == null) {
-            int bonusMainOnly = weapon != null && weapon.getExtraTBMH() != null ? weapon.getExtraTBMH() : 0;
-            int bonusOffOnly = weapon != null && weapon.getExtraTBOH() != null ? weapon.getExtraTBOH() : 0;
-            int base = p.getTb() != null ? p.getTb() : 0;
-            int result = base + bonusMainOnly;
-            p.setTbOffHand(bonusOffOnly);
-            return result;
-        }
-
-        int main = 0;
-        int off = 0;
-        switch (attackType) {
-            case slashing:
-                main = p.getTb1HSlashing() != null ? p.getTb1HSlashing() : 0;
-                break;
-            case blunt:
-                main = p.getTb1HBlunt() != null ? p.getTb1HBlunt() : 0;
-                break;
-            case clawsAndFangs:
-            case grabOrBalance:
-                main = p.getTbUnarmed() != null ? p.getTbUnarmed() : 0;
-                break;
-            case dualWield: {
-                int baseMain;
-                if (p.getCritType() == CritType.blunt) {
-                    baseMain = p.getTb1HBlunt() != null ? p.getTb1HBlunt() : 0;
-                } else {
-                    baseMain = p.getTb1HSlashing() != null ? p.getTb1HSlashing() : 0;
-                }
-                main = DualWieldCalculator.computeMainHandTb(baseMain, p.getDualWield());
-                off = DualWieldCalculator.computeOffHandTb(baseMain, p.getDualWield());
-                break;
-            }
-            case twoHanded:
-                main = p.getTbTwoHanded() != null ? p.getTbTwoHanded() : 0;
-                break;
-            case ranged:
-                main = p.getTbRanged() != null ? p.getTbRanged() : 0;
-                break;
-            case baseMagic:
-            case magicBall:
-                main = p.getTbBaseMagic() != null ? p.getTbBaseMagic() : 0;
-                break;
-            case magicProjectile:
-                main = p.getTbTargetMagic() != null ? p.getTbTargetMagic() : 0;
-                break;
-            default:
-                main = p.getTb() != null ? p.getTb() : 0;
-                break;
-        }
-
-        int bonusMain = weapon != null && weapon.getExtraTBMH() != null ? weapon.getExtraTBMH() : 0;
-        int bonusOff = weapon != null && weapon.getExtraTBOH() != null ? weapon.getExtraTBOH() : 0;
-        int finalMain = main + bonusMain;
-        int finalOff = off + bonusOff;
-        p.setTbOffHand(finalOff);
-        return finalMain;
     }
 
     /**
