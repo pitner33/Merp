@@ -508,8 +508,10 @@ export default function CreateCharacterLevelUp() {
   const canUseLevelUp = canLevelUp && !levelUpUsed;
 
   useEffect(() => {
-    document.title = 'Character Creation – Level Up';
-  }, []);
+    const trimmedId = baseData.characterId?.trim();
+    const idPart = trimmedId ? ` - ${trimmedId}` : '';
+    document.title = `Character Details${idPart}`;
+  }, [baseData.characterId]);
 
   useEffect(() => {
     let ignore = false;
