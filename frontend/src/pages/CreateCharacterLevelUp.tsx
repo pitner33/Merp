@@ -8,7 +8,7 @@ import {
   type BonusAdjustmentDto,
   type SkillRowDto as EarlyYearsSkillRowDto
 } from '../api/earlyYears';
-import { getLevelCap } from '../utils/xp';
+import { isXpOverCap } from '../utils/xp';
 import type { Player } from '../types';
 
 const COLORS = {
@@ -502,7 +502,8 @@ export default function CreateCharacterLevelUp() {
   const [characterLevel, setCharacterLevel] = useState(1);
   const [xpValue, setXpValue] = useState(0);
   const [displayLevel, setDisplayLevel] = useState(1);
-  const canLevelUp = (characterLevel === 1 && xpValue === 0) || xpValue > getLevelCap(characterLevel);
+  const [levelAndXpLoaded, setLevelAndXpLoaded] = useState(false);
+  const canLevelUp = levelAndXpLoaded && ((characterLevel === 1 && xpValue === 0) || isXpOverCap(characterLevel, xpValue));
   const [levelUpUsed, setLevelUpUsed] = useState(false);
   const canUseLevelUp = canLevelUp && !levelUpUsed;
 
@@ -568,6 +569,7 @@ export default function CreateCharacterLevelUp() {
     if (!playerId) {
       return;
     }
+    setLevelAndXpLoaded(false);
     (async () => {
       try {
         const data = await get<Player>(`/players/${playerId}`);
@@ -577,6 +579,7 @@ export default function CreateCharacterLevelUp() {
         setCharacterLevel(lvl);
         setDisplayLevel(lvl);
         setXpValue(xp);
+        setLevelAndXpLoaded(true);
       } catch (e) {
         console.warn('Failed to load player level and XP', e);
       }

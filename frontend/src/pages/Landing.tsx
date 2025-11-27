@@ -217,8 +217,7 @@ export default function Landing() {
     } catch {}
   }
 
-  function handleLevelUpClick(p: Player) {
-    if (!isXpOverCap(Number(p.lvl), Number(p.xp))) return;
+  function openCharacterDetails(p: Player) {
     const playerId = typeof p.id === 'number' ? p.id : null;
     if (playerId == null) return;
     try {
@@ -227,6 +226,11 @@ export default function Landing() {
     } catch {
       window.open(`/create-character-levelup?playerId=${playerId}`, '_blank');
     }
+  }
+
+  function handleLevelUpClick(p: Player) {
+    if (!isXpOverCap(Number(p.lvl), Number(p.xp))) return;
+    openCharacterDetails(p);
   }
 
   function toggleSort(key: keyof Player) {
@@ -541,6 +545,32 @@ export default function Landing() {
                       <path d="M6 7l1.5-3h9L18 7" />
                       <path d="M6 7h12l-1 12H7L6 7z" />
                       <path d="M9 11h6" />
+                    </svg>
+                  </button>
+                  <button
+                    aria-label="Character details"
+                    title="Character details"
+                    onClick={() => openCharacterDetails(p)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="8" r="3" />
+                      <path d="M6 20c0-3.333 2.667-6 6-6s6 2.667 6 6" />
                     </svg>
                   </button>
                   <Link to={`/players/${p.id}/edit`}>
