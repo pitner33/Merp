@@ -163,24 +163,6 @@ export default function MM() {
     return v && map[v] ? map[v] : (v || '');
   }
 
-  // Compute TB based on current attack type (same logic as SingleAttack)
-  function computeTb(p: Player): number | undefined {
-    const a = (p.attackType || 'slashing') as string;
-    switch (a) {
-      case 'none': return 0;
-      case 'slashing':
-      case 'blunt':
-      case 'clawsAndFangs':
-      case 'grabOrBalance': return p.tbOneHanded;
-      case 'twoHanded': return p.tbTwoHanded;
-      case 'ranged': return p.tbRanged;
-      case 'baseMagic': return p.tbBaseMagic;
-      case 'magicBall': return p.tbBaseMagic;
-      case 'magicProjectile': return p.tbTargetMagic;
-      default: return p.tb;
-    }
-  }
-
   // Reset MM result when a fresh open roll starts
   useEffect(() => {
     setMmRes(null);

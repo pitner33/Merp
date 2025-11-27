@@ -1236,15 +1236,26 @@ public class ApiController {
         int off = 0;
         switch (attackType) {
             case slashing:
-            case blunt:
-            case clawsAndFangs:
-            case grabOrBalance:
                 main = p.getTb1HSlashing() != null ? p.getTb1HSlashing() : 0;
                 break;
-            case dualWield:
-                main = DualWieldCalculator.computeMainHandTb(p.getTb1HSlashing(), p.getDualWield());
-                off = DualWieldCalculator.computeOffHandTb(p.getTb1HSlashing(), p.getDualWield());
+            case blunt:
+                main = p.getTb1HBlunt() != null ? p.getTb1HBlunt() : 0;
                 break;
+            case clawsAndFangs:
+            case grabOrBalance:
+                main = p.getTbUnarmed() != null ? p.getTbUnarmed() : 0;
+                break;
+            case dualWield: {
+                int baseMain;
+                if (p.getCritType() == CritType.blunt) {
+                    baseMain = p.getTb1HBlunt() != null ? p.getTb1HBlunt() : 0;
+                } else {
+                    baseMain = p.getTb1HSlashing() != null ? p.getTb1HSlashing() : 0;
+                }
+                main = DualWieldCalculator.computeMainHandTb(baseMain, p.getDualWield());
+                off = DualWieldCalculator.computeOffHandTb(baseMain, p.getDualWield());
+                break;
+            }
             case twoHanded:
                 main = p.getTbTwoHanded() != null ? p.getTbTwoHanded() : 0;
                 break;

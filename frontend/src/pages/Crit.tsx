@@ -1052,26 +1052,3 @@ function labelArmor(v?: string): string {
   };
   return v && map[v] ? map[v] : (v || '');
 }
-
-function computeTb(p: any): number | undefined {
-  const a = p.attackType ?? 'slashing';
-  switch (a) {
-    case 'slashing':
-    case 'blunt':
-    case 'clawsAndFangs':
-    case 'grabOrBalance':
-      return p.tbOneHanded;
-    case 'twoHanded':
-      return p.tbTwoHanded;
-    case 'ranged':
-      return p.tbRanged;
-    case 'baseMagic':
-      return p.tbBaseMagic;
-    case 'magicBall':
-      return p.tbBaseMagic;
-    case 'magicProjectile':
-      return p.tbTargetMagic;
-    default:
-      return p.tb;
-  }
-}
