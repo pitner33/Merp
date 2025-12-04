@@ -5,6 +5,7 @@ export type Player = {
   gender?: string;
   race?: string;
   playerClass?: string;
+  magicSchool?: string;
   isPlaying: boolean;
   isActive?: boolean;
   isStunned?: boolean;

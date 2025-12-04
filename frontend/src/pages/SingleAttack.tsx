@@ -93,6 +93,14 @@ export default function SingleAttack() {
   const [critOnesFace, setCritOnesFace] = useState<number>(0);
   const [critLastRoll, setCritLastRoll] = useState<number | null>(null);
   const [critDto, setCritDto] = useState<CritResultDto | null>(null);
+  const [saveRolling, setSaveRolling] = useState(false);
+  const [saveTensFace, setSaveTensFace] = useState<number>(0);
+  const [saveOnesFace, setSaveOnesFace] = useState<number>(0);
+  const [saveOpenSign, setSaveOpenSign] = useState<0 | 1 | -1>(0);
+  const [saveOpenTotal, setSaveOpenTotal] = useState<number | null>(null);
+  const [saveManualInput, setSaveManualInput] = useState<string>('0');
+  const [saveConsentingTarget, setSaveConsentingTarget] = useState(false);
+  const [saveGmModifier, setSaveGmModifier] = useState<number>(0);
   const [failEnabled, setFailEnabled] = useState(false);
   const [failRolling, setFailRolling] = useState(false);
   const [failTensFace, setFailTensFace] = useState<number>(0);
@@ -170,6 +178,30 @@ export default function SingleAttack() {
   useEffect(() => {
     setMod((m) => ({ ...m, defenderStunned: autoDefenderStunned, attackerHPBelow50Percent: autoAttackerHPBelow50 }));
   }, [autoDefenderStunned, autoAttackerHPBelow50]);
+
+  useEffect(() => {
+    const src = attacker ?? undefined;
+    const attackType = (attackerAttack ?? src?.attackType) as string | undefined;
+    if (attackType !== 'baseMagic') return;
+
+    const rawSchool = (src as any)?.magicSchool;
+    if (!rawSchool) return;
+
+    const normalized = String(rawSchool).trim().toLowerCase();
+    let nextType: 'lenyeg' | 'kapcsolat' | undefined;
+    if (normalized === 'essence' || normalized === 'lenyeg') {
+      nextType = 'lenyeg';
+    } else if (normalized === 'channeling' || normalized === 'kapcsolat') {
+      nextType = 'kapcsolat';
+    }
+    if (!nextType) return;
+
+    setRm((prev) => (prev.baseMageType === nextType ? prev : { ...prev, baseMageType: nextType! }));
+  }, [
+    attackerAttack,
+    attacker?.attackType,
+    (attacker as any)?.magicSchool,
+  ]);
 
   // Load players
   useEffect(() => {
@@ -365,7 +397,10 @@ export default function SingleAttack() {
 
     // Reset modifiers when target changes
     setMod(initialMod());
-    setRm(initialRm());
+    setRm((prev) => {
+      const next = initialRm();
+      return { ...next, baseMageType: prev.baseMageType };
+    });
   }, [defenderToken]);
 
   useEffect(() => {
@@ -443,6 +478,14 @@ export default function SingleAttack() {
     setCritOnesFace(0);
     setCritLastRoll(null);
     setCritDto(null);
+    setSaveRolling(false);
+    setSaveTensFace(0);
+    setSaveOnesFace(0);
+    setSaveOpenSign(0);
+    setSaveOpenTotal(null);
+    setSaveManualInput('0');
+    setSaveConsentingTarget(false);
+    setSaveGmModifier(0);
     setFailEnabled(false);
     setFailRolling(false);
     setFailTensFace(0);
@@ -802,6 +845,7 @@ export default function SingleAttack() {
     const usingMelee = activity === '_3PhisicalAttackOrMovement';
     const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
     const isPerformMagic = activity === '_1PerformMagic';
+    const ignoreDefenderVBAndShield = attackType === 'baseMagic';
 
     let modSum = 0;
     if (usingMelee) {
@@ -848,9 +892,9 @@ export default function SingleAttack() {
     const attackerTb = usingOffHand ? (tbPair.offHand ?? 0) : (tbPair.main ?? 0);
     const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
     const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
-    const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
+    const cDefenderVB = ignoreDefenderVBAndShield ? 0 : -Math.abs(Number(defender?.vb) || 0);
     const cDefenderTBForDefense = -Math.abs(Number(defender?.tbUsedForDefense) || 0);
-    const cDefenderShield = defender?.shield ? -25 : 0;
+    const cDefenderShield = ignoreDefenderVBAndShield ? 0 : (defender?.shield ? -25 : 0);
     const cDefenderPenalty = Math.abs(Number(defender?.penaltyOfActions) || 0);
 
     const open = openTotal;
@@ -983,9 +1027,10 @@ export default function SingleAttack() {
       const attackerTb = usingOffHand ? tbPair.offHand : tbPair.main;
       const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker.tbUsedForDefense) || 0);
       const cAttackerPenalty = -Math.abs(Number(attacker.penaltyOfActions) || 0);
-      const cDefenderVB = -Math.abs(Number(defender.vb) || 0);
+      const ignoreDefenderVBAndShield = attackerAttack === 'baseMagic';
+      const cDefenderVB = ignoreDefenderVBAndShield ? 0 : -Math.abs(Number(defender.vb) || 0);
       const cDefenderTBForDefense = -Math.abs(Number(defender.tbUsedForDefense) || 0);
-      const cDefenderShield = defender.shield ? -25 : 0;
+      const cDefenderShield = ignoreDefenderVBAndShield ? 0 : (defender.shield ? -25 : 0);
       const cDefenderPenalty = Math.abs(Number(defender.penaltyOfActions) || 0);
 
       const usedTotalLocal = computeLocalModifiedTotal();
@@ -998,9 +1043,9 @@ export default function SingleAttack() {
         `&attackerTb=${attackerTb}` +
         `&attackerTbForDefense=${cAttackerTBForDefense}` +
         `&attackerPenalty=${cAttackerPenalty}` +
-        `&defenderVb=${cDefenderVB}` +
+        (ignoreDefenderVBAndShield ? '' : `&defenderVb=${cDefenderVB}`) +
         `&defenderTbForDefense=${cDefenderTBForDefense}` +
-        `&defenderShield=${cDefenderShield}` +
+        (ignoreDefenderVBAndShield ? '' : `&defenderShield=${cDefenderShield}`) +
         `&defenderPenalty=${cDefenderPenalty}` +
         `&modifiers=${modifiersOut}` +
         `&total=${usedTotalLocal ?? 0}`
@@ -1149,6 +1194,82 @@ export default function SingleAttack() {
     } finally {
       window.clearInterval(localInterval);
       setCritRolling(false);
+    }
+  }
+
+  async function handleSaveRoll() {
+    if (!attackRes) return;
+    const resStr = (attackRes.result || '').toString().trim();
+    const upper = resStr.toUpperCase();
+    if (!upper || upper === 'FAIL') return;
+
+    const parsedManual = Number(saveManualInput);
+    const manualIsNumber = !Number.isNaN(parsedManual);
+    const manualOverrideActive = manualIsNumber && parsedManual !== 0;
+
+    if (manualOverrideActive) {
+      const value = parsedManual;
+      const absValue = Math.abs(value);
+      const normalized = absValue % 100;
+      const tens = normalized === 0 && absValue !== 0 ? 0 : Math.floor(normalized / 10);
+      const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
+      setSaveTensFace(tens);
+      setSaveOnesFace(ones);
+      setSaveOpenSign(0);
+      setSaveOpenTotal(value);
+      return;
+    }
+
+    if (saveRolling) return;
+
+    setSaveRolling(true);
+    const localInterval = window.setInterval(() => {
+      setSaveTensFace((p) => (p + 1) % 10);
+      setSaveOnesFace((p) => (p + 1) % 10);
+    }, 50);
+
+    try {
+      const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
+        if (!r.ok) throw new Error('Saving throw dice roll failed');
+        return r.json();
+      }) as Promise<number>;
+      const waitPromise = new Promise<void>((res) => setTimeout(res, 1200));
+      const [rolled] = await Promise.all([fetchPromise, waitPromise]);
+      const value = typeof rolled === 'number' ? rolled : 1;
+
+      const absValue = Math.abs(value);
+      const normalized = absValue % 100;
+      const tens = normalized === 0 && absValue !== 0 ? 0 : Math.floor(normalized / 10);
+      const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
+      setSaveTensFace(tens);
+      setSaveOnesFace(ones);
+
+      if (saveOpenSign === 0 || saveOpenTotal == null) {
+        if (value >= 96) {
+          setSaveOpenSign(1);
+          setSaveOpenTotal(value);
+        } else if (value <= 4) {
+          setSaveOpenSign(-1);
+          setSaveOpenTotal(value);
+        } else {
+          setSaveOpenSign(0);
+          setSaveOpenTotal(value);
+        }
+      } else {
+        setSaveOpenTotal((prev) => {
+          const base = prev == null ? 0 : prev;
+          if (saveOpenSign === 1) return base + value;
+          if (saveOpenSign === -1) return base - value;
+          return base;
+        });
+        if (saveOpenSign === 1 && value < 96) setSaveOpenSign(0);
+        if (saveOpenSign === -1 && value > 4) setSaveOpenSign(0);
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Saving throw roll failed');
+    } finally {
+      window.clearInterval(localInterval);
+      setSaveRolling(false);
     }
   }
 
@@ -1786,7 +1907,12 @@ export default function SingleAttack() {
                   <tr style={{ opacity: isBaseMagic ? 1 : 0.6 }} title={isBaseMagic ? undefined : 'Active only when Attack is Base Magic'}>
                     <td>Base mage type</td>
                     <td>
-                      <select value={rm.baseMageType} onChange={(e) => setRm((p) => ({ ...p, baseMageType: e.target.value as 'lenyeg' | 'kapcsolat' }))} disabled={!isBaseMagic} title="Lényeg: 0, Kapcsolat: -10">
+                      <select
+                        value={rm.baseMageType}
+                        onChange={(e) => setRm((p) => ({ ...p, baseMageType: e.target.value as 'lenyeg' | 'kapcsolat' }))}
+                        disabled
+                        title="Lényeg: 0, Kapcsolat: -10"
+                      >
                         <option value="lenyeg">Lényeg (0)</option>
                         <option value="kapcsolat">Kapcsolat (-10)</option>
                       </select>
@@ -1907,6 +2033,7 @@ export default function SingleAttack() {
                   const usingMelee = activity === '_3PhisicalAttackOrMovement';
                   const usingRanged = activity === '_2RangedAttack' || activity === '_1PerformMagic';
                   const isPerformMagic = activity === '_1PerformMagic';
+                  const ignoreDefenderVBAndShield = attackType === 'baseMagic';
                   let modSum = 0;
                   if (usingMelee) {
                     if (mod.attackFromWeakSide) modSum += 15;
@@ -1934,12 +2061,12 @@ export default function SingleAttack() {
                   const attackerTb = usingOffHand ? (tbPair.offHand ?? 0) : (tbPair.main ?? 0);
                   const cAttackerTBForDefense = usingOffHand ? 0 : -Math.abs(Number(attacker?.tbUsedForDefense) || 0);
                   const cAttackerPenalty = -Math.abs(Number(attacker?.penaltyOfActions) || 0);
-                  const cDefenderVB = -Math.abs(Number(defender?.vb) || 0);
+                  const cDefenderVB = ignoreDefenderVBAndShield ? 0 : -Math.abs(Number(defender?.vb) || 0);
                   const cDefenderTBForDefense = -Math.abs(Number(defender?.tbUsedForDefense) || 0);
-                  const cDefenderShield = defender?.shield ? -25 : 0;
+                  const cDefenderShield = ignoreDefenderVBAndShield ? 0 : (defender?.shield ? -25 : 0);
                   const cDefenderPenalty = Math.abs(Number(defender?.penaltyOfActions) || 0);
                   const modLabel = usingMelee ? 'Melee modifiers' : 'Ranged/Magic modifiers';
-                  const items = [
+                  const itemsRaw = [
                     { label: 'Attacker TB', val: attackerTb },
                     { label: 'Attacker TB for defense', val: cAttackerTBForDefense },
                     { label: 'Attacker penalty', val: cAttackerPenalty },
@@ -1949,6 +2076,10 @@ export default function SingleAttack() {
                     { label: 'Defender penalty', val: cDefenderPenalty },
                     { label: modLabel, val: modSum },
                   ];
+
+                  const items = ignoreDefenderVBAndShield
+                    ? itemsRaw.filter((it) => it.label !== 'Defender VB' && it.label !== 'Defender shield')
+                    : itemsRaw;
                   const modifiersTotal = attackerTb + cAttackerTBForDefense + cAttackerPenalty + cDefenderVB + cDefenderTBForDefense + cDefenderShield + cDefenderPenalty + modSum;
                   return (
                     <div style={{ border: '1px solid #555', borderRadius: 8, padding: 4, minWidth: 0, width: 'auto', height: 120, color: '#555', overflow: 'hidden', whiteSpace: 'normal' }}>
@@ -2024,9 +2155,242 @@ export default function SingleAttack() {
                 </div>
               </div>
               {(() => {
+                const attackType = (attackerAttack as string | undefined) ?? (attacker?.attackType as string | undefined) ?? '';
+                const isBaseMagic = attackType === 'baseMagic';
+                if (!isBaseMagic) return null;
+                if (!attackRes || attackRes.result === 'Fail') return null;
+
+                const attackerLvlRaw = Number((attacker as any)?.lvl ?? 0) || 0;
+                const defenderLvlRaw = Number((defender as any)?.lvl ?? 0) || 0;
+
+                const levelStepValue = (lvl: number) => {
+                  const l = Math.max(0, lvl);
+                  if (l <= 5) return 5;
+                  if (l <= 10) return 3;
+                  if (l <= 15) return 2;
+                  return 1;
+                };
+
+                let mdToReach = 50;
+                if (attackerLvlRaw !== defenderLvlRaw) {
+                  if (attackerLvlRaw < defenderLvlRaw) {
+                    let cur = attackerLvlRaw;
+                    while (cur < defenderLvlRaw) {
+                      cur += 1;
+                      mdToReach -= levelStepValue(cur);
+                    }
+                  } else {
+                    let cur = attackerLvlRaw;
+                    while (cur > defenderLvlRaw) {
+                      mdToReach += levelStepValue(cur);
+                      cur -= 1;
+                    }
+                  }
+                }
+
+                // Recompute saving throw result using the same logic as the Saving Throw container
+                const rawAttackResult = (attackRes.result || '').toString();
+                const attackResultStr = rawAttackResult.endsWith('X') ? rawAttackResult.slice(0, -1) : rawAttackResult;
+                const attackResultVal = Number(attackResultStr) || 0;
+                const rawSchool = (attacker as any)?.magicSchool;
+                const schoolNorm = String(rawSchool || '').trim().toLowerCase();
+                let defenderSaveBonus = 0;
+                if (schoolNorm === 'essence' || schoolNorm === 'lenyeg') {
+                  defenderSaveBonus = Number((defender as any)?.mdLenyeg ?? 0) || 0;
+                } else if (schoolNorm === 'channeling' || schoolNorm === 'kapcsolat') {
+                  defenderSaveBonus = Number((defender as any)?.mdKapcsolat ?? 0) || 0;
+                }
+                const consentingMod = saveConsentingTarget ? -50 : 0;
+                const gmMod = Number(saveGmModifier) || 0;
+                const totalBonus = attackResultVal + defenderSaveBonus + consentingMod + gmMod;
+                const rollValueForText = saveOpenTotal;
+                const modifiedRollForText = rollValueForText != null ? rollValueForText + totalBonus : null;
+
+                let textTop = '';
+                let textBottom = '';
+                let isBaseMagicSuccess = false;
+                if (modifiedRollForText != null) {
+                  if (modifiedRollForText < mdToReach) {
+                    textTop = 'Saving throw failed';
+                    textBottom = 'BASE MAGIC SUCCESS';
+                    isBaseMagicSuccess = true;
+                  } else {
+                    textTop = 'Saving throw success';
+                    textBottom = 'BASE MAGIC FAIL';
+                    isBaseMagicSuccess = false;
+                  }
+                }
+
+                return (
+                  <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12, width: 560, maxWidth: '100%', minHeight: 220, marginLeft: 'auto', marginRight: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <div
+                        className="result-col"
+                        style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                      >
+                        <span
+                          className="result-label"
+                          style={{ display: 'block', width: '100%', textAlign: 'center' }}
+                        >
+                          SAVING THROW NEEDED
+                        </span>
+                        <div className="result-box orange" style={{ margin: '4px auto 0' }}>
+                          <span className="result-value">{mdToReach}</span>
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            border: '1px solid #ddd',
+                            borderRadius: 6,
+                            padding: '6px 8px',
+                            background: '#fff',
+                            color: '#111',
+                            fontWeight: 700,
+                            textAlign: 'center',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {textTop && (
+                            <>
+                              {textTop}
+                              <br />
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  marginTop: 2,
+                                  color: isBaseMagicSuccess ? '#16a34a' : '#b91c1c',
+                                  fontWeight: 800,
+                                  fontSize: 35,
+                                }}
+                              >
+                                {textBottom}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {(() => {
                 const resStr = (attackRes?.result || '').toString().trim();
                 const upper = resStr.toUpperCase();
                 const letter = upper && upper !== 'FAIL' ? upper.slice(-1) : '';
+                const attackType = (attackerAttack as string | undefined) ?? (attacker?.attackType as string | undefined) ?? '';
+                const isBaseMagic = attackType === 'baseMagic';
+
+                if (!attackRes) return null;
+                if (attackRes.result === 'Fail') return null;
+
+                if (isBaseMagic) {
+                  const rawAttackResult = (attackRes.result || '').toString();
+                  const attackResultStr = rawAttackResult.endsWith('X') ? rawAttackResult.slice(0, -1) : rawAttackResult;
+                  const attackResultVal = Number(attackResultStr) || 0;
+                  const rawSchool = (attacker as any)?.magicSchool;
+                  const schoolNorm = String(rawSchool || '').trim().toLowerCase();
+                  let defenderSaveBonus = 0;
+                  if (schoolNorm === 'essence' || schoolNorm === 'lenyeg') {
+                    defenderSaveBonus = Number((defender as any)?.mdLenyeg ?? 0) || 0;
+                  } else if (schoolNorm === 'channeling' || schoolNorm === 'kapcsolat') {
+                    defenderSaveBonus = Number((defender as any)?.mdKapcsolat ?? 0) || 0;
+                  }
+                  const consentingMod = saveConsentingTarget ? -50 : 0;
+                  const gmMod = Number(saveGmModifier) || 0;
+                  const totalBonus = attackResultVal + defenderSaveBonus + consentingMod + gmMod;
+                  const rollValue = saveOpenTotal;
+                  const modifiedRoll = rollValue != null ? rollValue + totalBonus : null;
+
+                  return (
+                    <div style={{ marginTop: 16, border: '1px solid  #ddd', borderRadius: 8, padding: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                        <div className="result-col" style={{ width: 260 }}>
+                          <span className="result-label" style={{ textAlign: 'center' }}>Saving throw mods</span>
+                          <div style={{ fontSize: 11, lineHeight: 1.2, width: '100%' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                              <span>Attack result</span>
+                              <strong>{(() => { const s = (attackRes.result || '').toString(); return s.endsWith('X') ? s.slice(0, -1) : s; })()}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                              <span>Defender saving throw bonus</span>
+                              <strong>{defenderSaveBonus}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span>Consenting target (-50)</span>
+                              <input
+                                type="checkbox"
+                                checked={saveConsentingTarget}
+                                onChange={(e) => setSaveConsentingTarget(e.target.checked)}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                              <span>GM modifier</span>
+                              <input
+                                type="number"
+                                value={saveGmModifier}
+                                onChange={(e) => { const v = Math.floor(Number(e.target.value) || 0); setSaveGmModifier(v); }}
+                                style={{ width: 70, textAlign: 'right' }}
+                              />
+                            </div>
+                            <div style={{ height: 1, background: '#555', margin: '2px 0' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                              <span style={{ fontWeight: 700 }}>Total bonus</span>
+                              <span style={{ fontWeight: 900 }}>{totalBonus}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <div className="result-col" style={{ alignItems: 'center', width: 'auto' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+                            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', fontSize: 11, fontWeight: 600, color: '#2f5597' }}>
+                              Manual roll
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                value={saveManualInput}
+                                onChange={(e) => setSaveManualInput(e.target.value)}
+                                style={{ width: 80, height: 40, borderRadius: 8, border: '1px solid #bbb', padding: '0 8px', fontSize: 14, fontWeight: 700, textAlign: 'center' }}
+                                title="Enter a non-zero value to use instead of the d100 roll"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleSaveRoll}
+                              disabled={saveRolling}
+                              style={{ marginTop: 6, background: saveRolling ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: saveRolling ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                            >
+                              {saveRolling ? 'Rolling…' : 'Saving throw'}
+                            </button>
+                          </div>
+                          <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <>
+                              <div className={`die tens${saveRolling ? ' rolling' : ''}`} aria-label="save-tens">{saveTensFace}</div>
+                              <div className={`die ones${saveRolling ? ' rolling' : ''}`} aria-label="save-ones">{saveOnesFace}</div>
+                            </>
+                          </div>
+                        </div>
+
+                        <div className="result-col">
+                          <span className="result-label">Roll result</span>
+                          <div className="result-box">
+                            <span className="result-value">{rollValue != null ? `${rollValue}` : ''}</span>
+                          </div>
+                        </div>
+
+                        <div className="result-col">
+                          <span className="result-label">SAVING THROW</span>
+                          <div className="result-box orange">
+                            <span className="result-value">{modifiedRoll != null ? `${modifiedRoll}` : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const show = !!letter && letter !== 'X';
                 return show ? (
                   <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
@@ -2052,11 +2416,11 @@ export default function SingleAttack() {
                       {(() => {
                         const resTrimmed = (attackRes?.result || '').toString().trim();
                         const upperLetter = resTrimmed.toUpperCase();
-                        const letter = upperLetter && upperLetter !== 'FAIL' ? upperLetter.slice(-1) : '';
+                        const letterInner = upperLetter && upperLetter !== 'FAIL' ? upperLetter.slice(-1) : '';
                         let modVal: number | null = null;
-                        if (critLastRoll != null && letter) {
+                        if (critLastRoll != null && letterInner) {
                           const base = critLastRoll;
-                          switch (letter) {
+                          switch (letterInner) {
                             case 'T': modVal = base - 50; break;
                             case 'A': modVal = base - 20; break;
                             case 'B': modVal = base - 10; break;
