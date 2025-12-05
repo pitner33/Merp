@@ -105,6 +105,7 @@ export default function AdventureFightRound() {
   const [saveManualInput, setSaveManualInput] = useState<string>('0');
   const [saveConsentingTarget, setSaveConsentingTarget] = useState(false);
   const [saveGmModifier, setSaveGmModifier] = useState<number>(0);
+  const [baseMagicSaveApplied, setBaseMagicSaveApplied] = useState(false);
   const [attackRes, setAttackRes] = useState<null | { result: string; row: string[]; total: number }>(null);
   const [attackDto, setAttackDto] = useState<null | {
     // Add properties for attackDto here
@@ -402,6 +403,7 @@ export default function AdventureFightRound() {
     setSaveManualInput('0');
     setSaveConsentingTarget(false);
     setSaveGmModifier(0);
+    setBaseMagicSaveApplied(false);
     setReadyToRoll(false);
     setResolveAttempted(false);
     setError(null);
@@ -1205,6 +1207,9 @@ export default function AdventureFightRound() {
     const upper = resStr.toUpperCase();
     if (!upper || upper === 'FAIL') return;
 
+    const attackType = (effAttacker?.attackType as string | undefined) ?? '';
+    const isBaseMagic = attackType === 'baseMagic';
+
     const parsedManual = Number(saveManualInput);
     const manualIsNumber = !Number.isNaN(parsedManual);
     const manualOverrideActive = manualIsNumber && parsedManual !== 0;
@@ -1220,6 +1225,16 @@ export default function AdventureFightRound() {
       setSaveLastRoll(value);
       setSaveOpenSign(0);
       setSaveOpenTotal(value);
+
+      if (isBaseMagic && !baseMagicSaveApplied) {
+        try {
+          await fetch('http://localhost:8081/api/fight/apply-base-magic-after-save', { method: 'POST' });
+          await refreshPairFromBackend();
+          setBaseMagicSaveApplied(true);
+        } catch (e: any) {
+          setError(e?.message || 'Saving throw apply failed');
+        }
+      }
       return;
     }
 
@@ -1248,26 +1263,40 @@ export default function AdventureFightRound() {
       setSaveOnesFace(ones);
       setSaveLastRoll(value);
 
-      if (saveOpenSign === 0 || saveOpenTotal == null) {
+      let nextSign = saveOpenSign;
+      let nextTotal = saveOpenTotal == null ? null : saveOpenTotal;
+
+      if (nextSign === 0 || nextTotal == null) {
         if (value >= 96) {
-          setSaveOpenSign(1);
-          setSaveOpenTotal(value);
+          nextSign = 1;
+          nextTotal = value;
         } else if (value <= 4) {
-          setSaveOpenSign(-1);
-          setSaveOpenTotal(value);
+          nextSign = -1;
+          nextTotal = value;
         } else {
-          setSaveOpenSign(0);
-          setSaveOpenTotal(value);
+          nextSign = 0;
+          nextTotal = value;
         }
       } else {
-        setSaveOpenTotal((prev) => {
-          const base = prev == null ? 0 : prev;
-          if (saveOpenSign === 1) return base + value;
-          if (saveOpenSign === -1) return base - value;
-          return base;
-        });
-        if (saveOpenSign === 1 && value < 96) setSaveOpenSign(0);
-        if (saveOpenSign === -1 && value > 4) setSaveOpenSign(0);
+        const base = nextTotal == null ? 0 : nextTotal;
+        if (nextSign === 1) nextTotal = base + value;
+        if (nextSign === -1) nextTotal = base - value;
+        if (nextSign === 1 && value < 96) nextSign = 0;
+        if (nextSign === -1 && value > 4) nextSign = 0;
+      }
+
+      setSaveOpenTotal(nextTotal);
+      setSaveOpenSign(nextSign as 0 | 1 | -1);
+
+      const sequenceClosed = nextTotal != null && nextSign === 0;
+      if (sequenceClosed && isBaseMagic && !baseMagicSaveApplied) {
+        try {
+          await fetch('http://localhost:8081/api/fight/apply-base-magic-after-save', { method: 'POST' });
+          await refreshPairFromBackend();
+          setBaseMagicSaveApplied(true);
+        } catch (e: any) {
+          setError(e?.message || 'Saving throw apply failed');
+        }
       }
     } catch (e: any) {
       setError(e?.message || 'Saving throw roll failed');
@@ -2203,23 +2232,25 @@ export default function AdventureFightRound() {
                             boxSizing: 'border-box',
                           }}
                         >
-                          {textTop && (
-                            <>
-                              {textTop}
-                              <br />
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  marginTop: 2,
-                                  color: isBaseMagicSuccess ? '#16a34a' : '#b91c1c',
-                                  fontWeight: 800,
-                                  fontSize: 35,
-                                }}
-                              >
-                                {textBottom}
-                              </span>
-                            </>
-                          )}
+                          <div
+                            style={{
+                              visibility: textTop ? 'visible' : 'hidden',
+                            }}
+                          >
+                            {textTop || 'Saving throw failed'}
+                            <br />
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                marginTop: 2,
+                                color: isBaseMagicSuccess ? '#16a34a' : '#b91c1c',
+                                fontWeight: 800,
+                                fontSize: 35,
+                              }}
+                            >
+                              {textBottom || 'BASE MAGIC SUCCESS'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

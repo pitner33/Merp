@@ -889,6 +889,22 @@ TODO      */
         return attackResultsDTO;
     }
 
+    public void applyBaseMagicAfterSavingThrow(Player attacker) {
+        if (attacker == null) {
+            return;
+        }
+        if (attacker.getAttackType() != AttackType.baseMagic) {
+            return;
+        }
+        spendManaForEquippedWeapon(attacker);
+        try {
+            playerService.refreshAdventurerOrderedListObject(attacker);
+        } catch (Exception ignore) {}
+        try {
+            playerRepository.save(attacker);
+        } catch (Exception ignore) {}
+    }
+
     // Safe integer parser for optional sheet values
     private int parseIntSafe(String s) {
         try { return Integer.parseInt(s); } catch (Exception e) { return 0; }

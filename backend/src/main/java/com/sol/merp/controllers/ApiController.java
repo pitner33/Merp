@@ -863,6 +863,56 @@ public class ApiController {
         return ResponseEntity.ok(dto);
     }
 
+    @PostMapping("/fight/apply-attack-to-target")
+    public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyAttackToTarget(@RequestParam(name = "defenderId") Long defenderId,
+                                                                                  @RequestParam(name = "result") String result,
+                                                                                  @RequestParam(name = "attackerId", required = false) Long attackerId,
+                                                                                  @RequestParam(name = "weaponId", required = false) Long weaponId) {
+        if (defenderId == null || result == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Player> defenderOpt = playerRepository.findById(defenderId);
+        if (defenderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Player defender = defenderOpt.get();
+
+        Player attacker = null;
+        if (attackerId != null) {
+            Optional<Player> attackerOpt = playerRepository.findById(attackerId);
+            if (attackerOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            attacker = attackerOpt.get();
+        } else {
+            try {
+                java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+                if (pair != null && pair.size() >= 1) attacker = pair.get(0);
+            } catch (Exception ignore) {}
+            if (attacker == null) {
+                attacker = new Player();
+                attacker.setAttackType(AttackType.none);
+            }
+        }
+
+        Long originalEquippedId = attacker.getEquippedWeaponId();
+        boolean overrideEquipped = (weaponId != null);
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(weaponId);
+        }
+
+        try { playerService.adventurersOrderedList(); } catch (Exception ignore) {}
+        com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttack(attacker, defender, result);
+
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(originalEquippedId);
+            try { playerRepository.save(attacker); } catch (Exception ignore) {}
+        }
+
+        return ResponseEntity.ok(dto);
+    }
+
     @PostMapping("/fight/apply-crit-to-target")
     public ResponseEntity<com.sol.merp.dto.AttackResultsDTO> applyCritToTarget(@RequestParam(name = "defenderId") Long defenderId,
                                                                                @RequestParam(name = "result") String result,
@@ -942,6 +992,46 @@ public class ApiController {
 
         com.sol.merp.dto.AttackResultsDTO dto = fightServiceImpl.applyResolvedAttackWithFailRoll(attacker, defender, failRoll);
         return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/fight/apply-base-magic-after-save")
+    public ResponseEntity<Void> applyBaseMagicAfterSave(
+            @RequestParam(name = "attackerId", required = false) Long attackerId,
+            @RequestParam(name = "weaponId", required = false) Long weaponId) {
+        Player attacker;
+
+        if (attackerId != null) {
+            Optional<Player> attackerOpt = playerRepository.findById(attackerId);
+            if (attackerOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            attacker = attackerOpt.get();
+        } else {
+            List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+            if (pair == null || pair.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            attacker = pair.get(0);
+        }
+
+        if (attacker == null || attacker.getAttackType() != AttackType.baseMagic) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long originalEquippedId = attacker.getEquippedWeaponId();
+        boolean overrideEquipped = (weaponId != null);
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(weaponId);
+        }
+
+        fightServiceImpl.applyBaseMagicAfterSavingThrow(attacker);
+
+        if (overrideEquipped) {
+            attacker.setEquippedWeaponId(originalEquippedId);
+            try { playerRepository.save(attacker); } catch (Exception ignore) {}
+        }
+
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/fight/reset-mana")

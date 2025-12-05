@@ -101,6 +101,8 @@ export default function SingleAttack() {
   const [saveManualInput, setSaveManualInput] = useState<string>('0');
   const [saveConsentingTarget, setSaveConsentingTarget] = useState(false);
   const [saveGmModifier, setSaveGmModifier] = useState<number>(0);
+  const [baseMagicSaveApplied, setBaseMagicSaveApplied] = useState(false);
+  const [playersSavedForRoll, setPlayersSavedForRoll] = useState(false);
   const [failEnabled, setFailEnabled] = useState(false);
   const [failRolling, setFailRolling] = useState(false);
   const [failTensFace, setFailTensFace] = useState<number>(0);
@@ -486,6 +488,7 @@ export default function SingleAttack() {
     setSaveManualInput('0');
     setSaveConsentingTarget(false);
     setSaveGmModifier(0);
+    setBaseMagicSaveApplied(false);
     setFailEnabled(false);
     setFailRolling(false);
     setFailTensFace(0);
@@ -498,6 +501,7 @@ export default function SingleAttack() {
 
   function resetRollState() {
     resetRollSequence();
+    setPlayersSavedForRoll(false);
     setOffHandReady(false);
     setIsOffHandSequence(false);
     setOffHandDone(false);
@@ -554,6 +558,21 @@ export default function SingleAttack() {
       if (value === 0 || remaining <= 0) return max;
       return Math.max(max, remaining);
     }, 0);
+  }
+
+  function normalizePlayerTargetToken(value?: string | null, selfId?: string | null): string {
+    if (!value) return 'none';
+    if (value === 'none') return 'none';
+    if (value === 'self') {
+      if (!selfId) return 'none';
+      return normalizePlayerTargetToken(selfId, selfId);
+    }
+    const source = value.toUpperCase();
+    const match = source.match(/^(JK|NJK)(\d{1,2})$/);
+    if (!match) return 'none';
+    const num = Number(match[2]);
+    if (!Number.isFinite(num) || num < 1 || num > 30) return 'none';
+    return `${match[1]}${num.toString().padStart(2, '0')}`;
   }
 
   function computeMmForPlayer(p?: Player | null, armorOverride?: string | null): number {
@@ -774,6 +793,92 @@ export default function SingleAttack() {
     try { localStorage.setItem('merp:adventureRefresh', String(Date.now())); } catch {}
   }
 
+  async function persistPlayersForSingleRoll(): Promise<void> {
+    if (!attacker || typeof attacker.id !== 'number') return;
+
+    try {
+      const payload: Player[] = [];
+
+      const act = (attackerActivity as string | undefined) ?? (attacker.playerActivity as string | undefined) ?? '_5DoNothing';
+      const atk = (attackerAttack as string | undefined) ?? (attacker.attackType as string | undefined) ?? 'none';
+      const crit = (attackerCrit as string | undefined) ?? (attacker.critType as string | undefined) ?? 'none';
+
+      let targetToken = 'none';
+      if (defender && defenderToken && defenderToken !== 'none') {
+        const candidate = defender.characterId ?? defenderToken;
+        targetToken = normalizePlayerTargetToken(candidate, attacker.characterId);
+      }
+
+      const pair = computeTbPair({ ...(attacker as any), attackType: atk } as Player);
+      const inactiveByActivity = act === '_4PrepareMagic' || act === '_5DoNothing';
+      const tbVal = inactiveByActivity ? 0 : pair.main;
+      const tbOff = inactiveByActivity ? 0 : pair.offHand;
+      const isActive = deriveActive(act, attacker.isAlive, attacker.stunnedForRounds);
+      const maxDef = Math.floor(Math.max(0, tbVal) / 2);
+      const rawDef = Number(attacker.tbUsedForDefense ?? 0);
+      const nextDef = tbVal < 0 ? 0 : Math.min(Math.max(0, rawDef), maxDef);
+
+      const weaponToken = attackerWeaponValue;
+      const parsedWeaponId = Number(weaponToken);
+      const equippedWeaponId =
+        weaponToken && weaponToken !== WEAPON_NONE_VALUE && weaponToken !== 'none' && Number.isFinite(parsedWeaponId)
+          ? parsedWeaponId
+          : null;
+
+      const armor =
+        attackerArmor && attackerArmor !== ''
+          ? attackerArmor
+          : ((attacker.armorType as string | undefined) ?? 'none');
+
+      const attackerUpdate: Player = {
+        ...attacker,
+        playerActivity: act as any,
+        attackType: atk as any,
+        critType: crit as any,
+        armorType: armor as any,
+        tb: tbVal,
+        tbOffHand: tbOff,
+        tbUsedForDefense: nextDef,
+        target: targetToken as any,
+        isActive,
+        equippedWeaponId,
+      };
+
+      payload.push(attackerUpdate);
+
+      if (defender && typeof defender.id === 'number') {
+        const defArmor =
+          defenderArmor && defenderArmor !== ''
+            ? defenderArmor
+            : ((defender.armorType as string | undefined) ?? 'none');
+        const defenderUpdate: Player = {
+          ...defender,
+          armorType: defArmor as any,
+        };
+        payload.push(defenderUpdate);
+      }
+
+      if (payload.length === 0) return;
+
+      const res = await fetch('http://localhost:8081/api/players/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        throw new Error(`Bulk update failed (${res.status})`);
+      }
+
+      try {
+        await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
+        broadcastAdventureRefresh();
+      } catch {}
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save players before roll');
+      throw e;
+    }
+  }
+
   // Refresh current attacker/defender from DB when tab gains focus
   useEffect(() => {
     function onFocus() {
@@ -973,6 +1078,10 @@ export default function SingleAttack() {
   async function handleRoll() {
     setUsingOffHandView(false);
     setOffHandAwaitingRoll(false);
+    if (!playersSavedForRoll) {
+      await persistPlayersForSingleRoll();
+      setPlayersSavedForRoll(true);
+    }
     await executeRoll();
   }
 
@@ -1083,7 +1192,7 @@ export default function SingleAttack() {
             const weaponIdQuery = weapon && typeof weapon.id === 'number'
               ? `&weaponId=${encodeURIComponent(String(weapon.id))}`
               : '';
-            const url = `http://localhost:8081/api/fight/apply-crit-to-target?defenderId=${encodeURIComponent(defenderId)}&attackerId=${encodeURIComponent(String(attackerId))}${weaponIdQuery}&result=${encodeURIComponent(resStr)}&critResult=${encodeURIComponent(0)}&critType=${encodeURIComponent('none')}`;
+            const url = `http://localhost:8081/api/fight/apply-attack-to-target?defenderId=${encodeURIComponent(defenderId)}&attackerId=${encodeURIComponent(String(attackerId))}${weaponIdQuery}&result=${encodeURIComponent(resStr)}`;
             const applyResp = await fetch(url, { method: 'POST' });
             if (!applyResp.ok) throw new Error('apply-attack failed');
             const dto = await applyResp.json();
@@ -1203,6 +1312,9 @@ export default function SingleAttack() {
     const upper = resStr.toUpperCase();
     if (!upper || upper === 'FAIL') return;
 
+    const attackType = (attackerAttack as string | undefined) ?? (attacker?.attackType as string | undefined) ?? '';
+    const isBaseMagic = attackType === 'baseMagic';
+
     const parsedManual = Number(saveManualInput);
     const manualIsNumber = !Number.isNaN(parsedManual);
     const manualOverrideActive = manualIsNumber && parsedManual !== 0;
@@ -1217,6 +1329,27 @@ export default function SingleAttack() {
       setSaveOnesFace(ones);
       setSaveOpenSign(0);
       setSaveOpenTotal(value);
+
+       if (isBaseMagic && !baseMagicSaveApplied) {
+         try {
+           const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+           if (attackerId != null) {
+             const weapon = findCurrentWeapon();
+             const weaponId = weapon && typeof weapon.id === 'number' ? weapon.id : undefined;
+             const params = new URLSearchParams();
+             params.append('attackerId', String(attackerId));
+             if (weaponId != null) params.append('weaponId', String(weaponId));
+             const url = `http://localhost:8081/api/fight/apply-base-magic-after-save?${params.toString()}`;
+             const resp = await fetch(url, { method: 'POST' });
+             if (!resp.ok) throw new Error('apply-base-magic-after-save failed');
+             await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
+             broadcastAdventureRefresh();
+             setBaseMagicSaveApplied(true);
+           }
+         } catch (e: any) {
+           setError(e?.message || 'Saving throw apply failed');
+         }
+       }
       return;
     }
 
@@ -1243,27 +1376,51 @@ export default function SingleAttack() {
       const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
       setSaveTensFace(tens);
       setSaveOnesFace(ones);
+      let nextSign = saveOpenSign;
+      let nextTotal = saveOpenTotal == null ? null : saveOpenTotal;
 
-      if (saveOpenSign === 0 || saveOpenTotal == null) {
+      if (nextSign === 0 || nextTotal == null) {
         if (value >= 96) {
-          setSaveOpenSign(1);
-          setSaveOpenTotal(value);
+          nextSign = 1;
+          nextTotal = value;
         } else if (value <= 4) {
-          setSaveOpenSign(-1);
-          setSaveOpenTotal(value);
+          nextSign = -1;
+          nextTotal = value;
         } else {
-          setSaveOpenSign(0);
-          setSaveOpenTotal(value);
+          nextSign = 0;
+          nextTotal = value;
         }
       } else {
-        setSaveOpenTotal((prev) => {
-          const base = prev == null ? 0 : prev;
-          if (saveOpenSign === 1) return base + value;
-          if (saveOpenSign === -1) return base - value;
-          return base;
-        });
-        if (saveOpenSign === 1 && value < 96) setSaveOpenSign(0);
-        if (saveOpenSign === -1 && value > 4) setSaveOpenSign(0);
+        const base = nextTotal == null ? 0 : nextTotal;
+        if (nextSign === 1) nextTotal = base + value;
+        if (nextSign === -1) nextTotal = base - value;
+        if (nextSign === 1 && value < 96) nextSign = 0;
+        if (nextSign === -1 && value > 4) nextSign = 0;
+      }
+
+      setSaveOpenTotal(nextTotal);
+      setSaveOpenSign(nextSign as 0 | 1 | -1);
+
+      const sequenceClosed = nextTotal != null && nextSign === 0;
+      if (sequenceClosed && isBaseMagic && !baseMagicSaveApplied) {
+        try {
+          const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+          if (attackerId != null) {
+            const weapon = findCurrentWeapon();
+            const weaponId = weapon && typeof weapon.id === 'number' ? weapon.id : undefined;
+            const params = new URLSearchParams();
+            params.append('attackerId', String(attackerId));
+            if (weaponId != null) params.append('weaponId', String(weaponId));
+            const url = `http://localhost:8081/api/fight/apply-base-magic-after-save?${params.toString()}`;
+            const resp = await fetch(url, { method: 'POST' });
+            if (!resp.ok) throw new Error('apply-base-magic-after-save failed');
+            await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
+            broadcastAdventureRefresh();
+            setBaseMagicSaveApplied(true);
+          }
+        } catch (e: any) {
+          setError(e?.message || 'Saving throw apply failed');
+        }
       }
     } catch (e: any) {
       setError(e?.message || 'Saving throw roll failed');
@@ -2251,23 +2408,25 @@ export default function SingleAttack() {
                             boxSizing: 'border-box',
                           }}
                         >
-                          {textTop && (
-                            <>
-                              {textTop}
-                              <br />
-                              <span
-                                style={{
-                                  display: 'inline-block',
-                                  marginTop: 2,
-                                  color: isBaseMagicSuccess ? '#16a34a' : '#b91c1c',
-                                  fontWeight: 800,
-                                  fontSize: 35,
-                                }}
-                              >
-                                {textBottom}
-                              </span>
-                            </>
-                          )}
+                          <div
+                            style={{
+                              visibility: textTop ? 'visible' : 'hidden',
+                            }}
+                          >
+                            {textTop || 'Saving throw failed'}
+                            <br />
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                marginTop: 2,
+                                color: isBaseMagicSuccess ? '#16a34a' : '#b91c1c',
+                                fontWeight: 800,
+                                fontSize: 35,
+                              }}
+                            >
+                              {textBottom || 'BASE MAGIC SUCCESS'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
