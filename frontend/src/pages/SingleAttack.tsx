@@ -154,8 +154,6 @@ export default function SingleAttack() {
       targetAware: false,
       targetNotMoving: false,
       baseMageType: 'lenyeg' as 'lenyeg' | 'kapcsolat',
-      mdBonus: false,
-      agreeingTarget: false,
       gmModifier: 0 as number,
     };
   }
@@ -168,8 +166,6 @@ export default function SingleAttack() {
     targetAware: false,
     targetNotMoving: false,
     baseMageType: 'lenyeg' as 'lenyeg' | 'kapcsolat',
-    mdBonus: false,
-    agreeingTarget: false,
     gmModifier: 0 as number,
   });
 
@@ -204,6 +200,50 @@ export default function SingleAttack() {
     attacker?.attackType,
     (attacker as any)?.magicSchool,
   ]);
+
+  useEffect(() => {
+    const src = attacker ?? undefined;
+    const attackType = (attackerAttack ?? src?.attackType) as string | undefined;
+    if (attackType !== 'baseMagic') return;
+    if (!src) return;
+
+    const attackerId = typeof src.id === 'number' ? src.id : null;
+    const defenderIsSelf =
+      defenderToken === 'self' ||
+      (!!defender && attackerId != null && typeof defender.id === 'number' && defender.id === attackerId);
+    if (!defenderIsSelf) return;
+
+    setRm((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      if (prev.distanceOfAttack !== '_0_3m') {
+        next.distanceOfAttack = '_0_3m';
+        changed = true;
+      }
+      if (!prev.targetNotMoving) {
+        next.targetNotMoving = true;
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [attacker, attackerAttack, defender, defenderToken]);
+
+  useEffect(() => {
+    const src = attacker ?? undefined;
+    const attackType = (attackerAttack ?? src?.attackType) as string | undefined;
+    if (attackType !== 'baseMagic') return;
+    if (!src) return;
+
+    const attackerId = typeof src.id === 'number' ? src.id : null;
+    const defenderIsSelf =
+      defenderToken === 'self' ||
+      (!!defender && attackerId != null && typeof defender.id === 'number' && defender.id === attackerId);
+    if (!defenderIsSelf) return;
+
+    setSaveConsentingTarget(true);
+  }, [attacker, attackerAttack, defender, defenderToken]);
 
   // Load players
   useEffect(() => {
@@ -335,6 +375,17 @@ export default function SingleAttack() {
     (async () => {
       try {
         if (defenderToken === 'none') { setDefender(null); return; }
+        if (defenderToken === 'self') {
+          const base = attacker ?? (players || []).find((pl) => String(pl.characterId) === attackerToken) ?? null;
+          if (!base) { setDefender(null); return; }
+          const id = base.id;
+          if (!id) { setDefender(base); return; }
+          const r = await fetch(`http://localhost:8081/api/players/${id}`);
+          if (!r.ok) { setDefender(base); return; }
+          const fresh = await r.json();
+          if (!cancel) setDefender(fresh);
+          return;
+        }
         const found = (players || []).find((pl) => String(pl.characterId) === defenderToken);
         const id = found?.id;
         if (!id) { setDefender(found || null); return; }
@@ -345,7 +396,7 @@ export default function SingleAttack() {
       } catch {}
     })();
     return () => { cancel = true; };
-  }, [defenderToken, players]);
+  }, [defenderToken, players, attackerToken, attacker]);
 
   // Keep dropdowns synced with selected players
   useEffect(() => {
@@ -985,8 +1036,6 @@ export default function SingleAttack() {
       if (rm.targetNotMoving) modSum += 10;
       if (attackType === 'baseMagic') {
         if (rm.baseMageType === 'kapcsolat') modSum -= 10;
-        if (rm.mdBonus) modSum += 50;
-        if (rm.agreeingTarget) modSum -= 50;
       }
       modSum += Number(rm.gmModifier) || 0;
     }
@@ -1708,11 +1757,21 @@ export default function SingleAttack() {
                       style={{ minWidth: 140 }}
                     >
                       <option value="none">none</option>
-                      {(players || []).filter((o: any) => o.characterId !== attacker.characterId).filter((o: any) => !!o.isPlaying).map((o: any) => {
-                        const dead = o.isAlive === false; const stunned = !!o.isStunned || (o.stunnedForRounds ?? 0) > 0;
-                        const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
-                        return (<option key={String(o.characterId)} value={String(o.characterId)} style={dead ? { color: '#d32f2f' } : {}}>{String(o.characterId)}{mark}</option>);
-                      })}
+                      <option value="self">self</option>
+                      {(players || [])
+                        .filter((o: any) => o.characterId !== attacker.characterId)
+                        .filter((o: any) => !!o.isPlaying)
+                        .slice()
+                        .sort((a: any, b: any) => {
+                          const aId = String(a.characterId || '');
+                          const bId = String(b.characterId || '');
+                          return aId.localeCompare(bId, undefined, { numeric: true });
+                        })
+                        .map((o: any) => {
+                          const dead = o.isAlive === false; const stunned = !!o.isStunned || (o.stunnedForRounds ?? 0) > 0;
+                          const mark = `${dead ? ' \u2620' : ''}${stunned ? ' \u26A1' : ''}`;
+                          return (<option key={String(o.characterId)} value={String(o.characterId)} style={dead ? { color: '#d32f2f' } : {}}>{String(o.characterId)}{mark}</option>);
+                        })}
                     </select>
                   ) : null}
                 </td>
@@ -2075,14 +2134,6 @@ export default function SingleAttack() {
                       </select>
                     </td>
                   </tr>
-                  <tr style={{ opacity: isBaseMagic ? 1 : 0.6 }} title={isBaseMagic ? undefined : 'Active only when Attack is Base Magic'}>
-                    <td>MD bonus (+50)</td>
-                    <td><input type="checkbox" checked={rm.mdBonus} disabled={!isBaseMagic} onChange={(e) => setRm((p) => ({ ...p, mdBonus: e.target.checked }))} /></td>
-                  </tr>
-                  <tr style={{ opacity: isBaseMagic ? 1 : 0.6 }} title={isBaseMagic ? undefined : 'Active only when Attack is Base Magic'}>
-                    <td>Agreeing target (-50)</td>
-                    <td><input type="checkbox" checked={rm.agreeingTarget} disabled={!isBaseMagic} onChange={(e) => setRm((p) => ({ ...p, agreeingTarget: e.target.checked }))} /></td>
-                  </tr>
                   <tr style={{ opacity: rangedDisabled ? 0.6 : 1 }} title={rangedDisabled ? 'Inactive: only for Ranged or Perform Magic' : undefined}>
                     <td>GM modifier</td>
                     <td><input type="number" value={rm.gmModifier} onChange={(e) => { const v = Math.floor(Number(e.target.value) || 0); setRm((m) => ({ ...m, gmModifier: v })); }} disabled={rangedDisabled} style={{ width: 80, textAlign: 'right' }} /></td>
@@ -2202,14 +2253,29 @@ export default function SingleAttack() {
                     if (mod.attackerMoreThan3MetersMovement) modSum -= 10;
                     modSum += Number(mod.modifierByGameMaster) || 0;
                   } else if (usingRanged) {
-                    switch (rm.distanceOfAttack) { case '_0_3m': modSum += 35; break; case '_3_15m': modSum += 0; break; case '_15_30m': modSum -= 20; break; case '_30_60m': modSum -= 40; break; case '_60_90m': modSum -= 55; break; case '_90m_plus': modSum -= 75; break; }
-                    if (isPerformMagic) { const r = Math.max(0, Math.min(4, Math.floor(Number(rm.prepareRounds) || 0))); if (r === 0) modSum -= 20; else if (r === 1) modSum -= 10; else if (r === 2) modSum += 0; else if (r === 3) modSum += 10; else if (r === 4) modSum += 20; }
+                    switch (rm.distanceOfAttack) {
+                      case '_0_3m': modSum += 35; break;
+                      case '_3_15m': modSum += 0; break;
+                      case '_15_30m': modSum -= 20; break;
+                      case '_30_60m': modSum -= 40; break;
+                      case '_60_90m': modSum -= 55; break;
+                      case '_90m_plus': modSum -= 75; break;
+                    }
+                    if (isPerformMagic) {
+                      const r = Math.max(0, Math.min(4, Math.floor(Number(rm.prepareRounds) || 0)));
+                      if (r === 0) modSum -= 20; else if (r === 1) modSum -= 10; else if (r === 2) modSum += 0; else if (r === 3) modSum += 10; else if (r === 4) modSum += 20;
+                    }
                     modSum += Math.floor(Number(rm.coverPenalty) || 0);
                     const defenderHasShield = !!defender?.shield;
                     if (!rm.shieldInLoS && defenderHasShield) modSum += 25;
-                    if (attackType === 'magicBall') { if (rm.inMiddleOfMagicBall) modSum += 20; if (rm.targetAware) modSum -= 10; }
+                    if (attackType === 'magicBall') {
+                      if (rm.inMiddleOfMagicBall) modSum += 20;
+                      if (rm.targetAware) modSum -= 10;
+                    }
                     if (rm.targetNotMoving) modSum += 10;
-                    if (attackType === 'baseMagic') { if (rm.baseMageType === 'kapcsolat') modSum -= 10; if (rm.mdBonus) modSum += 50; if (rm.agreeingTarget) modSum -= 50; }
+                    if (attackType === 'baseMagic') {
+                      if (rm.baseMageType === 'kapcsolat') modSum -= 10;
+                    }
                     modSum += Number(rm.gmModifier) || 0;
                   }
                   const usingOffHand = usingOffHandView;

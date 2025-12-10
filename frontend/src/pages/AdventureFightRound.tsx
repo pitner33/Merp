@@ -177,8 +177,6 @@ export default function AdventureFightRound() {
     targetAware: false,
     targetNotMoving: false,
     baseMageType: 'lenyeg' as 'lenyeg' | 'kapcsolat',
-    mdBonus: false,
-    agreeingTarget: false,
     gmModifier: 0 as number,
   });
 
@@ -216,8 +214,6 @@ export default function AdventureFightRound() {
       targetAware: false,
       targetNotMoving: false,
       baseMageType: 'lenyeg',
-      mdBonus: false,
-      agreeingTarget: false,
       gmModifier: 0,
     });
     setReadyToRoll(false);
@@ -250,6 +246,52 @@ export default function AdventureFightRound() {
     attacker?.attackType,
     (attacker as any)?.magicSchool,
   ]);
+
+  useEffect(() => {
+    const src = effAttacker ?? attacker;
+    if (!src) return;
+
+    const attackType = src.attackType as unknown as string | undefined;
+    const isBaseMagic = attackType === 'baseMagic';
+    if (!isBaseMagic) return;
+
+    const targetToken = normalizeCharacterIdToken(src.target as any);
+    const selfToken = normalizeCharacterIdToken(src.characterId as any);
+    const isSelfTarget = targetToken !== 'none' && selfToken !== 'none' && targetToken === selfToken;
+    if (!isSelfTarget) return;
+
+    setRm((prev) => {
+      let next = prev;
+      let changed = false;
+
+      if (prev.distanceOfAttack !== '_0_3m') {
+        next = { ...next, distanceOfAttack: '_0_3m' };
+        changed = true;
+      }
+      if (!prev.targetNotMoving) {
+        next = changed ? { ...next, targetNotMoving: true } : { ...next, targetNotMoving: true };
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [effAttacker, attacker]);
+
+  useEffect(() => {
+    const src = effAttacker ?? attacker;
+    if (!src) return;
+
+    const attackType = src.attackType as unknown as string | undefined;
+    const isBaseMagic = attackType === 'baseMagic';
+    if (!isBaseMagic) return;
+
+    const targetToken = normalizeCharacterIdToken(src.target as any);
+    const selfToken = normalizeCharacterIdToken(src.characterId as any);
+    const isSelfTarget = targetToken !== 'none' && selfToken !== 'none' && targetToken === selfToken;
+    if (!isSelfTarget) return;
+
+    setSaveConsentingTarget(true);
+  }, [effAttacker, attacker]);
 
   useEffect(() => {
     const ids = [attacker?.id, defender?.id]
@@ -533,6 +575,16 @@ export default function AdventureFightRound() {
       if (value === 0 || remaining <= 0) return max;
       return Math.max(max, remaining);
     }, 0);
+  }
+
+  function normalizeCharacterIdToken(value?: string | null): string {
+    if (!value) return 'none';
+    const source = `${value}`.trim().toUpperCase();
+    const match = source.match(/^(JK|NJK)([0-9]{1,2})$/);
+    if (!match) return 'none';
+    const num = Number(match[2]);
+    if (!Number.isFinite(num) || num < 1 || num > 30) return 'none';
+    return `${match[1]}${num.toString().padStart(2, '0')}`;
   }
 
   function computeTbPair(p?: Player | null): { main: number; offhand: number } {
@@ -822,8 +874,6 @@ export default function AdventureFightRound() {
       if (rm.targetNotMoving) modSum += 10;
       if (attackType === 'baseMagic') {
         if (rm.baseMageType === 'kapcsolat') modSum -= 10;
-        if (rm.mdBonus) modSum += 50;
-        if (rm.agreeingTarget) modSum -= 50;
       }
       modSum += Number(rm.gmModifier) || 0;
     }
@@ -1039,8 +1089,6 @@ export default function AdventureFightRound() {
         if (rm.targetNotMoving) modSum += 10;
         if (attackType === 'baseMagic') {
           if (rm.baseMageType === 'kapcsolat') modSum -= 10;
-          if (rm.mdBonus) modSum += 50;
-          if (rm.agreeingTarget) modSum -= 50;
         }
         modSum += Number(rm.gmModifier) || 0;
       }
@@ -1774,14 +1822,6 @@ export default function AdventureFightRound() {
                       </select>
                     </td>
                   </tr>
-                  <tr style={{ opacity: isBaseMagic ? 1 : 0.6 }} title={isBaseMagic ? undefined : 'Active only when Attack is Base Magic'}>
-                    <td>MD bonus (+50)</td>
-                    <td><input type="checkbox" checked={rm.mdBonus} disabled={!isBaseMagic} onChange={(e) => setRm((p) => ({ ...p, mdBonus: e.target.checked }))} /></td>
-                  </tr>
-                  <tr style={{ opacity: isBaseMagic ? 1 : 0.6 }} title={isBaseMagic ? undefined : 'Active only when Attack is Base Magic'}>
-                    <td>Agreeing target (-50)</td>
-                    <td><input type="checkbox" checked={rm.agreeingTarget} disabled={!isBaseMagic} onChange={(e) => setRm((p) => ({ ...p, agreeingTarget: e.target.checked }))} /></td>
-                  </tr>
                   <tr style={{ opacity: rangedDisabled ? 0.6 : 1 }} title={rangedDisabled ? 'Inactive: only for Ranged or Perform Magic' : undefined}>
                     <td>GM modifier</td>
                     <td>
@@ -2006,8 +2046,6 @@ export default function AdventureFightRound() {
                 if (rm.targetNotMoving) modSum += 10;
                 if (attackType === 'baseMagic') {
                   if (rm.baseMageType === 'kapcsolat') modSum -= 10;
-                  if (rm.mdBonus) modSum += 50;
-                  if (rm.agreeingTarget) modSum -= 50;
                 }
                 modSum += Number(rm.gmModifier) || 0;
               }
