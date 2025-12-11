@@ -9,6 +9,8 @@ export type WeaponOption = {
   extraTBMH: number;
   extraTBOH: number;
   manaCost?: number | null;
+  rollCapMH?: number | null;
+  rollCapOH?: number | null;
   critCapMH?: string | null;
   critCapOH?: string | null;
 };
@@ -36,6 +38,8 @@ export function toWeaponOptions(inventory: PlayerInventoryItem[]): WeaponOption[
       extraTBMH: typeof weapon.extraTBMH === 'number' ? weapon.extraTBMH : 0,
       extraTBOH: typeof weapon.extraTBOH === 'number' ? weapon.extraTBOH : 0,
       manaCost: typeof weapon.manaCost === 'number' ? weapon.manaCost : 0,
+      rollCapMH: typeof weapon.rollCapMH === 'number' ? weapon.rollCapMH : null,
+      rollCapOH: typeof weapon.rollCapOH === 'number' ? weapon.rollCapOH : null,
       critCapMH: weapon.critCapMH ?? null,
       critCapOH: weapon.critCapOH ?? null,
     }));

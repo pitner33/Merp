@@ -525,6 +525,41 @@ export default function AdventureFight() {
       };
     }, [isOpen, onToggle]);
 
+    useEffect(() => {
+      if (!isOpen) return;
+      if (!btnRef.current || !menuRef.current) return;
+
+      const margin = 8;
+      const vh = window.innerHeight;
+      const buttonRect = btnRef.current.getBoundingClientRect();
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const menuHeight = menuRect.height;
+
+      const belowTop = buttonRect.bottom + 2;
+      const aboveTop = buttonRect.top - menuHeight - 2;
+
+      const canFitBelow = belowTop + menuHeight <= vh - margin;
+      const canFitAbove = aboveTop >= margin;
+
+      let nextTop: number;
+      if (canFitBelow) {
+        nextTop = belowTop;
+      } else if (canFitAbove) {
+        nextTop = aboveTop;
+      } else {
+        const spaceBelow = vh - buttonRect.bottom - margin;
+        const spaceAbove = buttonRect.top - margin;
+        if (spaceBelow >= spaceAbove) {
+          nextTop = Math.max(margin, Math.min(belowTop, vh - margin - menuHeight));
+        } else {
+          const clampedAbove = Math.min(aboveTop, vh - margin - menuHeight);
+          nextTop = Math.max(margin, clampedAbove);
+        }
+      }
+
+      setPos((prev) => ({ ...prev, top: nextTop }));
+    }, [isOpen, options.length]);
+
     return (
       <div style={{ position: 'relative', display: 'inline-block' }}>
         <button
@@ -577,8 +612,8 @@ export default function AdventureFight() {
               top: pos.top,
               width: pos.width,
               zIndex: 10000,
-              maxHeight: 'none',
-              overflowY: 'visible',
+              maxHeight: 'calc(100vh - 16px)',
+              overflowY: 'auto',
               background: '#2b2b2b',
               color: '#fff',
               border: '1px solid #555',

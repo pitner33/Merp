@@ -1128,7 +1128,15 @@ export default function AdventureFightRound() {
       if (!r1.ok) throw new Error('compute-modified-roll failed');
       const be = await r1.json();
       setBeRoll(be);
-      const usedTotal = usedTotalLocal != null ? usedTotalLocal : be.total;
+      const usedTotalRaw = usedTotalLocal != null ? usedTotalLocal : be.total;
+      let usedTotal = usedTotalRaw;
+      const equippedWeapon = findEquippedWeapon(effAttacker);
+      if (equippedWeapon) {
+        const cap = usingOffHand ? equippedWeapon.rollCapOH ?? null : equippedWeapon.rollCapMH ?? null;
+        if (typeof cap === 'number' && Number.isFinite(cap) && usedTotal >= cap) {
+          usedTotal = cap;
+        }
+      }
       const r2 = await fetch(`http://localhost:8081/api/fight/resolve-attack?total=${usedTotal}`);
       if (!r2.ok) throw new Error('resolve-attack failed');
       const ar = await r2.json();
@@ -1251,6 +1259,7 @@ export default function AdventureFightRound() {
 
   async function handleSaveRoll() {
     if (!attackRes) return;
+    if (baseMagicSaveApplied) return;
     const resStr = (attackRes.result || '').toString().trim();
     const upper = resStr.toUpperCase();
     if (!upper || upper === 'FAIL') return;
@@ -2380,8 +2389,8 @@ export default function AdventureFightRound() {
                             <button
                               type="button"
                               onClick={handleSaveRoll}
-                              disabled={saveRolling}
-                              style={{ marginTop: 6, background: saveRolling ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: saveRolling ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                              disabled={saveRolling || baseMagicSaveApplied}
+                              style={{ marginTop: 6, background: (saveRolling || baseMagicSaveApplied) ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (saveRolling || baseMagicSaveApplied) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
                             >
                               {saveRolling ? 'Rolling…' : 'Saving throw'}
                             </button>

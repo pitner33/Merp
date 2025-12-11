@@ -1210,16 +1210,25 @@ export default function SingleAttack() {
       );
       if (r1.ok) setBeRoll(await r1.json());
 
+      const usedTotalRaw = usedTotalLocal != null ? usedTotalLocal : 0;
+      let usedTotal = usedTotalRaw;
+      const currentWeapon = findCurrentWeapon();
+      if (currentWeapon) {
+        const cap = usingOffHand ? currentWeapon.rollCapOH ?? null : currentWeapon.rollCapMH ?? null;
+        if (typeof cap === 'number' && Number.isFinite(cap) && usedTotal >= cap) {
+          usedTotal = cap;
+        }
+      }
+
       // Resolve attack row using overrides (attackType, defenderArmor)
       const r2 = await fetch(
-        `http://localhost:8081/api/fight/resolve-attack?total=${usedTotalLocal ?? 0}` +
+        `http://localhost:8081/api/fight/resolve-attack?total=${usedTotal}` +
         `&attackType=${encodeURIComponent(attackerAttack)}` +
         `&defenderArmor=${encodeURIComponent(defenderArmor)}`
       );
       if (!r2.ok) throw new Error('resolve-attack failed');
       const ar = await r2.json();
       const resStr = (ar?.result || '').toString().trim();
-      const usedTotal = usedTotalLocal ?? ar.total;
       setAttackRes({ ...ar, total: usedTotal });
 
       // Enable crit if letter A-E, fail flow if Fail
@@ -1357,6 +1366,7 @@ export default function SingleAttack() {
 
   async function handleSaveRoll() {
     if (!attackRes) return;
+    if (baseMagicSaveApplied) return;
     const resStr = (attackRes.result || '').toString().trim();
     const upper = resStr.toUpperCase();
     if (!upper || upper === 'FAIL') return;
@@ -2584,8 +2594,8 @@ export default function SingleAttack() {
                             <button
                               type="button"
                               onClick={handleSaveRoll}
-                              disabled={saveRolling}
-                              style={{ marginTop: 6, background: saveRolling ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: saveRolling ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                              disabled={saveRolling || baseMagicSaveApplied}
+                              style={{ marginTop: 6, background: (saveRolling || baseMagicSaveApplied) ? '#9ca3af' : '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: (saveRolling || baseMagicSaveApplied) ? 'not-allowed' : 'pointer', fontWeight: 600 }}
                             >
                               {saveRolling ? 'Rolling…' : 'Saving throw'}
                             </button>
