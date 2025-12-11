@@ -1310,14 +1310,14 @@ public class ApiController {
         try {
             java.util.List<Player> all = playerRepository.findAll();
             for (Player p : all) {
-                if (p.getActivePenaltyEffects() != null) {
-                    p.getActivePenaltyEffects().clear();
-                } else {
+                if (p.getActivePenaltyEffects() == null) {
                     p.setActivePenaltyEffects(new java.util.ArrayList<>());
                 }
-                p.setHpLossPerRound(0);
-                // derive displayed penalty from active effects (now none)
-                p.setPenaltyOfActions(0);
+                Integer hpLoss = p.getHpLossPerRound();
+                if (hpLoss == null || hpLoss < 0) {
+                    p.setHpLossPerRound(0);
+                }
+                p.recomputePenaltyOfActions();
                 playerRepository.save(p);
             }
         } catch (Exception ignore) {}
@@ -1335,10 +1335,14 @@ public class ApiController {
             try {
                 java.util.List<Player> all = playerRepository.findAll();
                 for (Player p : all) {
-                    if (p.getActivePenaltyEffects() != null) p.getActivePenaltyEffects().clear();
-                    else p.setActivePenaltyEffects(new java.util.ArrayList<>());
-                    p.setHpLossPerRound(0);
-                    p.setPenaltyOfActions(0);
+                    if (p.getActivePenaltyEffects() == null) {
+                        p.setActivePenaltyEffects(new java.util.ArrayList<>());
+                    }
+                    Integer hpLoss = p.getHpLossPerRound();
+                    if (hpLoss == null || hpLoss < 0) {
+                        p.setHpLossPerRound(0);
+                    }
+                    p.recomputePenaltyOfActions();
                     playerRepository.save(p);
                 }
             } catch (Exception ignore) {}

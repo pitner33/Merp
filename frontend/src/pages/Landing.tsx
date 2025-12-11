@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { get, patch, del } from '../api/client';
+import { get, patch, del, put } from '../api/client';
 import type { Player } from '../types';
 import { fetchInventory } from '../api/inventory';
 import { toWeaponOptions, type WeaponOption } from '../utils/weapons';
@@ -29,6 +29,16 @@ export default function Landing() {
   const [reviveAllError, setReviveAllError] = useState<string | null>(null);
   const [reviveAllHover, setReviveAllHover] = useState(false);
   const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
+  const [healTarget, setHealTarget] = useState<Player | null>(null);
+  const [healState, setHealState] = useState<{
+    hpActual: string;
+    stunnedForRounds: string;
+    hpLossPerRound: string;
+    activePenaltyEffects: { value: string; remainingRounds: string }[];
+  } | null>(null);
+  const [healClosing, setHealClosing] = useState(false);
+  const [healing, setHealing] = useState(false);
+  const [healError, setHealError] = useState<string | null>(null);
 
   function hpStyle(p: Player): CSSProperties {
     const max = Number(p.hpMax) || 0;
@@ -61,6 +71,19 @@ export default function Landing() {
     }, 0);
   }
 
+  function computePenaltyFromEffects(effects?: { value?: number; remainingRounds?: number }[] | null): number {
+    if (!effects || effects.length === 0) return 0;
+    let sum = 0;
+    for (const effect of effects) {
+      if (!effect) continue;
+      const v = Number(effect.value) || 0;
+      const r = Number(effect.remainingRounds) || 0;
+      if (v === 0 || r <= 0) continue;
+      sum += v;
+    }
+    return -sum;
+  }
+
   function isRevived(p: Player): boolean {
     const totalMana = Number(p.totalManaBonus ?? 0);
     const currentMana = Number(p.currentManaBonus ?? totalMana);
@@ -71,6 +94,26 @@ export default function Landing() {
       (p.hpLossPerRound ?? 0) === 0 &&
       currentMana >= totalMana
     );
+  }
+
+  function openHealDialog(p: Player) {
+    const hpActual = p.hpActual != null ? String(p.hpActual) : '0';
+    const stunnedForRounds = p.stunnedForRounds != null ? String(p.stunnedForRounds) : '0';
+    const hpLossPerRound = p.hpLossPerRound != null ? String(p.hpLossPerRound) : '0';
+    const effects = (p.activePenaltyEffects ?? []).map((e) => ({
+      value: e?.value != null ? String(e.value) : '0',
+      remainingRounds: e?.remainingRounds != null ? String(e.remainingRounds) : '0',
+    }));
+    setHealTarget(p);
+    setHealState({
+      hpActual,
+      stunnedForRounds,
+      hpLossPerRound,
+      activePenaltyEffects: effects,
+    });
+    setHealError(null);
+    setHealClosing(false);
+    setHealing(false);
   }
 
   async function load() {
@@ -200,6 +243,63 @@ export default function Landing() {
       targets.map((p) => fetch(`http://localhost:8081/api/players/${p.id}/revive`, { method: 'POST' }))
     );
     await load();
+  }
+
+  async function handleHealSave() {
+    if (!healTarget || !healState) return;
+    try {
+      setHealing(true);
+      setHealError(null);
+
+      const base = players.find((p) => p.id === healTarget.id) ?? healTarget;
+
+      const hpMaxNum = Number(base.hpMax) || 0;
+      let hpActualNum = Number(healState.hpActual);
+      if (!Number.isFinite(hpActualNum)) hpActualNum = 0;
+      if (hpActualNum < 0) hpActualNum = 0;
+      if (hpMaxNum > 0 && hpActualNum > hpMaxNum) hpActualNum = hpMaxNum;
+
+      let stunnedNum = Number.parseInt(healState.stunnedForRounds, 10);
+      if (!Number.isFinite(stunnedNum) || stunnedNum < 0) stunnedNum = 0;
+
+      let hpLossPerRoundNum = Number.parseInt(healState.hpLossPerRound, 10);
+      if (!Number.isFinite(hpLossPerRoundNum) || hpLossPerRoundNum < 0) hpLossPerRoundNum = 0;
+
+      const effectsClean = (healState.activePenaltyEffects ?? [])
+        .map((e) => ({
+          value: Number(e.value) || 0,
+          remainingRounds: Number(e.remainingRounds) || 0,
+        }))
+        .filter((e) => e.value !== 0 && e.remainingRounds > 0);
+
+      const penaltyOfActions = computePenaltyFromEffects(effectsClean);
+
+      const payload: Player = {
+        ...base,
+        hpActual: hpActualNum,
+        stunnedForRounds: stunnedNum,
+        hpLossPerRound: hpLossPerRoundNum,
+        activePenaltyEffects: effectsClean,
+        penaltyOfActions,
+      };
+
+      await put<Player>(`/players/${base.id}`, payload);
+      try {
+        localStorage.setItem('merp:player-updated', String(Date.now()));
+      } catch {}
+      await load();
+
+      setHealClosing(true);
+      setTimeout(() => {
+        setHealTarget(null);
+        setHealState(null);
+        setHealClosing(false);
+        setHealing(false);
+      }, 180);
+    } catch {
+      setHealError('Failed to save changes. Please try again.');
+      setHealing(false);
+    }
   }
 
   function playAll() {
@@ -555,7 +655,7 @@ export default function Landing() {
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      padding: 4
+                      padding: 4,
                     }}
                   >
                     <svg
@@ -579,12 +679,44 @@ export default function Landing() {
                       title="Edit"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
                         <path d="M12 20h9" />
                         <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                       </svg>
                     </button>
                   </Link>
+                  <button
+                    aria-label="Heal"
+                    title="Heal"
+                    onClick={() => openHealDialog(p)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="4" y="4" width="16" height="16" rx="3" ry="3" />
+                      <path d="M12 8v8" />
+                      <path d="M8 12h8" />
+                    </svg>
+                  </button>
                   <button
                     aria-label="Revive"
                     title="Revive"
@@ -794,7 +926,7 @@ export default function Landing() {
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Delete player</h3>
             </div>
             <div style={{ padding: 16, color: '#111' }}>
-              <p style={{ margin: 0, lineHeight: 1.6 }}>Delete character <strong>{confirmDeleteFor.characterId}</strong>?</p>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>Delete character <strong>{confirmDeleteFor?.characterId}</strong>?</p>
               <p style={{ margin: '8px 0 0 0', lineHeight: 1.6 }}>This action cannot be undone.</p>
               {deleteError && (
                 <p style={{ margin: '12px 0 0 0', color: '#b00020' }}>{deleteError}</p>
@@ -834,6 +966,233 @@ export default function Landing() {
           </div>
         </div>
       )}
+      {healTarget && healState && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 50,
+            animation: (healClosing ? 'overlayFadeOut 140ms ease-in forwards' : 'overlayFadeIn 160ms ease-out'),
+          }}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: 8,
+              width: 'min(420px, 92vw)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              animation: (healClosing ? 'dialogPopOut 140ms ease-in forwards' : 'dialogPopIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1)'),
+            }}
+          >
+            <div style={{ padding: '16px 16px 8px 16px', borderBottom: '1px solid #e6e6e6', background: '#14532d', color: '#fff' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Heal player</h3>
+            </div>
+            <div style={{ padding: 16, color: '#111' }}>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>
+                Adjust healing and penalties for character <strong>{healTarget?.characterId}</strong>.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, fontSize: 13 }}>
+                  <span>HP actual</span>
+                  <input
+                    type="number"
+                    value={healState?.hpActual ?? ''}
+                    onChange={(e) => setHealState((prev) => (prev ? { ...prev, hpActual: e.target.value } : prev))}
+                    style={{ width: '120px', padding: '4px 6px' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, fontSize: 13 }}>
+                  <span>Stunned for rounds</span>
+                  <input
+                    type="number"
+                    value={healState?.stunnedForRounds ?? ''}
+                    onChange={(e) => setHealState((prev) => (prev ? { ...prev, stunnedForRounds: e.target.value } : prev))}
+                    style={{ width: '120px', padding: '4px 6px' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, fontSize: 13 }}>
+                  <span>HP loss per round</span>
+                  <input
+                    type="number"
+                    value={healState?.hpLossPerRound ?? ''}
+                    onChange={(e) => setHealState((prev) => (prev ? { ...prev, hpLossPerRound: e.target.value } : prev))}
+                    style={{ width: '120px', padding: '4px 6px' }}
+                  />
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
+                  <span>Total penalty of actions</span>
+                  <div style={{ padding: '4px 6px', borderRadius: 4, border: '1px solid #ddd', background: '#f9fafb', width: '120px' }}>
+                    {computePenaltyFromEffects(
+                      (healState?.activePenaltyEffects ?? []).map((e) => ({
+                        value: Number(e.value) || 0,
+                        remainingRounds: Number(e.remainingRounds) || 0,
+                      }))
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <strong style={{ fontSize: 13 }}>Active penalty effects</strong>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setHealState((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              activePenaltyEffects: [
+                                ...prev.activePenaltyEffects,
+                                { value: '0', remainingRounds: '1' },
+                              ],
+                            }
+                          : prev
+                      )
+                    }
+                    style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid #15803d', background: '#16a34a', color: '#fff', cursor: 'pointer' }}
+                  >
+                    Add effect
+                  </button>
+                </div>
+                {(healState?.activePenaltyEffects?.length ?? 0) === 0 ? (
+                  <p style={{ margin: 0, fontSize: 12, color: '#6b7280' }}>No active penalty effects.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto',
+                        gap: 6,
+                        fontSize: 11,
+                        color: '#6b7280',
+                        padding: '0 2px',
+                      }}
+                    >
+                      <span>Penalty</span>
+                      <span>Remaining rounds</span>
+                      <span style={{ textAlign: 'right' }}>Actions</span>
+                    </div>
+                    {(healState?.activePenaltyEffects ?? []).map((eff, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ display: 'inline-flex' }}>
+                          <input
+                            type="number"
+                            value={eff.value}
+                            onChange={(e) =>
+                              setHealState((prev) => {
+                                if (!prev) return prev;
+                                const next = { ...prev, activePenaltyEffects: [...prev.activePenaltyEffects] };
+                                next.activePenaltyEffects[idx] = {
+                                  ...next.activePenaltyEffects[idx],
+                                  value: e.target.value,
+                                };
+                                return next;
+                              })
+                            }
+                            style={{
+                              width: '100px',
+                              padding: '4px 6px',
+                              borderTopRightRadius: 0,
+                              borderBottomRightRadius: 0,
+                              marginRight: -1,
+                            }}
+                          />
+                          <input
+                            type="number"
+                            value={eff.remainingRounds}
+                            onChange={(e) =>
+                              setHealState((prev) => {
+                                if (!prev) return prev;
+                                const next = { ...prev, activePenaltyEffects: [...prev.activePenaltyEffects] };
+                                next.activePenaltyEffects[idx] = {
+                                  ...next.activePenaltyEffects[idx],
+                                  remainingRounds: e.target.value,
+                                };
+                                return next;
+                              })
+                            }
+                            style={{
+                              width: '100px',
+                              padding: '4px 6px',
+                              borderTopLeftRadius: 0,
+                              borderBottomLeftRadius: 0,
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHealState((prev) => {
+                              if (!prev) return prev;
+                              const next = { ...prev, activePenaltyEffects: [...prev.activePenaltyEffects] };
+                              next.activePenaltyEffects.splice(idx, 1);
+                              return next;
+                            })
+                          }
+                          style={{
+                            padding: '4px 6px',
+                            borderRadius: 4,
+                            border: '1px solid #b91c1c',
+                            background: '#dc2626',
+                            color: '#fff',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            marginLeft: 8,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {healError && (
+                <p style={{ margin: '12px 0 0 0', color: '#b00020' }}>{healError}</p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: 16, background: '#f5f5f5', borderTop: '1px solid #e6e6e6' }}>
+              <button
+                onClick={() => {
+                  setHealClosing(true);
+                  setTimeout(() => {
+                    setHealTarget(null);
+                    setHealState(null);
+                    setHealClosing(false);
+                    setHealing(false);
+                    setHealError(null);
+                  }, 160);
+                }}
+                disabled={healing}
+                style={{ padding: '8px 12px', background: '#ffffff', color: '#111', border: '1px solid #444', borderRadius: 4, fontWeight: 600, opacity: healing ? 0.7 : 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleHealSave}
+                disabled={healing}
+                style={{ padding: '8px 12px', background: '#14532d', color: '#fff', border: '1px solid #14532d', borderRadius: 4, fontWeight: 700, opacity: healing ? 0.8 : 1 }}
+              >
+                {healing ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmReviveFor && (
         <div
           role="dialog"
@@ -863,7 +1222,7 @@ export default function Landing() {
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Revive player</h3>
             </div>
             <div style={{ padding: 16, color: '#111' }}>
-              <p style={{ margin: 0, lineHeight: 1.6 }}>Revive character <strong>{confirmReviveFor.characterId}</strong>?</p>
+              <p style={{ margin: 0, lineHeight: 1.6 }}>Revive character <strong>{confirmReviveFor?.characterId}</strong>?</p>
               <p style={{ margin: '8px 0 0 0', lineHeight: 1.6 }}>
                 This will set HP to max and clear stunned rounds, penalty, and HP loss per round.
               </p>
