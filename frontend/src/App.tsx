@@ -14,6 +14,7 @@ import SingleAttack from './pages/SingleAttack';
 import MM from './pages/MM';
 import GmAddCharacter from './pages/GmAddCharacter';
 import GmAddWeapon from './pages/GmAddWeapon';
+import GmBackupMaintenance from './pages/GmBackupMaintenance';
 import PlayerInventory from './pages/PlayerInventory';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/adventure/mm" element={<MM />} />
         <Route path="/gm/addcharacter" element={<GmAddCharacter />} />
         <Route path="/gm/addweapon" element={<GmAddWeapon />} />
+        <Route path="/gm/backup" element={<GmBackupMaintenance />} />
         <Route path="/players/:id/inventory" element={<PlayerInventory />} />
         <Route path="*" element={<p>Not Found</p>} />
       </Routes>
