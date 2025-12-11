@@ -34,6 +34,7 @@ export default function Landing() {
     hpActual: string;
     stunnedForRounds: string;
     hpLossPerRound: string;
+    currentManaBonus: string;
     activePenaltyEffects: { value: string; remainingRounds: string }[];
   } | null>(null);
   const [healClosing, setHealClosing] = useState(false);
@@ -100,6 +101,9 @@ export default function Landing() {
     const hpActual = p.hpActual != null ? String(p.hpActual) : '0';
     const stunnedForRounds = p.stunnedForRounds != null ? String(p.stunnedForRounds) : '0';
     const hpLossPerRound = p.hpLossPerRound != null ? String(p.hpLossPerRound) : '0';
+    const totalMana = p.totalManaBonus != null ? Number(p.totalManaBonus) : 0;
+    const currentMana = p.currentManaBonus != null ? Number(p.currentManaBonus) : totalMana;
+    const currentManaBonus = String(currentMana);
     const effects = (p.activePenaltyEffects ?? []).map((e) => ({
       value: e?.value != null ? String(e.value) : '0',
       remainingRounds: e?.remainingRounds != null ? String(e.remainingRounds) : '0',
@@ -109,6 +113,7 @@ export default function Landing() {
       hpActual,
       stunnedForRounds,
       hpLossPerRound,
+      currentManaBonus,
       activePenaltyEffects: effects,
     });
     setHealError(null);
@@ -265,6 +270,11 @@ export default function Landing() {
       let hpLossPerRoundNum = Number.parseInt(healState.hpLossPerRound, 10);
       if (!Number.isFinite(hpLossPerRoundNum) || hpLossPerRoundNum < 0) hpLossPerRoundNum = 0;
 
+      const totalManaNum = Number(base.totalManaBonus ?? 0);
+      let currentManaNum = Number.parseInt(healState.currentManaBonus, 10);
+      if (!Number.isFinite(currentManaNum) || currentManaNum < 0) currentManaNum = 0;
+      if (totalManaNum > 0 && currentManaNum > totalManaNum) currentManaNum = totalManaNum;
+
       const effectsClean = (healState.activePenaltyEffects ?? [])
         .map((e) => ({
           value: Number(e.value) || 0,
@@ -279,6 +289,7 @@ export default function Landing() {
         hpActual: hpActualNum,
         stunnedForRounds: stunnedNum,
         hpLossPerRound: hpLossPerRoundNum,
+        currentManaBonus: currentManaNum,
         activePenaltyEffects: effectsClean,
         penaltyOfActions,
       };
@@ -1005,6 +1016,15 @@ export default function Landing() {
                     type="number"
                     value={healState?.hpActual ?? ''}
                     onChange={(e) => setHealState((prev) => (prev ? { ...prev, hpActual: e.target.value } : prev))}
+                    style={{ width: '120px', padding: '4px 6px' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, fontSize: 13 }}>
+                  <span>Mana (current)</span>
+                  <input
+                    type="number"
+                    value={healState?.currentManaBonus ?? ''}
+                    onChange={(e) => setHealState((prev) => (prev ? { ...prev, currentManaBonus: e.target.value } : prev))}
                     style={{ width: '120px', padding: '4px 6px' }}
                   />
                 </label>
