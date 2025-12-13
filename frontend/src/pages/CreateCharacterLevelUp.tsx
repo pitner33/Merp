@@ -421,7 +421,7 @@ export default function CreateCharacterLevelUp() {
   const [loading, setLoading] = useState<boolean>(!!playerId);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [meta, setMeta] = useState<MetaOptions>({ genders: [], races: [], playerClasses: [], armorTypes: [] });
   const [baseData, setBaseData] = useState<BaseDataState>(() => ({
@@ -709,7 +709,7 @@ export default function CreateCharacterLevelUp() {
       return;
     }
     if (saving) return;
-    setSaveError(null);
+    setSaveFeedback(null);
     setSaving(true);
     try {
       const payload = buildLevelUpProfileDto();
@@ -727,8 +727,10 @@ export default function CreateCharacterLevelUp() {
         spells: 0,
         languages: 0
       });
+
+      setSaveFeedback({ type: 'success', message: 'Player data saved succesfully' });
     } catch (e) {
-      setSaveError('Failed to save Level Up data. Please try again.');
+      setSaveFeedback({ type: 'error', message: 'Failed to save Player data' });
     } finally {
       setSaving(false);
     }
@@ -811,6 +813,7 @@ export default function CreateCharacterLevelUp() {
     setLevelUpUsed(true);
     setDisplayLevel((prev) => (xpValue === 0 ? prev : prev + 1));
     void loadLevellingSkillPoints(false);
+    setXpValue((prev) => (prev === 0 ? prev + 1 : prev));
   }
 
   const genderOptions = useMemo(() => [
@@ -1054,6 +1057,7 @@ export default function CreateCharacterLevelUp() {
         race: baseData.race || null,
         playerClass: baseData.playerClass || null,
         lvl: displayLevel,
+        xp: xpValue,
         magicSchool: baseData.magicSchool || null,
         age: baseData.age || null,
         height: baseData.height || null,
@@ -1547,8 +1551,17 @@ export default function CreateCharacterLevelUp() {
             {saving ? 'Saving…' : 'ACCEPT'}
           </button>
         </div>
-        {saveError && (
-          <p style={{ textAlign: 'center', color: COLORS.danger, fontWeight: 600, margin: 0 }}>{saveError}</p>
+        {saveFeedback && (
+          <p
+            style={{
+              textAlign: 'center',
+              color: saveFeedback.type === 'success' ? '#2e7d32' : COLORS.danger,
+              fontWeight: 600,
+              margin: 0
+            }}
+          >
+            {saveFeedback.message}
+          </p>
         )}
       </div>
       {loading && (

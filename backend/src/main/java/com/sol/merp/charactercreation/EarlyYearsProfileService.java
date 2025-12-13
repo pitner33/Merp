@@ -89,6 +89,7 @@ public class EarlyYearsProfileService {
                 .race(enumToString(player.getRace()))
                 .playerClass(enumToString(player.getPlayerClass()))
                 .lvl(player.getLvl())
+                .xp(player.getXp())
                 .magicSchool(player.getMagicSchool())
                 .age(player.getAge())
                 .height(player.getHeight())
@@ -372,6 +373,9 @@ public class EarlyYearsProfileService {
         player.setPlayerClass(parseEnum(PlayerClass.class, baseData.getPlayerClass()));
         if (baseData.getLvl() != null) {
             player.setLvl(baseData.getLvl());
+        }
+        if (baseData.getXp() != null) {
+            player.setXp(baseData.getXp());
         }
         player.setMagicSchool(trimToEmpty(baseData.getMagicSchool()));
         player.setAge(trimToEmpty(baseData.getAge()));

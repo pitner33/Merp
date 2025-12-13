@@ -294,10 +294,6 @@ public class FightServiceImpl implements FightService {
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
 
-            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
-            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
-            playerService.experienceCounterKill();
-
             // persist defender state after applying effects
             playerRepository.save(defender);
             return;
@@ -366,10 +362,6 @@ public class FightServiceImpl implements FightService {
 
             // ordered list refreshed with defenderstats after every fightpairs KEEPING the same order
             playerService.refreshAdventurerOrderedListObject(defender);
-
-            playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
-            playerService.experienceCounterCrit(attackResultsDTO.getCrit());
-            playerService.experienceCounterKill();
 
             // persist defender state after applying effects
             playerRepository.save(defender);
@@ -835,9 +827,6 @@ TODO      */
         }
 
         playerService.refreshAdventurerOrderedListObject(defender);
-        try { playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage()); } catch (Exception ignore) {}
-        try { playerService.experienceCounterCrit(attackResultsDTO.getCrit()); } catch (Exception ignore) {}
-        try { playerService.experienceCounterKill(); } catch (Exception ignore) {}
 
         // Spend mana for the attacker based on their equipped weapon (if any)
         spendManaForEquippedWeapon(attacker);
@@ -1000,9 +989,6 @@ TODO      */
         }
 
         playerService.refreshAdventurerOrderedListObject(defender);
-        playerService.experienceCounterHPLoss(attackResultsDTO.getFullDamage());
-        playerService.experienceCounterCrit(attackResultsDTO.getCrit());
-        playerService.experienceCounterKill();
 
         // Spend mana for the attacker based on their equipped weapon (if any)
         spendManaForEquippedWeapon(attacker);

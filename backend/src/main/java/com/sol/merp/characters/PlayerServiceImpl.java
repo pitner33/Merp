@@ -600,15 +600,21 @@ public class PlayerServiceImpl implements PlayerService {
             experienceModifiers.setCritMultiplyer(25D);
         }
 
+        double critModifier = 1D;
         if (!defender.getIsAlive()) {
-            experienceModifiers.setCritModifier(0D);
-        } else if (healthPercent(defender) < 15) {
-            experienceModifiers.setCritModifier(0.1);
-        } else if (defender.getIsStunned()) {
-            experienceModifiers.setCritModifier(0.5);
-        } else if (isPlayerFightAlone()) {
-            experienceModifiers.setCritModifier(2D);
-        } else  experienceModifiers.setCritModifier(1D);
+            critModifier = Math.min(critModifier, 0D);
+        }
+        if (healthPercent(defender) < 15) {
+            critModifier = Math.min(critModifier, 0.1);
+        }
+        if (defender.getIsStunned()) {
+            critModifier = Math.min(critModifier, 0.5);
+        }
+
+        if (isPlayerFightAlone()) {
+            critModifier *= 2D;
+        }
+        experienceModifiers.setCritModifier(critModifier);
 
         Double experienceAttacker = defenderLvl * experienceModifiers.getCritMultiplyer() * experienceModifiers.getCritModifier();
         attacker.setXp(attacker.getXp() + experienceAttacker);
@@ -648,7 +654,47 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
-    public void experienceCounterManeuver() {
+    public void experienceCounterManeuver(String difficulty) {
+        java.util.List<Player> pair = nextTwoPlayersToFigthObject.getNextTwoPlayersToFight();
+        if (pair == null || pair.size() < 2) return;
+        Player attacker = pair.get(0);
+        Double experienceManeuver = 0D;
+
+        switch (difficulty) {
+            case "Piece of Cake":
+                experienceManeuver = 0D;
+                break;
+            case "Very Easy":
+                experienceManeuver = 5D;
+                break;
+            case "Easy":
+                experienceManeuver = 10D;
+                break;
+            case "Average":
+                experienceManeuver = 50D;
+                break;
+            case "Hard":
+                experienceManeuver = 100D;
+                break;
+            case "Very Hard":
+                experienceManeuver = 150D;
+                break;
+            case "Extremely Hard":
+                experienceManeuver = 200D;
+                break;
+            case "Insane":
+                experienceManeuver = 300D;
+                break;
+            case "Absurd":
+                experienceManeuver = 500D;
+                break;
+            default:
+                break;
+        }
+
+
+        attacker.setXp(attacker.getXp() + experienceManeuver);
+        refreshAdventurerOrderedListObject(attacker);
         //TODO implement method
     }
 

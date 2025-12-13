@@ -50,7 +50,7 @@ public interface PlayerService {
     void experienceCounterHPLoss(Integer hpLoss);
     void experienceCounterCrit(String crit);
     void experienceCounterKill();
-    void experienceCounterManeuver();
+    void experienceCounterManeuver(String difficulty);
     void experienceCounterMagic();
 
 

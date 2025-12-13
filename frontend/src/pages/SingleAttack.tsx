@@ -74,7 +74,7 @@ export default function SingleAttack() {
   const [resolving, setResolving] = useState(false);
   const [resolveAttempted, setResolveAttempted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [beRoll, setBeRoll] = useState<null | {
+  const [, setBeRoll] = useState<null | {
     open: number;
     attackerTb: number;
     attackerTbForDefense: number;
@@ -102,6 +102,8 @@ export default function SingleAttack() {
   const [saveConsentingTarget, setSaveConsentingTarget] = useState(false);
   const [saveGmModifier, setSaveGmModifier] = useState<number>(0);
   const [baseMagicSaveApplied, setBaseMagicSaveApplied] = useState(false);
+  const [pendingXpPersist, setPendingXpPersist] = useState(false);
+  const xpPersistingRef = useRef(false);
   const [playersSavedForRoll, setPlayersSavedForRoll] = useState(false);
   const [failEnabled, setFailEnabled] = useState(false);
   const [failRolling, setFailRolling] = useState(false);
@@ -117,6 +119,12 @@ export default function SingleAttack() {
   const [usingOffHandView, setUsingOffHandView] = useState(false);
   const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
   const intervalRef = useRef<number | null>(null);
+  const defenderAliveAtAttackStartRef = useRef<boolean>(true);
+  const [defenderAliveAtAttackStart, setDefenderAliveAtAttackStart] = useState<boolean>(true);
+  const defenderHpPercentAtAttackStartRef = useRef<number>(100);
+  const [defenderHpPercentAtAttackStart, setDefenderHpPercentAtAttackStart] = useState<number>(100);
+  const defenderStunnedAtAttackStartRef = useRef<boolean>(false);
+  const [defenderStunnedAtAttackStart, setDefenderStunnedAtAttackStart] = useState<boolean>(false);
 
   // Modifiers (from AdventureFightRound)
   function initialMod() {
@@ -611,6 +619,192 @@ export default function SingleAttack() {
     }, 0);
   }
 
+  function parseOutcomeNumber(value?: string | null): number {
+    if (!value) return 0;
+    const m = `${value}`.match(/-?\d+/);
+    if (!m) return 0;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function outcomeDamageForArmor(row?: string[] | null, armorType?: string | null): number {
+    if (!row || row.length === 0) return 0;
+    const order = ['plate', 'chainmail', 'heavyLeather', 'leather', 'none'] as const;
+    const key = ((armorType || 'none') as string).trim();
+    const idx = order.indexOf(key as any);
+    const safeIdx = idx >= 0 ? idx : order.length - 1;
+    return parseOutcomeNumber(row[safeIdx] ?? null);
+  }
+
+  function xpHpLossValues(): { attacker: number; defender: number } {
+    const attackType = (attackerAttack as string | undefined) ?? (attacker?.attackType as string | undefined) ?? '';
+    if (attackType === 'baseMagic') return { attacker: 0, defender: 0 };
+
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    const defenderAliveNow = (defender?.isAlive ?? true) !== false;
+
+    const defenderBleeding = Math.abs(Number(defender?.hpLossPerRound ?? 0) || 0);
+    const defenderAttackDamage = attackRes?.result === 'Fail'
+      ? 0
+      : Math.max(0, outcomeDamageForArmor(attackRes?.row, defender?.armorType));
+    const defenderCritExtra = attackRes?.result === 'Fail'
+      ? 0
+      : Math.max(0, Number((critDto as any)?.critResultAdditionalDamage ?? 0) || 0);
+    const defenderTotal = defenderAliveNow ? (defenderAttackDamage + defenderCritExtra + defenderBleeding) : 0;
+
+    let attackerTotal = 0;
+    if (attackRes?.result === 'Fail') {
+      const extra = Math.max(0, Number((failDto as any)?.failResultAdditionalDamage ?? 0) || 0);
+      const bleed = Math.abs(Number((failDto as any)?.failResultHPLossPerRound ?? 0) || 0);
+      attackerTotal = extra + bleed;
+    }
+
+    return { attacker: attackerTotal, defender: defenderTotal };
+  }
+
+  function critMultiplyerFromLetter(critLetter?: string | null): number {
+    const c = (critLetter ?? '').toString().trim().toUpperCase();
+    if (c === 'A') return 5;
+    if (c === 'B') return 10;
+    if (c === 'C') return 15;
+    if (c === 'D') return 20;
+    if (c === 'E') return 25;
+    return 0;
+  }
+
+  function healthPercent(p?: Player | null): number {
+    const max = Number(p?.hpMax ?? 0) || 0;
+    const actual = Number((p?.hpActual ?? p?.hpMax) ?? 0) || 0;
+    if (max <= 0) return 0;
+    return (actual / max) * 100;
+  }
+
+  function xpCritValues(): { attacker: number; defender: number } {
+    const raw = (attackRes?.result ?? '').toString().trim().toUpperCase();
+    const m = raw.match(/([A-EXYT])$/);
+    const critLetter = m?.[1] ?? '';
+
+    const critMultiplyer = critMultiplyerFromLetter(critLetter);
+    if (critMultiplyer <= 0) return { attacker: 0, defender: 0 };
+
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    const defenderLvl = Number(defender?.lvl ?? 0) || 0;
+
+    let critModifier = 1;
+    if (defenderHpPercentAtAttackStart < 15) critModifier = Math.min(critModifier, 0.1);
+    if (defenderStunnedAtAttackStart === true) critModifier = Math.min(critModifier, 0.5);
+    // SingleAttack is always 1 attacker vs 1 defender => treat as fight alone
+    critModifier *= 2;
+
+    const experienceAttacker = defenderLvl * critMultiplyer * critModifier;
+    const defenderAliveNow = (defender?.isAlive ?? true) !== false;
+    const experienceDefender = defenderAliveNow ? (20 * critMultiplyer) : 0;
+    return { attacker: formatXp(experienceAttacker), defender: formatXp(experienceDefender) };
+  }
+
+  function xpKillValues(): { attacker: number; defender: number } {
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    const defenderAliveNow = (defender?.isAlive ?? true) !== false;
+    if (defenderAliveNow) return { attacker: 0, defender: 0 };
+
+    const attackerLvl = Number(attacker?.lvl ?? 0) || 0;
+    const defenderLvl = Number(defender?.lvl ?? 0) || 0;
+
+    let experienceKill = 0;
+    if (attackerLvl === defenderLvl) {
+      experienceKill = 200;
+    } else if (attackerLvl < defenderLvl) {
+      experienceKill = 200 + (defenderLvl - attackerLvl) * 50;
+    } else {
+      experienceKill = 200 - (attackerLvl - defenderLvl) * 25;
+    }
+
+    if (experienceKill < 0) experienceKill = 0;
+    return { attacker: formatXp(experienceKill), defender: 0 };
+  }
+
+  function xpMagicValues(): { attacker: number; defender: number } {
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    if (!attackRes || attackRes.result === 'Fail') return { attacker: 0, defender: 0 };
+
+    const attackType = (attackerAttack as string | undefined) ?? (attacker?.attackType as string | undefined) ?? '';
+    const isMagicBall = attackType === 'magicBall';
+    const isMagicProjectile = attackType === 'magicProjectile';
+    const isBaseMagic = attackType === 'baseMagic';
+    if (!isMagicBall && !isMagicProjectile && !isBaseMagic) return { attacker: 0, defender: 0 };
+
+    if (isBaseMagic) {
+      const attackerLvlRaw = Number((attacker as any)?.lvl ?? 0) || 0;
+      const defenderLvlRaw = Number((defender as any)?.lvl ?? 0) || 0;
+
+      const levelStepValue = (lvl: number) => {
+        const l = Math.max(0, lvl);
+        if (l <= 5) return 5;
+        if (l <= 10) return 3;
+        if (l <= 15) return 2;
+        return 1;
+      };
+
+      let mdToReach = 50;
+      if (attackerLvlRaw !== defenderLvlRaw) {
+        if (attackerLvlRaw < defenderLvlRaw) {
+          let cur = attackerLvlRaw;
+          while (cur < defenderLvlRaw) {
+            cur += 1;
+            mdToReach -= levelStepValue(cur);
+          }
+        } else {
+          let cur = attackerLvlRaw;
+          while (cur > defenderLvlRaw) {
+            mdToReach += levelStepValue(cur);
+            cur -= 1;
+          }
+        }
+      }
+
+      const rawAttackResult = (attackRes.result || '').toString();
+      const attackResultStr = rawAttackResult.endsWith('X') ? rawAttackResult.slice(0, -1) : rawAttackResult;
+      const attackResultVal = Number(attackResultStr) || 0;
+      const rawSchool = (attacker as any)?.magicSchool;
+      const schoolNorm = String(rawSchool || '').trim().toLowerCase();
+      let defenderSaveBonus = 0;
+      if (schoolNorm === 'essence' || schoolNorm === 'lenyeg') {
+        defenderSaveBonus = Number((defender as any)?.mdLenyeg ?? 0) || 0;
+      } else if (schoolNorm === 'channeling' || schoolNorm === 'kapcsolat') {
+        defenderSaveBonus = Number((defender as any)?.mdKapcsolat ?? 0) || 0;
+      }
+      const consentingMod = saveConsentingTarget ? -50 : 0;
+      const gmMod = Number(saveGmModifier) || 0;
+      const totalBonus = attackResultVal + defenderSaveBonus + consentingMod + gmMod;
+      const rollValueForText = saveOpenTotal;
+      const modifiedRollForText = rollValueForText != null ? rollValueForText + totalBonus : null;
+      const isBaseMagicSuccess = modifiedRollForText != null && modifiedRollForText < mdToReach;
+      if (!isBaseMagicSuccess) return { attacker: 0, defender: 0 };
+    }
+
+    const attackerLvl = Number(attacker?.lvl ?? 0) || 0;
+    const weapon = findCurrentWeapon();
+    const magicLvl = Math.max(0, Math.floor(Number(weapon?.manaCost ?? 1) || 1));
+
+    let experienceMagic = 0;
+    if (attackerLvl <= magicLvl) {
+      experienceMagic = 100;
+    } else {
+      experienceMagic = 100 - ((attackerLvl - magicLvl) * 10);
+    }
+    if (experienceMagic < 0) experienceMagic = 0;
+
+    return { attacker: formatXp(experienceMagic), defender: 0 };
+  }
+
   function normalizePlayerTargetToken(value?: string | null, selfId?: string | null): string {
     if (!value) return 'none';
     if (value === 'none') return 'none';
@@ -843,6 +1037,49 @@ export default function SingleAttack() {
   function broadcastAdventureRefresh() {
     try { localStorage.setItem('merp:adventureRefresh', String(Date.now())); } catch {}
   }
+
+  useEffect(() => {
+    if (!pendingXpPersist) return;
+    if (xpPersistingRef.current) return;
+    if (!attackRes) return;
+
+    const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+    const defenderId = defender?.id ?? (players || []).find((pl) => String(pl.characterId) === defenderToken)?.id;
+    if (attackerId == null || defenderId == null) return;
+
+    // Clear the pending flag immediately to avoid duplicate persistence when other
+    // state updates (refreshes) trigger re-renders while we're persisting.
+    setPendingXpPersist(false);
+    xpPersistingRef.current = true;
+    (async () => {
+      const attackerXp =
+        xpHpLossValues().attacker +
+        xpCritValues().attacker +
+        xpMagicValues().attacker +
+        xpKillValues().attacker;
+      const defenderXp =
+        xpHpLossValues().defender +
+        xpCritValues().defender +
+        xpMagicValues().defender +
+        xpKillValues().defender;
+
+      if (attackerXp === 0 && defenderXp === 0) return;
+
+      const params = new URLSearchParams();
+      params.append('attackerId', String(attackerId));
+      params.append('defenderId', String(defenderId));
+      params.append('attackerXp', String(attackerXp));
+      params.append('defenderXp', String(defenderXp));
+      await fetch(`http://localhost:8081/api/fight/apply-xp-gains?${params.toString()}`, { method: 'POST' });
+    })()
+      .catch(() => {})
+      .finally(() => {
+        xpPersistingRef.current = false;
+        Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]).finally(() => {
+          broadcastAdventureRefresh();
+        });
+      });
+  }, [pendingXpPersist, attacker, defender, attackerToken, defenderToken, players, attackRes, critDto, failDto, saveOpenTotal, saveOpenSign, saveGmModifier, saveConsentingTarget]);
 
   async function persistPlayersForSingleRoll(): Promise<void> {
     if (!attacker || typeof attacker.id !== 'number') return;
@@ -1172,6 +1409,18 @@ export default function SingleAttack() {
   async function resolveBackend() {
     if (openTotal == null || !attacker || !defender || !attackerActivity || !attackerAttack || !attackerCrit || !defenderArmor) return;
     try {
+      const aliveAtStart = (defender?.isAlive ?? true) !== false;
+      defenderAliveAtAttackStartRef.current = aliveAtStart;
+      setDefenderAliveAtAttackStart(aliveAtStart);
+
+      const hpPctAtStart = healthPercent(defender ?? null);
+      defenderHpPercentAtAttackStartRef.current = hpPctAtStart;
+      setDefenderHpPercentAtAttackStart(hpPctAtStart);
+
+      const stunnedAtStart = (defender?.isStunned ?? false) === true;
+      defenderStunnedAtAttackStartRef.current = stunnedAtStart;
+      setDefenderStunnedAtAttackStart(stunnedAtStart);
+
       setResolveAttempted(true);
       setResolving(true);
       setError(null);
@@ -1257,6 +1506,7 @@ export default function SingleAttack() {
             setCritDto(dto);
             await Promise.allSettled([refreshDefenderFromServer(), refreshAttackerFromServer()]);
             broadcastAdventureRefresh();
+            setPendingXpPersist(true);
           }
           if (usingOffHandView) {
             markOffHandComplete();
@@ -1348,6 +1598,7 @@ export default function SingleAttack() {
         setCritEnabled(false);
         await Promise.allSettled([refreshDefenderFromServer(), refreshAttackerFromServer()]);
         broadcastAdventureRefresh();
+        setPendingXpPersist(true);
         if (usingOffHandView) {
           markOffHandComplete();
         } else {
@@ -1389,26 +1640,27 @@ export default function SingleAttack() {
       setSaveOpenSign(0);
       setSaveOpenTotal(value);
 
-       if (isBaseMagic && !baseMagicSaveApplied) {
-         try {
-           const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
-           if (attackerId != null) {
-             const weapon = findCurrentWeapon();
-             const weaponId = weapon && typeof weapon.id === 'number' ? weapon.id : undefined;
-             const params = new URLSearchParams();
-             params.append('attackerId', String(attackerId));
-             if (weaponId != null) params.append('weaponId', String(weaponId));
-             const url = `http://localhost:8081/api/fight/apply-base-magic-after-save?${params.toString()}`;
-             const resp = await fetch(url, { method: 'POST' });
-             if (!resp.ok) throw new Error('apply-base-magic-after-save failed');
-             await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
-             broadcastAdventureRefresh();
-             setBaseMagicSaveApplied(true);
-           }
-         } catch (e: any) {
-           setError(e?.message || 'Saving throw apply failed');
-         }
-       }
+      if (isBaseMagic && !baseMagicSaveApplied) {
+        try {
+          const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+          if (attackerId != null) {
+            const weapon = findCurrentWeapon();
+            const weaponId = weapon && typeof weapon.id === 'number' ? weapon.id : undefined;
+            const params = new URLSearchParams();
+            params.append('attackerId', String(attackerId));
+            if (weaponId != null) params.append('weaponId', String(weaponId));
+            const url = `http://localhost:8081/api/fight/apply-base-magic-after-save?${params.toString()}`;
+            const resp = await fetch(url, { method: 'POST' });
+            if (!resp.ok) throw new Error('apply-base-magic-after-save failed');
+            await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
+            broadcastAdventureRefresh();
+            setBaseMagicSaveApplied(true);
+            setPendingXpPersist(true);
+          }
+        } catch (e: any) {
+          setError(e?.message || 'Saving throw apply failed');
+        }
+      }
       return;
     }
 
@@ -1435,6 +1687,7 @@ export default function SingleAttack() {
       const ones = normalized === 0 && absValue !== 0 ? 0 : normalized % 10;
       setSaveTensFace(tens);
       setSaveOnesFace(ones);
+
       let nextSign = saveOpenSign;
       let nextTotal = saveOpenTotal == null ? null : saveOpenTotal;
 
@@ -1476,6 +1729,7 @@ export default function SingleAttack() {
             await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
             broadcastAdventureRefresh();
             setBaseMagicSaveApplied(true);
+            setPendingXpPersist(true);
           }
         } catch (e: any) {
           setError(e?.message || 'Saving throw apply failed');
@@ -1537,6 +1791,7 @@ export default function SingleAttack() {
         // Fail effects typically affect attacker; refresh both to be safe
         await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
         broadcastAdventureRefresh();
+        setPendingXpPersist(true);
       }
     } catch (e: any) {
       setError(e?.message || 'Fail roll failed');
@@ -2038,7 +2293,7 @@ export default function SingleAttack() {
           const activity = attackerActivity as string | undefined;
           const meleeActive = activity === '_3PhisicalAttackOrMovement';
           const meleeDisabled = !meleeActive;
-          function meleeLabel(base: string, active: boolean, amt: number): string { const sign = amt > 0 ? '+' : ''; return `${base} (${sign}${amt})`; }
+          function meleeLabel(base: string, amt: number): string { const sign = amt > 0 ? '+' : ''; return `${base} (${sign}${amt})`; }
           return (
             <div style={{ display: 'block', verticalAlign: 'top', flex: '0 0 700px', width: 700, minWidth: 700, maxWidth: 700, marginTop: 8, marginBottom: 4, opacity: meleeDisabled ? 0.6 : 1, overflow: 'hidden' }} title={meleeDisabled ? 'Inactive: only for Attack or Movement' : undefined}>
               <h2 style={{ margin: '0 0 6px 0', fontSize: 16 }}>Melee Modifiers</h2>
@@ -2049,14 +2304,14 @@ export default function SingleAttack() {
                 </colgroup>
                 <thead><tr><th>Melee Modifier</th><th>Value</th></tr></thead>
                 <tbody>
-                  <tr><td>{meleeLabel('Attack from weak side', mod.attackFromWeakSide, 15)}</td><td><input type="checkbox" checked={mod.attackFromWeakSide} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromWeakSide: e.target.checked }))} /></td></tr>
-                  <tr><td>{meleeLabel('Attack from behind', mod.attackFromBehind, 20)}</td><td><input type="checkbox" checked={mod.attackFromBehind} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromBehind: e.target.checked }))} /></td></tr>
-                  <tr><td>{meleeLabel('Defender surprised', mod.defenderSurprised, 20)}</td><td><input type="checkbox" checked={mod.defenderSurprised} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, defenderSurprised: e.target.checked }))} /></td></tr>
-                  <tr><td>{meleeLabel('Defender stunned', !!defender?.isStunned, 20)}</td><td><input type="checkbox" checked={!!defender?.isStunned} disabled aria-label="Defender stunned (auto)" /></td></tr>
-                  <tr><td>{meleeLabel('Attacker weapon change', mod.attackerWeaponChange, -30)}</td><td><input type="checkbox" checked={mod.attackerWeaponChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerWeaponChange: e.target.checked }))} /></td></tr>
-                  <tr><td>{meleeLabel('Attacker target change', mod.attackerTargetChange, -30)}</td><td><input type="checkbox" checked={mod.attackerTargetChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerTargetChange: e.target.checked }))} /></td></tr>
-                  <tr><td>{meleeLabel('Attacker HP below 50%', autoAttackerHPBelow50, -20)}</td><td><input type="checkbox" checked={autoAttackerHPBelow50} disabled aria-label="Attacker HP below 50% (auto)" /></td></tr>
-                  <tr><td>{meleeLabel('Attacker moved > 3m', mod.attackerMoreThan3MetersMovement, -10)}</td><td><input type="checkbox" checked={mod.attackerMoreThan3MetersMovement} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerMoreThan3MetersMovement: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Attack from weak side', 15)}</td><td><input type="checkbox" checked={mod.attackFromWeakSide} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromWeakSide: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Attack from behind', 20)}</td><td><input type="checkbox" checked={mod.attackFromBehind} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackFromBehind: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Defender surprised', 20)}</td><td><input type="checkbox" checked={mod.defenderSurprised} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, defenderSurprised: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Defender stunned', 20)}</td><td><input type="checkbox" checked={!!defender?.isStunned} disabled aria-label="Defender stunned (auto)" /></td></tr>
+                  <tr><td>{meleeLabel('Attacker weapon change', -30)}</td><td><input type="checkbox" checked={mod.attackerWeaponChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerWeaponChange: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Attacker target change', -30)}</td><td><input type="checkbox" checked={mod.attackerTargetChange} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerTargetChange: e.target.checked }))} /></td></tr>
+                  <tr><td>{meleeLabel('Attacker HP below 50%', -20)}</td><td><input type="checkbox" checked={autoAttackerHPBelow50} disabled aria-label="Attacker HP below 50% (auto)" /></td></tr>
+                  <tr><td>{meleeLabel('Attacker moved > 3m', -10)}</td><td><input type="checkbox" checked={mod.attackerMoreThan3MetersMovement} disabled={meleeDisabled} onChange={(e) => setMod((m) => ({ ...m, attackerMoreThan3MetersMovement: e.target.checked }))} /></td></tr>
                   <tr><td>GM modifier</td><td><input type="number" value={mod.modifierByGameMaster} onChange={(e) => { const v = Math.floor(Number(e.target.value) || 0); setMod((m) => ({ ...m, modifierByGameMaster: v })); }} style={{ width: 80, textAlign: 'right' }} disabled={meleeDisabled} /></td></tr>
                 </tbody>
               </table>
@@ -2760,6 +3015,63 @@ export default function SingleAttack() {
                   </table>
                 </div>
               )}
+
+              <div
+                style={{
+                  marginTop: 16,
+                  marginLeft: 'auto',
+                  width: 320,
+                  maxWidth: '100%',
+                  border: '1px solid #ddd',
+                  borderRadius: 8,
+                  padding: 12,
+                  background: '#fff',
+                  color: '#111',
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>XP gained</div>
+                <table className="table mods-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '56%' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '22%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }} />
+                      <th>Attacker</th>
+                      <th>Defender</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>XP HP loss</td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().attacker}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().defender}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>XP Crit</td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpCritValues().attacker}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpCritValues().defender}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>XP Magic</td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpMagicValues().attacker}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpMagicValues().defender}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left' }}>XP Kill</td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpKillValues().attacker}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpKillValues().defender}</strong></td>
+                    </tr>
+                    <tr>
+                      <td style={{ textAlign: 'left', fontWeight: 700 }}>Total</td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().attacker + xpCritValues().attacker + xpMagicValues().attacker + xpKillValues().attacker}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().defender + xpCritValues().defender + xpMagicValues().defender + xpKillValues().defender}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ) : null}

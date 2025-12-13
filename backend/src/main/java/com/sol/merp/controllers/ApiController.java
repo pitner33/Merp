@@ -1034,6 +1034,56 @@ public class ApiController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/fight/apply-xp-gains")
+    public ResponseEntity<Void> applyXpGains(
+            @RequestParam(name = "attackerId") Long attackerId,
+            @RequestParam(name = "defenderId") Long defenderId,
+            @RequestParam(name = "attackerXp") Integer attackerXp,
+            @RequestParam(name = "defenderXp") Integer defenderXp) {
+        if (attackerId == null || defenderId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Optional<Player> attackerOpt = playerRepository.findById(attackerId);
+        if (attackerOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Optional<Player> defenderOpt = playerRepository.findById(defenderId);
+        if (defenderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Player attacker = attackerOpt.get();
+        Player defender = defenderOpt.get();
+
+        int aGain = attackerXp != null ? attackerXp : 0;
+        int dGain = defenderXp != null ? defenderXp : 0;
+
+        if (attacker.getXp() == null) {
+            attacker.setXp(0D);
+        }
+        if (defender.getXp() == null) {
+            defender.setXp(0D);
+        }
+
+        if (Objects.equals(attackerId, defenderId)) {
+            attacker.setXp(attacker.getXp() + aGain + dGain);
+            try { playerService.refreshAdventurerOrderedListObject(attacker); } catch (Exception ignore) {}
+            try { playerRepository.save(attacker); } catch (Exception ignore) {}
+            return ResponseEntity.ok().build();
+        }
+
+        attacker.setXp(attacker.getXp() + aGain);
+        defender.setXp(defender.getXp() + dGain);
+
+        try { playerService.refreshAdventurerOrderedListObject(attacker); } catch (Exception ignore) {}
+        try { playerService.refreshAdventurerOrderedListObject(defender); } catch (Exception ignore) {}
+        try { playerRepository.save(attacker); } catch (Exception ignore) {}
+        try { playerRepository.save(defender); } catch (Exception ignore) {}
+
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/fight/reset-mana")
     public ResponseEntity<Void> resetManaForPlayingPlayers() {
         List<Player> players = playerRepository.findAllByIsPlayingIsTrue();

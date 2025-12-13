@@ -40,6 +40,13 @@ export default function AdventureFightRound() {
   const [offHandDone, setOffHandDone] = useState(false);
   const [usingOffHandView, setUsingOffHandView] = useState(false);
   const [offHandAwaitingRoll, setOffHandAwaitingRoll] = useState(false);
+  const [orderedPlayers, setOrderedPlayers] = useState<Player[]>([]);
+  const defenderAliveAtAttackStartRef = useRef<boolean>(true);
+  const [defenderAliveAtAttackStart, setDefenderAliveAtAttackStart] = useState<boolean>(true);
+  const defenderHpPercentAtAttackStartRef = useRef<number>(100);
+  const [defenderHpPercentAtAttackStart, setDefenderHpPercentAtAttackStart] = useState<number>(100);
+  const defenderStunnedAtAttackStartRef = useRef<boolean>(false);
+  const [defenderStunnedAtAttackStart, setDefenderStunnedAtAttackStart] = useState<boolean>(false);
   const [inventoryByPlayerId, setInventoryByPlayerId] = useState<Record<number, WeaponOption[]>>({});
 
   const [mod, setMod] = useState({
@@ -54,7 +61,7 @@ export default function AdventureFightRound() {
     modifierByGameMaster: 0,
   });
 
-  const [beRoll, setBeRoll] = useState<null | {
+  const [, setBeRoll] = useState<null | {
     open: number;
     attackerTb: number;
     attackerTbForDefense: number;
@@ -113,6 +120,8 @@ export default function AdventureFightRound() {
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentRoundCount, setCurrentRoundCount] = useState<number | null>(null);
+  const [pendingXpPersist, setPendingXpPersist] = useState(false);
+  const xpPersistingRef = useRef(false);
 
   // Helpers to refresh attacker/defender rows from server
   async function fetchPlayerById(id?: number | string | null): Promise<Player | undefined> {
@@ -123,12 +132,23 @@ export default function AdventureFightRound() {
       return (await r.json()) as Player;
     } catch { return undefined; }
   }
+
+  async function refreshOrderedPlayersFromServer(): Promise<void> {
+    try {
+      const res = await fetch('http://localhost:8081/api/players/ordered');
+      if (!res.ok) return;
+      const data = (await res.json()) as Player[];
+      if (Array.isArray(data)) setOrderedPlayers(data);
+    } catch { /* ignore */ }
+  }
+
   async function refreshPairFromServer() {
     const aId = attacker?.id;
     const dId = defender?.id;
     const [a, d] = await Promise.all([fetchPlayerById(aId), fetchPlayerById(dId)]);
     if (a) setAttackerRef(a);
     if (d) setDefenderRef(d);
+    refreshOrderedPlayersFromServer();
   }
 
   // Refresh on window focus, click (debounced), and storage broadcast from SingleAttack
@@ -159,6 +179,10 @@ export default function AdventureFightRound() {
     const rc = (round as any)?.roundCount;
     document.title = rc != null ? `Round ${rc}` : 'Round';
   }, []);
+
+  useEffect(() => {
+    refreshOrderedPlayersFromServer();
+  }, [attacker?.id]);
 
   // Update title when the fetched round count changes
   useEffect(() => {
@@ -496,8 +520,51 @@ export default function AdventureFightRound() {
       ]);
       if (ra) setAttackerRef(ra);
       if (rd) setDefenderRef(rd);
+      refreshOrderedPlayersFromServer();
     } catch {}
   }
+
+  useEffect(() => {
+    if (!pendingXpPersist) return;
+    if (xpPersistingRef.current) return;
+    if (!attackerRef || !defenderRef) return;
+    if (!attackRes) return;
+
+    // Clear the pending flag immediately to avoid duplicate persistence when other
+    // state updates (refreshes) trigger re-renders while we're persisting.
+    setPendingXpPersist(false);
+    xpPersistingRef.current = true;
+    (async () => {
+      const attackerId = attackerRef.id;
+      const defenderId = defenderRef.id;
+      if (attackerId == null || defenderId == null) return;
+
+      const attackerXp =
+        xpHpLossValues().attacker +
+        xpCritValues().attacker +
+        xpMagicValues().attacker +
+        xpKillValues().attacker;
+      const defenderXp =
+        xpHpLossValues().defender +
+        xpCritValues().defender +
+        xpMagicValues().defender +
+        xpKillValues().defender;
+
+      if (attackerXp === 0 && defenderXp === 0) return;
+
+      const params = new URLSearchParams();
+      params.append('attackerId', String(attackerId));
+      params.append('defenderId', String(defenderId));
+      params.append('attackerXp', String(attackerXp));
+      params.append('defenderXp', String(defenderXp));
+      await fetch(`http://localhost:8081/api/fight/apply-xp-gains?${params.toString()}`, { method: 'POST' });
+    })()
+      .catch(() => {})
+      .finally(() => {
+        xpPersistingRef.current = false;
+        refreshPairFromServer();
+      });
+  }, [pendingXpPersist, attackerRef, defenderRef, attackRes, critDto, failDto, saveOpenTotal, saveOpenSign, saveGmModifier, saveConsentingTarget, orderedPlayers]);
 
   async function clearTargetForStunnedPlayer(playerId?: number | string | null): Promise<void> {
     try {
@@ -575,6 +642,201 @@ export default function AdventureFightRound() {
       if (value === 0 || remaining <= 0) return max;
       return Math.max(max, remaining);
     }, 0);
+  }
+
+  function parseOutcomeNumber(value?: string | null): number {
+    if (!value) return 0;
+    const m = `${value}`.match(/-?\d+/);
+    if (!m) return 0;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function outcomeDamageForArmor(row?: string[] | null, armorType?: string | null): number {
+    if (!row || row.length === 0) return 0;
+    const order = ['plate', 'chainmail', 'heavyLeather', 'leather', 'none'] as const;
+    const key = ((armorType || 'none') as string).trim();
+    const idx = order.indexOf(key as any);
+    const safeIdx = idx >= 0 ? idx : order.length - 1;
+    return parseOutcomeNumber(row[safeIdx] ?? null);
+  }
+
+  function xpHpLossValues(): { attacker: number; defender: number } {
+    const attackType = (effAttacker?.attackType as string | undefined) ?? '';
+    if (attackType === 'baseMagic') return { attacker: 0, defender: 0 };
+
+    const defenderAlive = (effDefender?.isAlive ?? true) !== false;
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+
+    const defenderBleeding = Math.abs(Number(effDefender?.hpLossPerRound ?? 0) || 0);
+    const defenderAttackDamage = attackRes?.result === 'Fail'
+      ? 0
+      : Math.max(0, outcomeDamageForArmor(attackRes?.row, effDefender?.armorType));
+    const defenderCritExtra = attackRes?.result === 'Fail'
+      ? 0
+      : Math.max(0, Number((critDto as any)?.critResultAdditionalDamage ?? 0) || 0);
+    const defenderTotal = defenderAlive ? (defenderAttackDamage + defenderCritExtra + defenderBleeding) : 0;
+
+    let attackerTotal = 0;
+    if (defenderAliveAtStart && attackRes?.result === 'Fail') {
+      const extra = Math.max(0, Number((failDto as any)?.failResultAdditionalDamage ?? 0) || 0);
+      const bleed = Math.abs(Number((failDto as any)?.failResultHPLossPerRound ?? 0) || 0);
+      attackerTotal = extra + bleed;
+    }
+
+    return { attacker: attackerTotal, defender: defenderTotal };
+  }
+
+  function critMultiplyerFromLetter(critLetter?: string | null): number {
+    const c = (critLetter ?? '').toString().trim().toUpperCase();
+    if (c === 'A') return 5;
+    if (c === 'B') return 10;
+    if (c === 'C') return 15;
+    if (c === 'D') return 20;
+    if (c === 'E') return 25;
+    return 0;
+  }
+
+  function healthPercent(p?: Player | null): number {
+    const max = Number(p?.hpMax ?? 0) || 0;
+    const actual = Number((p?.hpActual ?? p?.hpMax) ?? 0) || 0;
+    if (max <= 0) return 0;
+    return (actual / max) * 100;
+  }
+
+  function isPlayerFightAlone(): boolean {
+    const targetToken = normalizeCharacterIdToken(effAttacker?.target);
+    if (!targetToken || targetToken === 'none') return false;
+    const attackerId = effAttacker?.id;
+    const anyOther = (orderedPlayers || []).some((p) => {
+      if (!p) return false;
+      if (attackerId != null && p.id === attackerId) return false;
+      return normalizeCharacterIdToken(p.target) === targetToken;
+    });
+    return !anyOther;
+  }
+
+  function xpCritValues(): { attacker: number; defender: number } {
+    const raw = (attackRes?.result ?? '').toString().trim().toUpperCase();
+    const m = raw.match(/([A-EXYT])$/);
+    const critLetter = m?.[1] ?? '';
+
+    const critMultiplyer = critMultiplyerFromLetter(critLetter);
+    if (critMultiplyer <= 0) return { attacker: 0, defender: 0 };
+
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    const defenderLvl = Number(effDefender?.lvl ?? 0) || 0;
+
+    let critModifier = 1;
+    if (defenderHpPercentAtAttackStart < 15) critModifier = Math.min(critModifier, 0.1);
+    if (defenderStunnedAtAttackStart === true) critModifier = Math.min(critModifier, 0.5);
+    if (isPlayerFightAlone()) critModifier *= 2;
+
+    const experienceAttacker = defenderLvl * critMultiplyer * critModifier;
+    const defenderAliveNow = (effDefender?.isAlive ?? true) !== false;
+    const experienceDefender = defenderAliveNow ? (20 * critMultiplyer) : 0;
+    return { attacker: formatXp(experienceAttacker), defender: formatXp(experienceDefender) };
+  }
+
+  function xpKillValues(): { attacker: number; defender: number } {
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    const defenderAliveNow = (effDefender?.isAlive ?? true) !== false;
+    if (defenderAliveNow) return { attacker: 0, defender: 0 };
+
+    const attackerLvl = Number(effAttacker?.lvl ?? 0) || 0;
+    const defenderLvl = Number(effDefender?.lvl ?? 0) || 0;
+
+    let experienceKill = 0;
+    if (attackerLvl === defenderLvl) {
+      experienceKill = 200;
+    } else if (attackerLvl < defenderLvl) {
+      experienceKill = 200 + (defenderLvl - attackerLvl) * 50;
+    } else {
+      experienceKill = 200 - (attackerLvl - defenderLvl) * 25;
+    }
+
+    if (experienceKill < 0) experienceKill = 0;
+    return { attacker: formatXp(experienceKill), defender: 0 };
+  }
+
+  function xpMagicValues(): { attacker: number; defender: number } {
+    const defenderAliveAtStart = defenderAliveAtAttackStart;
+    if (!defenderAliveAtStart) return { attacker: 0, defender: 0 };
+
+    if (!attackRes || attackRes.result === 'Fail') return { attacker: 0, defender: 0 };
+
+    const attackType = (effAttacker?.attackType as string | undefined) ?? '';
+    const isMagicBall = attackType === 'magicBall';
+    const isMagicProjectile = attackType === 'magicProjectile';
+    const isBaseMagic = attackType === 'baseMagic';
+    if (!isMagicBall && !isMagicProjectile && !isBaseMagic) return { attacker: 0, defender: 0 };
+
+    if (isBaseMagic) {
+      const attackerLvlRaw = Number((effAttacker as any)?.lvl ?? 0) || 0;
+      const defenderLvlRaw = Number((effDefender as any)?.lvl ?? 0) || 0;
+
+      const levelStepValue = (lvl: number) => {
+        const l = Math.max(0, lvl);
+        if (l <= 5) return 5;
+        if (l <= 10) return 3;
+        if (l <= 15) return 2;
+        return 1;
+      };
+
+      let mdToReach = 50;
+      if (attackerLvlRaw !== defenderLvlRaw) {
+        if (attackerLvlRaw < defenderLvlRaw) {
+          let cur = attackerLvlRaw;
+          while (cur < defenderLvlRaw) {
+            cur += 1;
+            mdToReach -= levelStepValue(cur);
+          }
+        } else {
+          let cur = attackerLvlRaw;
+          while (cur > defenderLvlRaw) {
+            mdToReach += levelStepValue(cur);
+            cur -= 1;
+          }
+        }
+      }
+
+      const rawAttackResult = (attackRes.result || '').toString();
+      const attackResultStr = rawAttackResult.endsWith('X') ? rawAttackResult.slice(0, -1) : rawAttackResult;
+      const attackResultVal = Number(attackResultStr) || 0;
+      const rawSchool = (effAttacker as any)?.magicSchool;
+      const schoolNorm = String(rawSchool || '').trim().toLowerCase();
+      let defenderSaveBonus = 0;
+      if (schoolNorm === 'essence' || schoolNorm === 'lenyeg') {
+        defenderSaveBonus = Number((effDefender as any)?.mdLenyeg ?? 0) || 0;
+      } else if (schoolNorm === 'channeling' || schoolNorm === 'kapcsolat') {
+        defenderSaveBonus = Number((effDefender as any)?.mdKapcsolat ?? 0) || 0;
+      }
+      const consentingMod = saveConsentingTarget ? -50 : 0;
+      const gmMod = Number(saveGmModifier) || 0;
+      const totalBonus = attackResultVal + defenderSaveBonus + consentingMod + gmMod;
+      const rollValueForText = saveOpenTotal;
+      const modifiedRollForText = rollValueForText != null ? rollValueForText + totalBonus : null;
+      const isBaseMagicSuccess = modifiedRollForText != null && modifiedRollForText < mdToReach;
+      if (!isBaseMagicSuccess) return { attacker: 0, defender: 0 };
+    }
+
+    const attackerLvl = Number(effAttacker?.lvl ?? 0) || 0;
+    const weapon = findEquippedWeapon(effAttacker);
+    const magicLvl = Math.max(0, Math.floor(Number(weapon?.manaCost ?? 1) || 1));
+
+    let experienceMagic = 0;
+    if (attackerLvl <= magicLvl) {
+      experienceMagic = 100;
+    } else {
+      experienceMagic = 100 - ((attackerLvl - magicLvl) * 10);
+    }
+    if (experienceMagic < 0) experienceMagic = 0;
+
+    return { attacker: formatXp(experienceMagic), defender: 0 };
   }
 
   function normalizeCharacterIdToken(value?: string | null): string {
@@ -665,6 +927,7 @@ export default function AdventureFightRound() {
           await clearTargetForStunnedPlayer(attacker.id);
           setAttackerRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
         }
+        setPendingXpPersist(true);
         if (isOffHandSequence) {
           markOffHandComplete();
         } else {
@@ -1042,6 +1305,18 @@ export default function AdventureFightRound() {
 
   async function resolveBackend() {
     try {
+      const aliveAtStart = (effDefender?.isAlive ?? true) !== false;
+      defenderAliveAtAttackStartRef.current = aliveAtStart;
+      setDefenderAliveAtAttackStart(aliveAtStart);
+
+      const hpPctAtStart = healthPercent(effDefender ?? null);
+      defenderHpPercentAtAttackStartRef.current = hpPctAtStart;
+      setDefenderHpPercentAtAttackStart(hpPctAtStart);
+
+      const stunnedAtStart = (effDefender?.isStunned ?? false) === true;
+      defenderStunnedAtAttackStartRef.current = stunnedAtStart;
+      setDefenderStunnedAtAttackStart(stunnedAtStart);
+
       setResolveAttempted(true);
       setResolving(true);
       setError(null);
@@ -1165,6 +1440,7 @@ export default function AdventureFightRound() {
           setCritDto(dto);
           setCritEnabled(false);
           await refreshPairFromBackend();
+          setPendingXpPersist(true);
           if (isOffHandSequence) {
             markOffHandComplete();
           } else {
@@ -1244,6 +1520,7 @@ export default function AdventureFightRound() {
         await clearTargetForStunnedPlayer(defender.id);
         setDefenderRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
       }
+      setPendingXpPersist(true);
       if (isOffHandSequence) {
         markOffHandComplete();
       } else {
@@ -1288,6 +1565,7 @@ export default function AdventureFightRound() {
           await fetch('http://localhost:8081/api/fight/apply-base-magic-after-save', { method: 'POST' });
           await refreshPairFromBackend();
           setBaseMagicSaveApplied(true);
+          setPendingXpPersist(true);
         } catch (e: any) {
           setError(e?.message || 'Saving throw apply failed');
         }
@@ -1351,6 +1629,7 @@ export default function AdventureFightRound() {
           await fetch('http://localhost:8081/api/fight/apply-base-magic-after-save', { method: 'POST' });
           await refreshPairFromBackend();
           setBaseMagicSaveApplied(true);
+          setPendingXpPersist(true);
         } catch (e: any) {
           setError(e?.message || 'Saving throw apply failed');
         }
@@ -2662,6 +2941,63 @@ export default function AdventureFightRound() {
                 </table>
               </div>
             )}
+
+            <div
+              style={{
+                marginTop: 16,
+                marginLeft: 'auto',
+                width: 320,
+                maxWidth: '100%',
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                padding: 12,
+                background: '#fff',
+                color: '#111',
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>XP gained</div>
+              <table className="table mods-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '56%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '22%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left' }} />
+                    <th>Attacker</th>
+                    <th>Defender</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ textAlign: 'left' }}>XP HP loss</td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().attacker}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().defender}</strong></td>
+                  </tr>
+                  <tr>
+                    <td style={{ textAlign: 'left' }}>XP Crit</td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpCritValues().attacker}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpCritValues().defender}</strong></td>
+                  </tr>
+                  <tr>
+                    <td style={{ textAlign: 'left' }}>XP Magic</td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpMagicValues().attacker}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpMagicValues().defender}</strong></td>
+                  </tr>
+                  <tr>
+                    <td style={{ textAlign: 'left' }}>XP Kill</td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpKillValues().attacker}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpKillValues().defender}</strong></td>
+                  </tr>
+                  <tr>
+                    <td style={{ textAlign: 'left', fontWeight: 700 }}>Total</td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().attacker + xpCritValues().attacker + xpMagicValues().attacker + xpKillValues().attacker}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{xpHpLossValues().defender + xpCritValues().defender + xpMagicValues().defender + xpKillValues().defender}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             </div>
            
             

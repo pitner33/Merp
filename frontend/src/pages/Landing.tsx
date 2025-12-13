@@ -32,6 +32,7 @@ export default function Landing() {
   const [healTarget, setHealTarget] = useState<Player | null>(null);
   const [healState, setHealState] = useState<{
     hpActual: string;
+    xp: string;
     stunnedForRounds: string;
     hpLossPerRound: string;
     currentManaBonus: string;
@@ -99,6 +100,7 @@ export default function Landing() {
 
   function openHealDialog(p: Player) {
     const hpActual = p.hpActual != null ? String(p.hpActual) : '0';
+    const xp = String(formatXp(Number(p.xp)));
     const stunnedForRounds = p.stunnedForRounds != null ? String(p.stunnedForRounds) : '0';
     const hpLossPerRound = p.hpLossPerRound != null ? String(p.hpLossPerRound) : '0';
     const totalMana = p.totalManaBonus != null ? Number(p.totalManaBonus) : 0;
@@ -111,6 +113,7 @@ export default function Landing() {
     setHealTarget(p);
     setHealState({
       hpActual,
+      xp,
       stunnedForRounds,
       hpLossPerRound,
       currentManaBonus,
@@ -264,6 +267,11 @@ export default function Landing() {
       if (hpActualNum < 0) hpActualNum = 0;
       if (hpMaxNum > 0 && hpActualNum > hpMaxNum) hpActualNum = hpMaxNum;
 
+      let xpNum = healState.xp.trim() === '' ? Number(base.xp) || 0 : Number(healState.xp);
+      if (!Number.isFinite(xpNum)) xpNum = Number(base.xp) || 0;
+      if (xpNum < 0) xpNum = 0;
+      xpNum = formatXp(xpNum);
+
       let stunnedNum = Number.parseInt(healState.stunnedForRounds, 10);
       if (!Number.isFinite(stunnedNum) || stunnedNum < 0) stunnedNum = 0;
 
@@ -286,6 +294,7 @@ export default function Landing() {
 
       const payload: Player = {
         ...base,
+        xp: xpNum,
         hpActual: hpActualNum,
         stunnedForRounds: stunnedNum,
         hpLossPerRound: hpLossPerRoundNum,
@@ -1036,6 +1045,15 @@ export default function Landing() {
                     type="number"
                     value={healState?.hpActual ?? ''}
                     onChange={(e) => setHealState((prev) => (prev ? { ...prev, hpActual: e.target.value } : prev))}
+                    style={{ width: '120px', padding: '4px 6px' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, fontSize: 13 }}>
+                  <span>XP</span>
+                  <input
+                    type="number"
+                    value={healState?.xp ?? ''}
+                    onChange={(e) => setHealState((prev) => (prev ? { ...prev, xp: e.target.value } : prev))}
                     style={{ width: '120px', padding: '4px 6px' }}
                   />
                 </label>
