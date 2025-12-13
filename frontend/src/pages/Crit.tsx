@@ -75,6 +75,7 @@ export default function Crit() {
     }
   }, [selectedId, critLetter, critType]);
   const rollBoxRef = useRef<HTMLDivElement | null>(null);
+  const xpTotalValueRef = useRef<HTMLSpanElement | null>(null);
   const [rollBoxWidth, setRollBoxWidth] = useState<number | undefined>(undefined);
   const pNone = {
     characterId: '',
@@ -728,14 +729,54 @@ export default function Crit() {
                   if (applied) setCritResult(applied);
 
                   // Refresh selected player from backend if we have an id
+                  let freshPlayer: any | null = null;
                   if (sel?.id || sel?.characterId) {
                     try {
                       const ref = await fetch(`http://localhost:8081/api/players/${encodeURIComponent(sel?.id ?? sel?.characterId)}`);
                       if (ref.ok) {
-                        const fresh = await ref.json();
-                        setP(fresh);
+                        freshPlayer = await ref.json();
+                        setP(freshPlayer);
                       }
                     } catch {}
+                  }
+
+                  // Apply XP gains to the player
+                  const defenderId = sel?.id ?? sel?.characterId;
+                  if (defenderId != null && applied) {
+                    // Compute Total using the refreshed player's bleeding (includes crit bleeding already applied)
+                    // plus base damage and extra crit damage.
+                    const hpLossPerRound = Number(freshPlayer?.hpLossPerRound ?? p?.hpLossPerRound) || 0;
+                    const totalXP =
+                      parseManualDamageValue(manualDamage) +
+                      (applied.critResultAdditionalDamage || 0) +
+                      hpLossPerRound +
+                      (() => {
+                        const crit = (critLetter || '').toUpperCase();
+                        let critMultiplyer = 0;
+                        if (crit === 'A') critMultiplyer = 5;
+                        else if (crit === 'B') critMultiplyer = 10;
+                        else if (crit === 'C') critMultiplyer = 15;
+                        else if (crit === 'D') critMultiplyer = 20;
+                        else if (crit === 'E') critMultiplyer = 25;
+                        return 20 * critMultiplyer;
+                      })();
+                    if (Number.isFinite(totalXP) && totalXP !== 0) {
+                      try {
+                        const xpUrl = `http://localhost:8081/api/fight/apply-xp-gains?attackerId=${encodeURIComponent(defenderId)}&defenderId=${encodeURIComponent(defenderId)}&attackerXp=${totalXP}&defenderXp=0`;
+                        await fetch(xpUrl, { method: 'POST' });
+                      } catch {}
+                    }
+
+                    // Refresh player after XP apply
+                    if (sel?.id || sel?.characterId) {
+                      try {
+                        const ref2 = await fetch(`http://localhost:8081/api/players/${encodeURIComponent(sel?.id ?? sel?.characterId)}`);
+                        if (ref2.ok) {
+                          const fresh2 = await ref2.json();
+                          setP(fresh2);
+                        }
+                      } catch {}
+                    }
                   }
                 } catch (e: any) {
                   setCritError(e?.message || 'Crit roll failed');
@@ -911,6 +952,47 @@ export default function Crit() {
           </div>
         );
       })()}
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ display: 'inline-block', border: '1px solid #ddd', borderRadius: 8, padding: 12, minWidth: rollBoxWidth ? `${rollBoxWidth}px` : undefined, background: '#fff', color: '#111' }}>
+          <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center', color: '#2f5597' }}>XP gained</div>
+          <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+            <tbody>
+<tr>
+                <td style={{ textAlign: 'left' }}>XP HP loss</td>
+                <td><strong>{parseManualDamageValue(manualDamage) + (critResult?.critResultAdditionalDamage || 0) + (Number(p.hpLossPerRound) || 0)}</strong></td>
+              </tr>
+              <tr>
+                <td style={{ textAlign: 'left' }}>XP Crit</td>
+                <td><strong>{(() => {
+                  const crit = (critLetter || '').toUpperCase();
+                  let critMultiplyer = 0;
+                  if (crit === 'A') critMultiplyer = 5;
+                  else if (crit === 'B') critMultiplyer = 10;
+                  else if (crit === 'C') critMultiplyer = 15;
+                  else if (crit === 'D') critMultiplyer = 20;
+                  else if (crit === 'E') critMultiplyer = 25;
+                  return 20 * critMultiplyer;
+                })()}</strong></td>
+              </tr>
+              <tr>
+                <td style={{ textAlign: 'left' }}>Total</td>
+                <td><strong><span ref={xpTotalValueRef} data-testid="xp-gained-total">{(() => {
+                  const hpLoss = parseManualDamageValue(manualDamage) + (critResult?.critResultAdditionalDamage || 0) + (Number(p.hpLossPerRound) || 0);
+                  const crit = (critLetter || '').toUpperCase();
+                  let critMultiplyer = 0;
+                  if (crit === 'A') critMultiplyer = 5;
+                  else if (crit === 'B') critMultiplyer = 10;
+                  else if (crit === 'C') critMultiplyer = 15;
+                  else if (crit === 'D') critMultiplyer = 20;
+                  else if (crit === 'E') critMultiplyer = 25;
+                  const xpCrit = 20 * critMultiplyer;
+                  return hpLoss + xpCrit;
+                })()}</span></strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

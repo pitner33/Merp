@@ -21,6 +21,8 @@ export default function MM() {
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [playersVersion, setPlayersVersion] = useState(0);
 
+  const [lastXpAppliedKey, setLastXpAppliedKey] = useState<string | null>(null);
+
   // Selections and resolved players
   const [attackerToken, setAttackerToken] = useState<string>('none');
   const [attacker, setAttacker] = useState<Player | null>(null);
@@ -200,6 +202,20 @@ export default function MM() {
         if (!r.ok) throw new Error('MM resolve failed');
         const data = await r.json();
         setMmRes({ resultText: data?.resultText ?? '', usedRow: data?.usedRow, usedCol: data?.usedCol, row: Array.isArray(data?.row) ? data.row as string[] : undefined });
+
+         // Apply XP based on computed XP gained (UI value) once per resolved roll
+         try {
+           const xp = computeXpGainedTotalFromResolveResult(used, data?.resultText);
+           const pid = attacker?.id;
+           const applyKey = `${mmType}|${difficulty}|${maneuverType}|${openTotal}|${used}|${data?.resultText ?? ''}|${pid ?? ''}`;
+           if (pid != null && xp > 0 && applyKey !== lastXpAppliedKey) {
+             const xpUrl = `http://localhost:8081/api/fight/apply-xp-gains?attackerId=${encodeURIComponent(pid)}&defenderId=${encodeURIComponent(pid)}&attackerXp=${encodeURIComponent(xp)}&defenderXp=0`;
+             await fetch(xpUrl, { method: 'POST' });
+             setLastXpAppliedKey(applyKey);
+             await refreshAttackerFromServer(pid);
+           }
+         } catch {}
+
         if (mmType === 'Movement') {
           const needFail = !!data?.failRequired;
           if (needFail) {
@@ -231,7 +247,7 @@ export default function MM() {
       }
     };
     run();
-  }, [mmType, maneuverType, difficulty, openTotal, openSign]);
+  }, [mmType, maneuverType, difficulty, openTotal, openSign, lastXpAppliedKey, attacker?.id]);
 
   async function refreshAttackerFromServer(playerId: number) {
     try {
@@ -484,6 +500,7 @@ export default function MM() {
 
   function resetAllUI() {
     try {
+      setLastXpAppliedKey(null);
       setReadyToRoll(false);
       setRolling(false);
       setTensFace(0);
@@ -549,6 +566,63 @@ export default function MM() {
       case 'absurd': return -70;
       default: return 0;
     }
+  }
+
+  function xpBaseByDifficulty(d: string): number {
+    switch (d) {
+      case 'Piece of cake':
+        return 0;
+      case 'Very easy':
+        return 5;
+      case 'Easy':
+        return 10;
+      case 'Average':
+        return 50;
+      case 'Hard':
+        return 100;
+      case 'Very Hard':
+        return 150;
+      case 'Extremely hard':
+        return 200;
+      case 'Insane':
+        return 300;
+      case 'Absurd':
+        return 500;
+      default:
+        return 0;
+    }
+  }
+
+  function computeXpGainedTotal(): number {
+    if (openTotal == null) return 0;
+    const base = xpBaseByDifficulty(difficulty);
+    if (base <= 0) return 0;
+    if (mmType === 'Maneuver') {
+      const used = computeLocalModifiedTotal();
+      if (typeof used !== 'number') return 0;
+      if (used <= 75) return 0;
+      const pct = Math.min(150, used);
+      return Math.round(base * (pct / 100));
+    }
+    const resVal = Number(mmRes?.resultText);
+    if (!Number.isFinite(resVal)) return 0;
+    if (resVal <= 75) return 0;
+    return Math.round(base * (resVal / 100));
+  }
+
+  function computeXpGainedTotalFromResolveResult(used: number, resolveResultText: any): number {
+    const base = xpBaseByDifficulty(difficulty);
+    if (base <= 0) return 0;
+    if (mmType === 'Maneuver') {
+      if (!Number.isFinite(used)) return 0;
+      if (used <= 75) return 0;
+      const pct = Math.min(150, used);
+      return Math.round(base * (pct / 100));
+    }
+    const resVal = Number(resolveResultText);
+    if (!Number.isFinite(resVal)) return 0;
+    if (resVal <= 75) return 0;
+    return Math.round(base * (resVal / 100));
   }
 
   // Compute modified total (movement modifiers only)
@@ -1616,6 +1690,20 @@ export default function MM() {
             )}
           </>
         )}
+      </div>
+
+      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ display: 'inline-block', border: '1px solid #ddd', borderRadius: 8, padding: 12, background: '#fff', color: '#111' }}>
+          <div style={{ fontWeight: 800, marginBottom: 6, textAlign: 'center', color: '#2f5597' }}>XP gained</div>
+          <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
+            <tbody>
+              <tr>
+                <td style={{ textAlign: 'left' }}>Total</td>
+                <td style={{ textAlign: 'right', width: 80 }}><strong>{openTotal != null ? computeXpGainedTotal() : ''}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
