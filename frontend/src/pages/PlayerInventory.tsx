@@ -88,6 +88,12 @@ export default function PlayerInventory() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [filterActivity, setFilterActivity] = useState<string>('');
+  const [filterAttack, setFilterAttack] = useState<string>('');
+  const [filterCrit, setFilterCrit] = useState<string>('');
+  const [filterWeaponType, setFilterWeaponType] = useState<string>('');
+  const [filterManaCost, setFilterManaCost] = useState<string>('');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -127,6 +133,21 @@ export default function PlayerInventory() {
     return weapons.filter((w) => !inventoryWeaponIds.has(w.id));
   }, [weapons, inventoryWeaponIds]);
 
+  const filteredSelectableWeapons = useMemo(() => {
+    return selectableWeapons.filter((weapon) => {
+      if (filterActivity && weapon.activityType !== filterActivity) return false;
+      if (filterAttack && weapon.attackType !== filterAttack) return false;
+      if (filterCrit && weapon.critType !== filterCrit) return false;
+      if (filterWeaponType && weapon.weaponType !== filterWeaponType) return false;
+      if (filterManaCost.trim() !== '') {
+        const parsed = Number.parseInt(filterManaCost, 10);
+        if (!Number.isFinite(parsed)) return false;
+        if ((weapon.manaCost ?? 0) !== parsed) return false;
+      }
+      return true;
+    });
+  }, [selectableWeapons, filterActivity, filterAttack, filterCrit, filterWeaponType, filterManaCost]);
+
   const selectedWeaponObjects = useMemo(() => {
     return selectableWeapons.filter((w) => selectedIds.has(w.id));
   }, [selectableWeapons, selectedIds]);
@@ -138,6 +159,14 @@ export default function PlayerInventory() {
       else next.add(weaponId);
       return next;
     });
+  }
+
+  function clearAllFilters() {
+    setFilterActivity('');
+    setFilterAttack('');
+    setFilterCrit('');
+    setFilterWeaponType('');
+    setFilterManaCost('');
   }
 
   async function handleAddWeapons(e: React.FormEvent) {
@@ -328,8 +357,93 @@ export default function PlayerInventory() {
               </button>
             </div>
             <form onSubmit={handleAddWeapons} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ maxHeight: '60vh', overflowY: 'auto', border: '1px solid #d4d4d4', borderRadius: 6, background: '#f5f8ff' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#1f3b6e', fontWeight: 600 }}>
+                  Activity
+                  <select
+                    value={filterActivity}
+                    onChange={(e) => setFilterActivity(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid #b0b8c5', minWidth: 170 }}
+                  >
+                    <option value="">All</option>
+                    {Object.keys(ACTIVITY_LABELS).map((key) => (
+                      <option key={key} value={key}>
+                        {ACTIVITY_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#1f3b6e', fontWeight: 600 }}>
+                  Attack
+                  <select
+                    value={filterAttack}
+                    onChange={(e) => setFilterAttack(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid #b0b8c5', minWidth: 170 }}
+                  >
+                    <option value="">All</option>
+                    {Object.keys(ATTACK_LABELS).map((key) => (
+                      <option key={key} value={key}>
+                        {ATTACK_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#1f3b6e', fontWeight: 600 }}>
+                  Crit
+                  <select
+                    value={filterCrit}
+                    onChange={(e) => setFilterCrit(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid #b0b8c5', minWidth: 170 }}
+                  >
+                    <option value="">All</option>
+                    {Object.keys(CRIT_LABELS).map((key) => (
+                      <option key={key} value={key}>
+                        {CRIT_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#1f3b6e', fontWeight: 600 }}>
+                  Weapon type
+                  <select
+                    value={filterWeaponType}
+                    onChange={(e) => setFilterWeaponType(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid #b0b8c5', minWidth: 170 }}
+                  >
+                    <option value="">All</option>
+                    {Object.keys(WEAPON_TYPE_LABELS).map((key) => (
+                      <option key={key} value={key}>
+                        {WEAPON_TYPE_LABELS[key]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#1f3b6e', fontWeight: 600 }}>
+                  Mana cost
+                  <input
+                    type="number"
+                    value={filterManaCost}
+                    onChange={(e) => setFilterManaCost(e.target.value)}
+                    style={{ padding: '6px 8px', borderRadius: 4, border: '1px solid #b0b8c5', width: 120 }}
+                    placeholder="Exact"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #b0b8c5', background: '#fff', color: '#1f3b6e', fontWeight: 600 }}
+                >
+                  Clear all filters
+                </button>
+              </div>
+
+              <div style={{ maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto', border: '1px solid #d4d4d4', borderRadius: 6, background: '#f5f8ff' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1500 }}>
                   <thead>
                     <tr style={{ background: '#1f3b6e', color: '#fff' }}>
                       <th style={{ ...thStyle, color: '#fff' }}>Select</th>
@@ -337,16 +451,27 @@ export default function PlayerInventory() {
                       <th style={{ ...thStyle, color: '#fff' }}>Activity</th>
                       <th style={{ ...thStyle, color: '#fff' }}>Attack</th>
                       <th style={{ ...thStyle, color: '#fff' }}>Crit</th>
-                      <th style={{ ...thStyle, color: '#fff' }}>Spec</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Secondary Crit</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Weapon Type</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Spec Type</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Extra TB MH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Extra TB OH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Roll Cap MH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Roll Cap OH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Crit Cap MH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Crit Cap OH</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Special Modifier TB</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Mana Cost</th>
+                      <th style={{ ...thStyle, color: '#fff' }}>Weight</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectableWeapons.length === 0 && (
+                    {filteredSelectableWeapons.length === 0 && (
                       <tr>
-                        <td style={emptyCellStyle} colSpan={6}>No additional weapons available.</td>
+                        <td style={emptyCellStyle} colSpan={17}>No additional weapons available.</td>
                       </tr>
                     )}
-                    {selectableWeapons.map((weapon) => (
+                    {filteredSelectableWeapons.map((weapon) => (
                       <tr key={weapon.id} style={{ borderBottom: '1px solid #d4d4d4', background: '#fff', color: '#123066' }}>
                         <td style={{ ...tdStyle, textAlign: 'center', color: '#123066' }}>
                           <input
@@ -360,7 +485,18 @@ export default function PlayerInventory() {
                         <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.activityType, ACTIVITY_LABELS)}</td>
                         <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.attackType, ATTACK_LABELS)}</td>
                         <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.critType, CRIT_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.secondaryCritType, CRIT_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.weaponType, WEAPON_TYPE_LABELS)}</td>
                         <td style={{ ...tdStyle, color: '#123066' }}>{displayValue(weapon.weaponSpecType, WEAPON_SPEC_LABELS)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.extraTBMH)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.extraTBOH)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.rollCapMH)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.rollCapOH)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.critCapMH ?? '—'}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.critCapOH ?? '—'}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.specialModofierTB)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{formatNumber(weapon.manaCost)}</td>
+                        <td style={{ ...tdStyle, color: '#123066' }}>{weapon.weight != null ? `${weapon.weight}` : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -430,7 +566,8 @@ const modalStyle: CSSProperties = {
   background: '#fff',
   borderRadius: 8,
   padding: 16,
-  width: 'min(860px, 94vw)',
+  width: '98vw',
+  maxWidth: 1600,
   maxHeight: '90vh',
   boxShadow: '0 16px 40px rgba(0,0,0,0.3)',
   display: 'flex',

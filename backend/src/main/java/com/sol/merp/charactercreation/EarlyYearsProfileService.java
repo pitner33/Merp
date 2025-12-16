@@ -20,6 +20,7 @@ import com.sol.merp.skills.PlayerSkillRepository;
 import com.sol.merp.skills.SkillDefinition;
 import com.sol.merp.skills.SkillDefinitionRepository;
 import jakarta.transaction.Transactional;
+ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -425,6 +426,7 @@ public class EarlyYearsProfileService {
 
     private void replaceLanguages(Player player, List<EarlyYearsProfileDto.LanguageDto> rows) {
         playerLanguageRepository.deleteByPlayer_Id(player.getId());
+        playerLanguageRepository.flush();
         if (rows == null || rows.isEmpty()) {
             return;
         }
