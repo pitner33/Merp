@@ -571,13 +571,15 @@ TODO      */
                 || attacker.getAttackType() == AttackType.magicBall
                 || attacker.getAttackType() == AttackType.magicProjectile) {
             startIdx = 14; // magic block
+        } else if (attacker.getAttackType() == AttackType.clawsAndFangs
+                || attacker.getAttackType() == AttackType.grabOrBalance) {
+            startIdx = 19; // special case: use MM block
         } else if (attacker.getPlayerActivity() == PlayerActivity._3PhisicalAttackOrMovement
                 || attacker.getAttackType() == AttackType.slashing
                 || attacker.getAttackType() == AttackType.dualWield
                 || attacker.getAttackType() == AttackType.blunt
                 || attacker.getAttackType() == AttackType.twoHanded
-                || attacker.getAttackType() == AttackType.clawsAndFangs
-                || attacker.getAttackType() == AttackType.grabOrBalance) {
+                ) {
             startIdx = 4; // weapon block
         } else {
             // Fallback to MM block if not matching above
@@ -627,10 +629,52 @@ TODO      */
         playerRepository.save(attacker);
     }
 
+    private int clampFailRoll(int value) {
+        if (value < 5) return 5;
+        if (value > 120) return 120;
+        return value;
+    }
+
+    private int computeFailRollModifierForAttacker(Player attacker) {
+        if (attacker == null || attacker.getAttackType() == null) return 0;
+
+        // Magic column
+        if (attacker.getAttackType() == AttackType.baseMagic) return 0;
+        if (attacker.getAttackType() == AttackType.magicProjectile) return 10;
+        if (attacker.getAttackType() == AttackType.magicBall) return 20;
+
+        // Ranged column
+        if (attacker.getAttackType() == AttackType.ranged) {
+            int[] choices = new int[]{-20, -10, 0, 10, 20};
+            int idx = (int) Math.floor(Math.random() * choices.length);
+            if (idx < 0) idx = 0;
+            if (idx >= choices.length) idx = choices.length - 1;
+            return choices[idx];
+        }
+
+        // Melee / weapon column
+        if (attacker.getAttackType() == AttackType.blunt) return -20;
+        if (attacker.getAttackType() == AttackType.slashing) return -10;
+        if (attacker.getAttackType() == AttackType.twoHanded) return 0;
+        if (attacker.getAttackType() == AttackType.dualWield) return 10;
+        if (attacker.getAttackType() == AttackType.clawsAndFangs || attacker.getAttackType() == AttackType.grabOrBalance) return -20;
+
+        return 0;
+    }
+
     // Public helper to apply fail effects to a specific attacker by a provided roll
     public AttackResultsDTO applyFailToAttackerByProvidedRoll(Player attacker, Integer providedRoll) {
         AttackResultsDTO dto = new AttackResultsDTO();
-        List<String> row = getFailResultRowByProvidedRoll(providedRoll);
+        int raw = (providedRoll == null ? 1 : providedRoll);
+        int modifier = computeFailRollModifierForAttacker(attacker);
+        int modified = raw + modifier;
+        int clamped = clampFailRoll(modified);
+        dto.setFailRollRaw(raw);
+        dto.setFailRollModifier(modifier);
+        dto.setFailRollModified(modified);
+        dto.setFailRollModifiedClamped(clamped);
+
+        List<String> row = getFailResultRowByProvidedRoll(clamped);
         if (attacker.getAttackType() == AttackType.baseMagic ||
                 attacker.getAttackType() == AttackType.magicBall ||
                 attacker.getAttackType() == AttackType.magicProjectile) {
@@ -647,8 +691,8 @@ TODO      */
 
     @Override
     public List<String> getFailRollResultRow() {
-        //fail roll open D100
-        Integer failRoll = d100Roll.d100RandomOpen();
+        //fail roll closed D100
+        Integer failRoll = d100Roll.d100Random();
         if (failRoll < 5) {
             failRoll = 5;
         }
@@ -844,14 +888,27 @@ TODO      */
         AttackResultsDTO attackResultsDTO = new AttackResultsDTO();
         attackResultsDTO.setAttackResult("Fail");
 
+        int raw = (failRoll == null ? 1 : failRoll);
+        int modifier = computeFailRollModifierForAttacker(attacker);
+        int modified = raw + modifier;
+        int clamped = clampFailRoll(modified);
+        attackResultsDTO.setFailRollRaw(raw);
+        attackResultsDTO.setFailRollModifier(modifier);
+        attackResultsDTO.setFailRollModified(modified);
+        attackResultsDTO.setFailRollModifiedClamped(clamped);
+
         // Apply bleeding damage on Fail
         attackResultsDTO.setFullDamage(defender.getHpLossPerRound());
         defender.setHpActual(defender.getHpActual() - attackResultsDTO.getFullDamage());
         logger.info("ATTACK FAIL: Defender actual HP after bleeding: {}", defender.getHpActual());
 
         // Determine fail text from provided roll and attack type
-        List<String> row = getFailResultRowByProvidedRoll(failRoll);
-        if (attacker.getAttackType().equals(AttackType.baseMagic) ||
+        List<String> row = getFailResultRowByProvidedRoll(clamped);
+        if (attacker.getAttackType().equals(AttackType.clawsAndFangs)
+                || attacker.getAttackType().equals(AttackType.grabOrBalance)) {
+            // Special case: take fail text from MM column
+            attackResultsDTO.setFailResultText(row != null && row.size() > 3 ? row.get(3) : "");
+        } else if (attacker.getAttackType().equals(AttackType.baseMagic) ||
                 attacker.getAttackType().equals(AttackType.magicBall) ||
                 attacker.getAttackType().equals(AttackType.magicProjectile)) {
             attackResultsDTO.setFailResultText(row.get(2));

@@ -83,19 +83,47 @@ public class MMServiceImpl implements MMService {
         return 1; // other
     }
 
+    private int mmFailModifierFromDifficulty(String difficulty) {
+        if (difficulty == null) return 0;
+        String s = difficulty.trim().toLowerCase();
+        if (s.equals("piece of cake")) return -50;
+        if (s.equals("very easy")) return -35;
+        if (s.equals("easy")) return -20;
+        if (s.equals("average")) return -10;
+        if (s.equals("hard")) return 0;
+        if (s.equals("very hard")) return 5;
+        if (s.equals("extremely hard")) return 10;
+        if (s.equals("insane")) return 15;
+        if (s.equals("absurd")) return 20;
+        return 0;
+    }
+
+    private int mmFailModifier(String mmType, String difficulty) {
+        if (mmType == null) return 0;
+        if (!"Movement".equalsIgnoreCase(mmType)) return 0;
+        return mmFailModifierFromDifficulty(difficulty);
+    }
+
     @Override
-    public MMFailResponse getFailText(int failRoll) {
-        int r = clamp(failRoll, 5, 120);
-        List<String> row = mapsFromTabs.getMapFail().get(r);
+    public MMFailResponse getFailText(int failRoll, String mmType, String difficulty) {
+        int raw = failRoll;
+        int mod = mmFailModifier(mmType, difficulty);
+        int modified = raw + mod;
+        int clamped = clamp(modified, 5, 120);
+        List<String> row = mapsFromTabs.getMapFail().get(clamped);
         String text = (row != null && row.size() > 3) ? row.get(3) : ""; // COL4 for MM text
         MMFailResponse resp = new MMFailResponse();
         resp.setFailResultText(text != null ? text : "");
         resp.setApplied(false);
+        resp.setFailRollRaw(raw);
+        resp.setFailRollModifier(mod);
+        resp.setFailRollModified(modified);
+        resp.setFailRollModifiedClamped(clamped);
         return resp;
     }
 
     @Override
-    public MMFailResponse applyFail(Long playerId, int failRoll) {
+    public MMFailResponse applyFail(Long playerId, int failRoll, String mmType, String difficulty) {
         MMFailResponse resp = new MMFailResponse();
         if (playerId == null) {
             resp.setFailResultText("");
@@ -108,7 +136,10 @@ public class MMServiceImpl implements MMService {
             resp.setApplied(false);
             return resp;
         }
-        int r = clamp(failRoll, 5, 120);
+        int raw = failRoll;
+        int mod = mmFailModifier(mmType, difficulty);
+        int modified = raw + mod;
+        int r = clamp(modified, 5, 120);
         List<String> row = mapsFromTabs.getMapFail().get(r);
         String text = (row != null && row.size() > 3) ? row.get(3) : ""; // COL4 text for MM
 
@@ -175,6 +206,10 @@ public class MMServiceImpl implements MMService {
 
         resp.setFailResultText(text != null ? text : "");
         resp.setApplied(true);
+        resp.setFailRollRaw(raw);
+        resp.setFailRollModifier(mod);
+        resp.setFailRollModified(modified);
+        resp.setFailRollModifiedClamped(r);
         resp.setFailResultAdditionalDamage(extra != null ? extra : 0);
         resp.setFailResultHPLossPerRound(bleed != null ? bleed : 0);
         resp.setFailResultStunnedForRounds(stun != null ? stun : 0);

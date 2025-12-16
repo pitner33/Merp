@@ -73,14 +73,12 @@ export default function AdventureFightRound() {
     modifiers: number;
     total: number;
   }>(null);
-  // Fail roll state (open-ended like attack roll)
+  // Fail roll state
   const [failEnabled, setFailEnabled] = useState(false);
   const [failRolling, setFailRolling] = useState(false);
   const [failTensFace, setFailTensFace] = useState<number>(0);
   const [failOnesFace, setFailOnesFace] = useState<number>(0);
   const [failLastRoll, setFailLastRoll] = useState<number | null>(null);
-  const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
-  const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
   const [failDto, setFailDto] = useState<null | { failResultText: string | null; fullDamage?: number | null }>(null);
   // Critical roll state
   const [critEnabled, setCritEnabled] = useState(false);
@@ -457,8 +455,6 @@ export default function AdventureFightRound() {
     setFailTensFace(0);
     setFailOnesFace(0);
     setFailLastRoll(null);
-    setFailOpenSign(0);
-    setFailOpenTotal(null);
     setFailDto(null);
     setSaveRolling(false);
     setSaveTensFace(0);
@@ -872,7 +868,6 @@ export default function AdventureFightRound() {
     }, 50);
 
     try {
-      // Perform one open-ended step
       const fetchPromise = fetch('http://localhost:8081/api/dice/d100').then((r) => {
         if (!r.ok) throw new Error('Fail dice roll failed');
         return r.json();
@@ -886,53 +881,23 @@ export default function AdventureFightRound() {
       setFailOnesFace(ones);
       setFailLastRoll(value);
 
-      // Compute next open-ended state locally to decide whether to close and resolve
-      let nextSign = failOpenSign;
-      let nextTotal = failOpenTotal == null ? null : failOpenTotal;
-
-      if (nextSign === 0 || nextTotal == null) {
-        if (value >= 96) {
-          nextSign = 1;
-          nextTotal = value;
-        } else if (value <= 4) {
-          nextSign = -1;
-          nextTotal = value;
-        } else {
-          nextSign = 0;
-          nextTotal = value;
-        }
-      } else {
-        const base = nextTotal == null ? 0 : nextTotal;
-        if (nextSign === 1) nextTotal = base + value;
-        if (nextSign === -1) nextTotal = base - value;
-        if (nextSign === 1 && value < 96) nextSign = 0;
-        if (nextSign === -1 && value > 4) nextSign = 0;
+      // Fail roll is NOT open-ended: first 1-100 is final (modifiers not applied here)
+      const resp = await fetch(`http://localhost:8081/api/fight/apply-attack-with-fail?failRoll=${value}`, { method: 'POST' });
+      if (!resp.ok) throw new Error('apply-attack-with-fail failed');
+      const dto = await resp.json();
+      const stunnedRounds = Number((dto as any)?.failResultStunnedForRounds ?? 0);
+      setFailDto(dto);
+      setFailEnabled(false);
+      await refreshPairFromBackend();
+      if (stunnedRounds > 0 && attacker?.id != null) {
+        await clearTargetForStunnedPlayer(attacker.id);
+        setAttackerRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
       }
-
-      // Push computed state to React
-      setFailOpenTotal(nextTotal);
-      setFailOpenSign(nextSign);
-
-      // If the sequence is now closed, apply fail to backend
-      const sequenceClosed = nextTotal != null && nextSign === 0;
-      if (sequenceClosed) {
-        const resp = await fetch(`http://localhost:8081/api/fight/apply-attack-with-fail?failRoll=${nextTotal}`, { method: 'POST' });
-        if (!resp.ok) throw new Error('apply-attack-with-fail failed');
-        const dto = await resp.json();
-        const stunnedRounds = Number((dto as any)?.failResultStunnedForRounds ?? 0);
-        setFailDto(dto);
-        setFailEnabled(false);
-        await refreshPairFromBackend();
-        if (stunnedRounds > 0 && attacker?.id != null) {
-          await clearTargetForStunnedPlayer(attacker.id);
-          setAttackerRef((prev) => (prev ? { ...prev, target: 'none' } : prev));
-        }
-        setPendingXpPersist(true);
-        if (isOffHandSequence) {
-          markOffHandComplete();
-        } else {
-          markOffHandReadyAfterPrimary();
-        }
+      setPendingXpPersist(true);
+      if (isOffHandSequence) {
+        markOffHandComplete();
+      } else {
+        markOffHandReadyAfterPrimary();
       }
     } catch (e: any) {
       setError(e?.message || 'Fail roll failed');
@@ -1286,8 +1251,6 @@ export default function AdventureFightRound() {
       setFailTensFace(0);
       setFailOnesFace(0);
       setFailLastRoll(null);
-      setFailOpenSign(0);
-      setFailOpenTotal(null);
       setFailDto(null);
       setResolveAttempted(false);
       setError(null);
@@ -1454,8 +1417,6 @@ export default function AdventureFightRound() {
         setFailTensFace(0);
         setFailOnesFace(0);
         setFailLastRoll(null);
-        setFailOpenSign(0);
-        setFailOpenTotal(null);
         setFailDto(null);
       }
     } catch (e: any) {
@@ -2836,6 +2797,23 @@ export default function AdventureFightRound() {
                   </div>
                   <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
                     <tbody>
+                      <tr style={{ background: '#f3f4f6' }}>
+                        <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll</td>
+                        <td><strong style={{ color: '#111' }}>{(failDto as any).failRollRaw ?? ''}</strong></td>
+                      </tr>
+                      <tr style={{ background: '#f3f4f6' }}>
+                        <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modifier</td>
+                        <td><strong style={{ color: '#111' }}>{(failDto as any).failRollModifier ?? 0}</strong></td>
+                      </tr>
+                      <tr style={{ background: '#f3f4f6' }}>
+                        <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modified (clamped)</td>
+                        <td><strong style={{ color: '#111' }}>{(failDto as any).failRollModifiedClamped ?? ''}</strong></td>
+                      </tr>
+                      <tr>
+                        <td colSpan={2} style={{ padding: 0 }}>
+                          <div style={{ height: 8 }} />
+                        </td>
+                      </tr>
                       <tr>
                         <td style={{ textAlign: 'left' }}>Extra dmg</td>
                         <td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultAdditionalDamage ?? 0}</strong></td>

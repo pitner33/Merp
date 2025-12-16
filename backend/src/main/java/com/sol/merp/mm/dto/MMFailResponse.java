@@ -9,6 +9,10 @@ public class MMFailResponse {
     private Integer failResultPenaltyOfActions;
     private Integer failResultPenaltyDurationRounds;
     private Boolean failResultsInstantDeath;
+    private Integer failRollRaw;
+    private Integer failRollModifier;
+    private Integer failRollModified;
+    private Integer failRollModifiedClamped;
 
     public String getFailResultText() { return failResultText; }
     public void setFailResultText(String failResultText) { this.failResultText = failResultText; }
@@ -33,4 +37,16 @@ public class MMFailResponse {
 
     public Boolean getFailResultsInstantDeath() { return failResultsInstantDeath; }
     public void setFailResultsInstantDeath(Boolean failResultsInstantDeath) { this.failResultsInstantDeath = failResultsInstantDeath; }
+
+    public Integer getFailRollRaw() { return failRollRaw; }
+    public void setFailRollRaw(Integer failRollRaw) { this.failRollRaw = failRollRaw; }
+
+    public Integer getFailRollModifier() { return failRollModifier; }
+    public void setFailRollModifier(Integer failRollModifier) { this.failRollModifier = failRollModifier; }
+
+    public Integer getFailRollModified() { return failRollModified; }
+    public void setFailRollModified(Integer failRollModified) { this.failRollModified = failRollModified; }
+
+    public Integer getFailRollModifiedClamped() { return failRollModifiedClamped; }
+    public void setFailRollModifiedClamped(Integer failRollModifiedClamped) { this.failRollModifiedClamped = failRollModifiedClamped; }
 }

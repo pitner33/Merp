@@ -78,8 +78,6 @@ export default function MM() {
   const [failTensFace, setFailTensFace] = useState<number>(0);
   const [failOnesFace, setFailOnesFace] = useState<number>(0);
   const [failLastRoll, setFailLastRoll] = useState<number | null>(null);
-  const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
-  const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
   const [failText, setFailText] = useState<string | null>(null);
   const [failDto, setFailDto] = useState<MMFailResponse | null>(null);
 
@@ -173,8 +171,6 @@ export default function MM() {
     setFailTensFace(0);
     setFailOnesFace(0);
     setFailLastRoll(null);
-    setFailOpenSign(0);
-    setFailOpenTotal(null);
     setFailText(null);
     setFailDto(null);
   }, [openTotal]);
@@ -224,8 +220,6 @@ export default function MM() {
             setFailTensFace(0);
             setFailOnesFace(0);
             setFailLastRoll(null);
-            setFailOpenSign(0);
-            setFailOpenTotal(null);
             setFailText(null);
           } else {
             setFailEnabled(false);
@@ -236,8 +230,6 @@ export default function MM() {
           setFailTensFace(0);
           setFailOnesFace(0);
           setFailLastRoll(null);
-          setFailOpenSign(0);
-          setFailOpenTotal(null);
           setFailText(null);
         }
       } catch (e: any) {
@@ -293,43 +285,25 @@ export default function MM() {
       setFailOnesFace(ones);
       setFailLastRoll(value);
 
-      // Compute next open-ended state locally
-      let nextSign = failOpenSign;
-      let nextTotal = failOpenTotal == null ? null : failOpenTotal;
-      if (nextSign === 0 || nextTotal == null) {
-        if (value >= 96) { nextSign = 1; nextTotal = value; }
-        else if (value <= 4) { nextSign = -1; nextTotal = value; }
-        else { nextSign = 0; nextTotal = value; }
-      } else {
-        const base = nextTotal == null ? 0 : nextTotal;
-        if (nextSign === 1) nextTotal = base + value;
-        if (nextSign === -1) nextTotal = base - value;
-        if (nextSign === 1 && value < 96) nextSign = 0;
-        if (nextSign === -1 && value > 4) nextSign = 0;
+      // MM fail roll is NOT open-ended: first 1-100 is final
+      const ft = await fetch(`http://localhost:8081/api/mm/fail-text?failRoll=${value}&mmType=${encodeURIComponent(mmType)}&difficulty=${encodeURIComponent(difficulty)}`);
+      if (ft.ok) {
+        const dto = (await ft.json()) as MMFailResponse;
+        setFailText(dto?.failResultText ?? null);
       }
-      setFailOpenTotal(nextTotal);
-      setFailOpenSign(nextSign);
 
-      const sequenceClosed = nextTotal != null && nextSign === 0;
-      if (sequenceClosed) {
-        // Fetch fail text and apply effects
-        const ft = await fetch(`http://localhost:8081/api/mm/fail-text?failRoll=${nextTotal}`);
-        if (ft.ok) {
-          const dto = (await ft.json()) as MMFailResponse;
-          setFailText(dto?.failResultText ?? null);
+      const pid = attacker?.id;
+      if (pid != null) {
+        const ap = await fetch(`http://localhost:8081/api/mm/apply-fail?playerId=${pid}&failRoll=${value}&mmType=${encodeURIComponent(mmType)}&difficulty=${encodeURIComponent(difficulty)}`, { method: 'POST' });
+        if (ap.ok) {
+          const dto = (await ap.json()) as MMFailResponse | null;
+          setFailDto(dto ?? null);
+          if (dto?.failResultText) setFailText(dto.failResultText);
+          await refreshAttackerFromServer(pid);
         }
-        const pid = attacker?.id;
-        if (pid != null) {
-          const ap = await fetch(`http://localhost:8081/api/mm/apply-fail?playerId=${pid}&failRoll=${nextTotal}`, { method: 'POST' });
-          if (ap.ok) {
-            const dto = (await ap.json()) as MMFailResponse | null;
-            setFailDto(dto ?? null);
-            if (dto?.failResultText) setFailText(dto.failResultText);
-            await refreshAttackerFromServer(pid);
-          }
-        }
-        setFailEnabled(false);
       }
+
+      setFailEnabled(false);
     } catch (e: any) {
       setError(e?.message || 'Fail roll failed');
     } finally {
@@ -1618,8 +1592,18 @@ export default function MM() {
                     {failRolling ? 'Rolling…' : 'Roll Fail'}
                   </button>
                   <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{failTensFace}</div>
-                    <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{failOnesFace}</div>
+                    {(() => {
+                      const tensFixed = (failLastRoll != null) ? (failLastRoll === 100 ? 0 : Math.floor(failLastRoll / 10)) : null;
+                      const onesFixed = (failLastRoll != null) ? (failLastRoll === 100 ? 0 : (failLastRoll % 10)) : null;
+                      const tensShow = failRolling ? failTensFace : (tensFixed != null ? tensFixed : failTensFace);
+                      const onesShow = failRolling ? failOnesFace : (onesFixed != null ? onesFixed : failOnesFace);
+                      return (
+                        <>
+                          <div className={`die tens${failRolling ? ' rolling' : ''}`} aria-label="fail-tens">{tensShow}</div>
+                          <div className={`die ones${failRolling ? ' rolling' : ''}`} aria-label="fail-ones">{onesShow}</div>
+                        </>
+                      );
+                    })()}
                   </div>
                   <span className="result-label" style={{ textAlign: 'center' }}>Fail roll</span>
                   <div className="result-box" title={failEnabled ? 'Fail roll available' : 'No fail required'}>
@@ -1639,6 +1623,23 @@ export default function MM() {
                     </div>
                     <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
                       <tbody>
+                        <tr style={{ background: '#f3f4f6' }}>
+                          <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll</td>
+                          <td><strong style={{ color: '#111' }}>{(failDto as any)?.failRollRaw ?? ''}</strong></td>
+                        </tr>
+                        <tr style={{ background: '#f3f4f6' }}>
+                          <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modifier</td>
+                          <td><strong style={{ color: '#111' }}>{(failDto as any)?.failRollModifier ?? 0}</strong></td>
+                        </tr>
+                        <tr style={{ background: '#f3f4f6' }}>
+                          <td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modified (clamped)</td>
+                          <td><strong style={{ color: '#111' }}>{(failDto as any)?.failRollModifiedClamped ?? ''}</strong></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={2} style={{ padding: 0 }}>
+                            <div style={{ height: 8 }} />
+                          </td>
+                        </tr>
                         <tr>
                           <td style={{ textAlign: 'left' }}>Extra dmg</td>
                           <td><strong style={{ color: failDto ? '#7a2e0c' : '#555' }}>{failDto?.failResultAdditionalDamage ?? 0}</strong></td>

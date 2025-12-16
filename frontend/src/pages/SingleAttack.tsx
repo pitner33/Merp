@@ -110,8 +110,6 @@ export default function SingleAttack() {
   const [failTensFace, setFailTensFace] = useState<number>(0);
   const [failOnesFace, setFailOnesFace] = useState<number>(0);
   const [failLastRoll, setFailLastRoll] = useState<number | null>(null);
-  const [failOpenSign, setFailOpenSign] = useState<0 | 1 | -1>(0);
-  const [failOpenTotal, setFailOpenTotal] = useState<number | null>(null);
   const [failDto, setFailDto] = useState<any>(null);
   const [offHandReady, setOffHandReady] = useState(false);
   const [isOffHandSequence, setIsOffHandSequence] = useState(false);
@@ -553,8 +551,6 @@ export default function SingleAttack() {
     setFailTensFace(0);
     setFailOnesFace(0);
     setFailLastRoll(null);
-    setFailOpenSign(0);
-    setFailOpenTotal(null);
     setFailDto(null);
   }
 
@@ -1518,7 +1514,7 @@ export default function SingleAttack() {
         // Enable fail roll box
         setFailEnabled(true);
         setFailRolling(false);
-        setFailTensFace(0); setFailOnesFace(0); setFailLastRoll(null); setFailOpenSign(0); setFailOpenTotal(null); setFailDto(null);
+        setFailTensFace(0); setFailOnesFace(0); setFailLastRoll(null); setFailDto(null);
       }
     } catch (e: any) {
       setError(e?.message || 'Resolve failed');
@@ -1763,36 +1759,20 @@ export default function SingleAttack() {
       const ones = value === 100 ? 0 : value % 10;
       setFailTensFace(tens); setFailOnesFace(ones); setFailLastRoll(value);
 
-      let nextSign = failOpenSign;
-      let nextTotal = failOpenTotal == null ? null : failOpenTotal;
-      if (nextSign === 0 || nextTotal == null) {
-        if (value >= 96) { nextSign = 1; nextTotal = value; }
-        else if (value <= 4) { nextSign = -1; nextTotal = value; }
-        else { nextSign = 0; nextTotal = value; }
-      } else {
-        const base = nextTotal == null ? 0 : nextTotal;
-        if (nextSign === 1) nextTotal = base + value;
-        if (nextSign === -1) nextTotal = base - value;
-        if (nextSign === 1 && value < 96) nextSign = 0;
-        if (nextSign === -1 && value > 4) nextSign = 0;
-      }
-      setFailOpenTotal(nextTotal); setFailOpenSign(nextSign);
+      // Fail roll is NOT open-ended: first 1-100 is final (modifiers not applied here)
 
-      const sequenceClosed = nextTotal != null && nextSign === 0;
-      if (sequenceClosed) {
-        // Apply fail directly to the selected attacker (independent of global pair)
-        const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
-        if (attackerId == null) throw new Error('No attacker selected');
-        const resp = await fetch(`http://localhost:8081/api/fight/apply-fail-to-attacker?attackerId=${encodeURIComponent(String(attackerId))}&failRoll=${nextTotal}`, { method: 'POST' });
-        if (!resp.ok) throw new Error('apply-fail-to-attacker failed');
-        const dto = await resp.json();
-        setFailDto(dto);
-        setFailEnabled(false);
-        // Fail effects typically affect attacker; refresh both to be safe
-        await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
-        broadcastAdventureRefresh();
-        setPendingXpPersist(true);
-      }
+      // Apply fail directly to the selected attacker (independent of global pair)
+      const attackerId = attacker?.id ?? (players || []).find((pl) => String(pl.characterId) === attackerToken)?.id;
+      if (attackerId == null) throw new Error('No attacker selected');
+      const resp = await fetch(`http://localhost:8081/api/fight/apply-fail-to-attacker?attackerId=${encodeURIComponent(String(attackerId))}&failRoll=${value}`, { method: 'POST' });
+      if (!resp.ok) throw new Error('apply-fail-to-attacker failed');
+      const dto = await resp.json();
+      setFailDto(dto);
+      setFailEnabled(false);
+      // Fail effects typically affect attacker; refresh both to be safe
+      await Promise.allSettled([refreshAttackerFromServer(), refreshDefenderFromServer()]);
+      broadcastAdventureRefresh();
+      setPendingXpPersist(true);
     } catch (e: any) {
       setError(e?.message || 'Fail roll failed');
     } finally {
@@ -2987,6 +2967,10 @@ export default function SingleAttack() {
                   </div>
                   <table className="table mods-table" style={{ width: '100%', maxWidth: 560 }}>
                     <tbody>
+                      <tr style={{ background: '#f3f4f6' }}><td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll</td><td><strong style={{ color: '#111' }}>{(failDto as any).failRollRaw ?? ''}</strong></td></tr>
+                      <tr style={{ background: '#f3f4f6' }}><td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modifier</td><td><strong style={{ color: '#111' }}>{(failDto as any).failRollModifier ?? 0}</strong></td></tr>
+                      <tr style={{ background: '#f3f4f6' }}><td style={{ textAlign: 'left', fontWeight: 700 }}>Fail roll modified (clamped)</td><td><strong style={{ color: '#111' }}>{(failDto as any).failRollModifiedClamped ?? ''}</strong></td></tr>
+                      <tr><td colSpan={2} style={{ padding: 0 }}><div style={{ height: 8 }} /></td></tr>
                       <tr><td style={{ textAlign: 'left' }}>Extra dmg</td><td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultAdditionalDamage ?? 0}</strong></td></tr>
                       <tr><td style={{ textAlign: 'left' }}>Bleeding (HP loss/round)</td><td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultHPLossPerRound ?? 0}</strong></td></tr>
                       <tr><td style={{ textAlign: 'left' }}>Stunned rounds</td><td><strong style={{ color: '#7a2e0c' }}>{(failDto as any).failResultStunnedForRounds ?? 0}</strong></td></tr>

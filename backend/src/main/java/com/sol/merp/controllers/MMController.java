@@ -24,15 +24,20 @@ public class MMController {
     }
 
     @GetMapping("/fail-text")
-    public MMFailResponse getFailText(@RequestParam("failRoll") int failRoll) {
-        return mmService.getFailText(failRoll);
+    public MMFailResponse getFailText(
+            @RequestParam("failRoll") int failRoll,
+            @RequestParam(value = "mmType", required = false) String mmType,
+            @RequestParam(value = "difficulty", required = false) String difficulty) {
+        return mmService.getFailText(failRoll, mmType, difficulty);
     }
 
     @PostMapping("/apply-fail")
     public MMFailResponse applyFail(
             @RequestParam("playerId") Long playerId,
-            @RequestParam("failRoll") int failRoll
+            @RequestParam("failRoll") int failRoll,
+            @RequestParam(value = "mmType", required = false) String mmType,
+            @RequestParam(value = "difficulty", required = false) String difficulty
     ) {
-        return mmService.applyFail(playerId, failRoll);
+        return mmService.applyFail(playerId, failRoll, mmType, difficulty);
     }
 }

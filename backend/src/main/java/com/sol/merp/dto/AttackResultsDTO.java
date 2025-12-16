@@ -29,6 +29,10 @@ public class AttackResultsDTO {
     private Integer failResultPenaltyOfActions;
     private Integer failResultPenaltyDurationRounds;
     private Boolean failResultsInstantDeath;
+    private Integer failRollRaw;
+    private Integer failRollModifier;
+    private Integer failRollModified;
+    private Integer failRollModifiedClamped;
 
     public AttackResultsDTO() {
         this.critResultText = "none";
@@ -45,5 +49,9 @@ public class AttackResultsDTO {
         this.failResultPenaltyOfActions = 0;
         this.failResultPenaltyDurationRounds = 0;
         this.failResultsInstantDeath = false;
+        this.failRollRaw = null;
+        this.failRollModifier = 0;
+        this.failRollModified = null;
+        this.failRollModifiedClamped = null;
     }
 }

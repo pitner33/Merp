@@ -655,8 +655,102 @@ public class ApiController {
     public ResponseEntity<Player> updatePlayer(@PathVariable Long id, @RequestBody Player updated) {
         return playerRepository.findById(id)
                 .map(existing -> {
-                    updated.setId(existing.getId());
-                    Player saved = playerRepository.save(updated);
+                    // Merge updates into the managed entity to avoid wiping relations (e.g. inventory) when
+                    // the client sends a partial Player payload.
+                    existing.setCharacterId(updated.getCharacterId());
+                    existing.setName(updated.getName());
+                    existing.setGender(updated.getGender());
+                    existing.setRace(updated.getRace());
+                    existing.setPlayerClass(updated.getPlayerClass());
+                    existing.setMagicSchool(updated.getMagicSchool());
+                    existing.setAge(updated.getAge());
+                    existing.setHeight(updated.getHeight());
+                    existing.setWeight(updated.getWeight());
+                    existing.setHair(updated.getHair());
+                    existing.setEyes(updated.getEyes());
+                    existing.setPersonality(updated.getPersonality());
+                    existing.setAlignment(updated.getAlignment());
+                    existing.setMotivation(updated.getMotivation());
+                    existing.setSpecialty(updated.getSpecialty());
+
+                    existing.setIsPlaying(updated.getIsPlaying());
+                    existing.setIsActive(updated.getIsActive());
+                    existing.setIsAlive(updated.getIsAlive());
+
+                    existing.setLvl(updated.getLvl());
+                    existing.setXp(updated.getXp());
+
+                    existing.setPlayerActivity(updated.getPlayerActivity());
+                    existing.setAttackType(updated.getAttackType());
+                    existing.setCritType(updated.getCritType());
+                    existing.setTarget(updated.getTarget());
+
+                    existing.setHpMax(updated.getHpMax());
+                    existing.setHpActual(updated.getHpActual());
+
+                    existing.setMm(updated.getMm());
+                    existing.setMmNone(updated.getMmNone());
+                    existing.setMmLeather(updated.getMmLeather());
+                    existing.setMmHeavyLeather(updated.getMmHeavyLeather());
+                    existing.setMmChainmail(updated.getMmChainmail());
+                    existing.setMmPlate(updated.getMmPlate());
+
+                    existing.setTb(updated.getTb());
+                    existing.setTb1HSlashing(updated.getTb1HSlashing());
+                    existing.setTb1HBlunt(updated.getTb1HBlunt());
+                    existing.setTbUnarmed(updated.getTbUnarmed());
+                    existing.setTbTwoHanded(updated.getTbTwoHanded());
+                    existing.setTbRanged(updated.getTbRanged());
+                    existing.setTbBaseMagic(updated.getTbBaseMagic());
+                    existing.setTbTargetMagic(updated.getTbTargetMagic());
+                    existing.setTbUsedForDefense(updated.getTbUsedForDefense());
+                    existing.setTbOffHand(updated.getTbOffHand());
+
+                    existing.setDualWield(updated.getDualWield());
+                    existing.setEquippedWeaponId(updated.getEquippedWeaponId());
+
+                    existing.setVb(updated.getVb());
+                    existing.setShield(updated.getShield());
+                    existing.setAgilityBonus(updated.getAgilityBonus());
+                    existing.setMdLenyeg(updated.getMdLenyeg());
+                    existing.setMdKapcsolat(updated.getMdKapcsolat());
+
+                    existing.setTotalManaBonus(updated.getTotalManaBonus());
+                    existing.setCurrentManaBonus(updated.getCurrentManaBonus());
+                    existing.setTotalPoisonMdBonus(updated.getTotalPoisonMdBonus());
+                    existing.setTotalDiseaseMdBonus(updated.getTotalDiseaseMdBonus());
+
+                    existing.setArmorType(updated.getArmorType());
+
+                    existing.setIsStunned(updated.getIsStunned());
+                    existing.setStunnedForRounds(updated.getStunnedForRounds());
+                    existing.setPenaltyOfActions(updated.getPenaltyOfActions());
+                    existing.setHpLossPerRound(updated.getHpLossPerRound());
+
+                    existing.setPerception(updated.getPerception());
+                    existing.setTracking(updated.getTracking());
+                    existing.setLockPicking(updated.getLockPicking());
+                    existing.setDisarmTraps(updated.getDisarmTraps());
+                    existing.setObjectUsage(updated.getObjectUsage());
+                    existing.setRunes(updated.getRunes());
+                    existing.setInfluence(updated.getInfluence());
+                    existing.setStealth(updated.getStealth());
+                    existing.setClimbing(updated.getClimbing());
+                    existing.setRiding(updated.getRiding());
+                    existing.setSwimming(updated.getSwimming());
+                    existing.setBackstab(updated.getBackstab());
+                    existing.setAcrobatics(updated.getAcrobatics());
+                    existing.setShips(updated.getShips());
+                    existing.setCaving(updated.getCaving());
+                    existing.setFirstAid(updated.getFirstAid());
+                    existing.setCooking(updated.getCooking());
+                    existing.setRopes(updated.getRopes());
+
+                    // Preserve relations like inventoryItems/playerSkills/spellLists/languages/attributeTotals/bonusAdjustments.
+                    // Only update the ElementCollection of penalty effects (used by Heal flow).
+                    existing.setActivePenaltyEffects(updated.getActivePenaltyEffects());
+
+                    Player saved = playerRepository.save(existing);
                     playerService.checkAndSetStats(saved);
                     return ResponseEntity.ok(saved);
                 })

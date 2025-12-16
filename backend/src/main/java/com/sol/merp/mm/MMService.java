@@ -5,6 +5,6 @@ import com.sol.merp.mm.dto.MMResolveResponse;
 
 public interface MMService {
     MMResolveResponse resolve(String mmType, String maneuverType, String difficulty, int modifiedRoll);
-    MMFailResponse getFailText(int failRoll);
-    MMFailResponse applyFail(Long playerId, int failRoll);
+    MMFailResponse getFailText(int failRoll, String mmType, String difficulty);
+    MMFailResponse applyFail(Long playerId, int failRoll, String mmType, String difficulty);
 }
