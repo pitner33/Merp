@@ -34,6 +34,9 @@ public class EarlyYearsProfileDto {
     @Builder.Default
     private List<SkillRowDto> skills = new ArrayList<>();
 
+    @Builder.Default
+    private List<CustomSecondarySkillRowDto> customSecondarySkills = new ArrayList<>();
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -132,5 +135,24 @@ public class EarlyYearsProfileDto {
         private Integer specialBonus;
         private Integer totalBonus;
         private Integer manualLevelInput;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CustomSecondarySkillRowDto {
+        private Integer slotIndex;
+        private String skillName;
+        private String attributeKey;
+        private Integer levelBonus;
+        private Integer levelCount;
+        private String levelsMask;
+        private Integer attributeBonus;
+        private Integer classBonus;
+        private Integer itemBonus;
+        private Integer specialBonus;
+        private Integer totalBonus;
     }
 }

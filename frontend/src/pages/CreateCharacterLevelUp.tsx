@@ -6,7 +6,8 @@ import {
   saveEarlyYearsProfile,
   type EarlyYearsProfileDto,
   type BonusAdjustmentDto,
-  type SkillRowDto as EarlyYearsSkillRowDto
+  type SkillRowDto as EarlyYearsSkillRowDto,
+  type CustomSecondarySkillRowDto
 } from '../api/earlyYears';
 import { isXpOverCap } from '../utils/xp';
 import type { Player } from '../types';
@@ -23,6 +24,7 @@ const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 const SKILL_LEVEL_COUNT = 30;
 const HP_MAX_SKILL_NAME = 'HP max';
+const CUSTOM_SECONDARY_SKILL_ROW_COUNT = 5;
 
 type SkillAttributeKey = AttributeKey | 'XX';
 type SkillCategory =
@@ -243,6 +245,15 @@ type SkillRowState = {
   hpMaxLevellingLevels?: boolean[];
 };
 
+type CustomSecondarySkillRowState = {
+  skillName: string;
+  attributeKey: AttributeKey | '';
+  levels: boolean[];
+  itemBonus: string;
+  specialBonus: string;
+  levelBonus: number;
+};
+
 type SkillPointBuckets = {
   mmSkills: number;
   weaponSkills: number;
@@ -404,7 +415,6 @@ function applySpellSkillPoints(spellLists: SpellListRow[], points: number): Spel
       break;
     }
   }
-
   return next;
 }
 
@@ -475,6 +485,16 @@ export default function CreateCharacterLevelUp() {
         manualLevelInput: isHpMax ? '0' : String(zeroLevelBonus)
       };
     })
+  );
+  const [customSecondarySkills, setCustomSecondarySkills] = useState<CustomSecondarySkillRowState[]>(() =>
+    Array.from({ length: CUSTOM_SECONDARY_SKILL_ROW_COUNT }, () => ({
+      skillName: '',
+      attributeKey: '',
+      levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+      itemBonus: '0',
+      specialBonus: '0',
+      levelBonus: -25
+    }))
   );
   const [skillPoints, setSkillPoints] = useState<SkillPointBuckets>({
     mmSkills: 0,
@@ -705,20 +725,7 @@ export default function CreateCharacterLevelUp() {
           learnt: !!from?.learnt
         };
       }
-      return rows;
-    });
 
-    setLanguages((prev) => {
-      const rows = [...prev];
-      const source = profile.languages ?? [];
-      for (let i = 0; i < rows.length; i += 1) {
-        const from = source[i];
-        rows[i] = {
-          id: rows[i].id,
-          name: from?.name ?? '',
-          level: from?.level != null ? String(from.level) : ''
-        };
-      }
       return rows;
     });
 
@@ -774,6 +781,30 @@ export default function CreateCharacterLevelUp() {
         };
       });
     });
+
+    const sourceCustom = profile.customSecondarySkills ?? [];
+    const normalizedCustom: CustomSecondarySkillRowState[] = Array.from(
+      { length: CUSTOM_SECONDARY_SKILL_ROW_COUNT },
+      (_, slotIndex) => {
+        const match = sourceCustom.find((row) => (row?.slotIndex ?? -1) === slotIndex);
+        const levelsMask = match?.levelsMask ?? '';
+        const levels = Array.from({ length: SKILL_LEVEL_COUNT }, (_, i) => levelsMask.charAt(i) === '1');
+        const levelCount = levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        const rawAttr = (match?.attributeKey ?? '').toString();
+        const attrKey = (ATTRIBUTE_KEYS as readonly string[]).includes(rawAttr)
+          ? (rawAttr as AttributeKey)
+          : '';
+        return {
+          skillName: match?.skillName ?? '',
+          attributeKey: attrKey,
+          levels,
+          itemBonus: match?.itemBonus != null ? String(match.itemBonus) : '0',
+          specialBonus: match?.specialBonus != null ? String(match.specialBonus) : '0',
+          levelBonus: match?.levelBonus != null ? match.levelBonus : (levelCount === 0 ? -25 : 0)
+        };
+      }
+    );
+    setCustomSecondarySkills(normalizedCustom);
   }, [profile]);
 
   function handleBack() {
@@ -920,6 +951,37 @@ export default function CreateCharacterLevelUp() {
     });
     return map;
   }, [attributeRows]);
+
+  const attributeBonusOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Select…' },
+      ...ATTRIBUTE_KEYS.map((key) => {
+        const row = attributeRowMap.get(key);
+        const bonus = row ? row.totalBonus ?? row.normalBonus ?? 0 : 0;
+        return { value: key, label: `${key} (${formatSigned(bonus)})` };
+      })
+    ];
+  }, [attributeRowMap]);
+
+  const customSecondaryDisplayRows = useMemo(() => {
+    return customSecondarySkills.map((row, slotIndex) => {
+      const attributeRow = row.attributeKey ? attributeRowMap.get(row.attributeKey) : undefined;
+      const attributeBonus = attributeRow ? attributeRow.totalBonus ?? attributeRow.normalBonus ?? 0 : 0;
+      const levelCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      const itemBonus = parseBonusInput(row.itemBonus);
+      const specialBonus = parseBonusInput(row.specialBonus);
+      const totalBonus = row.levelBonus + attributeBonus + itemBonus + specialBonus;
+      return {
+        slotIndex,
+        state: row,
+        attributeBonus,
+        levelCount,
+        itemBonus,
+        specialBonus,
+        totalBonus
+      };
+    });
+  }, [attributeRowMap, customSecondarySkills]);
 
   const skillDisplayRows = useMemo(() => {
     return SKILL_DEFINITIONS_WITH_INDEX.map((definition) => {
@@ -1102,6 +1164,22 @@ export default function CreateCharacterLevelUp() {
     });
   }
 
+  function buildCustomSecondarySkills(): CustomSecondarySkillRowDto[] {
+    return customSecondaryDisplayRows.map((row) => ({
+      slotIndex: row.slotIndex,
+      skillName: row.state.skillName || null,
+      attributeKey: row.state.attributeKey || null,
+      levelBonus: row.state.levelBonus,
+      levelCount: row.levelCount,
+      levelsMask: buildLevelsMask(row.state.levels),
+      attributeBonus: row.attributeBonus,
+      classBonus: 0,
+      itemBonus: row.itemBonus,
+      specialBonus: row.specialBonus,
+      totalBonus: row.totalBonus
+    }));
+  }
+
   function buildLevelUpProfileDto(): EarlyYearsProfileDto {
     const attributes = attributeRows.map((row) => ({
       attributeKey: row.attribute,
@@ -1151,8 +1229,69 @@ export default function CreateCharacterLevelUp() {
       spellLists: spellListsDto,
       languages: languagesDto,
       bonusAdjustments: buildLevelUpBonusAdjustments(),
-      skills: buildLevelUpSkills()
+      skills: buildLevelUpSkills(),
+      customSecondarySkills: buildCustomSecondarySkills()
     };
+  }
+
+  function handleCustomSecondarySkillChange(slotIndex: number, changes: Partial<CustomSecondarySkillRowState>) {
+    setCustomSecondarySkills((prev) => prev.map((row, idx) => {
+      if (idx !== slotIndex) return row;
+      return { ...row, ...changes };
+    }));
+  }
+
+  function handleCustomSecondarySkillLevelToggle(slotIndex: number, levelIndex: number, checked: boolean) {
+    const currentRow = customSecondarySkills[slotIndex];
+    if (!currentRow) {
+      return;
+    }
+
+    const skillName = (currentRow.skillName ?? '').trim();
+    if (!skillName && checked) {
+      // Mirror normal skill behavior: skills always have names.
+      // Prevent spending points on unnamed custom rows.
+      return;
+    }
+
+    const prevLevels = currentRow.levels;
+    const prevUnlockedCount = prevLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+    const nextLevels = [...prevLevels];
+    nextLevels[levelIndex] = checked;
+    const nextUnlockedCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+    const levelCount = nextUnlockedCount;
+
+    const bucketKey = getSkillPointBucketKeyForCategory('Secondary skills');
+    let costDelta = 0;
+    if (bucketKey) {
+      const prevCost = getRowSkillPointCost(prevUnlockedCount);
+      const nextCost = getRowSkillPointCost(nextUnlockedCount);
+      costDelta = nextCost - prevCost;
+      if (costDelta > 0 && skillPoints[bucketKey] < costDelta) {
+        return;
+      }
+    }
+
+    setCustomSecondarySkills((prev) => prev.map((row, idx) => {
+      if (idx !== slotIndex) return row;
+      const nextLevelBonus = levelCount === 0 ? -25 : row.levelBonus;
+      return {
+        ...row,
+        levels: nextLevels,
+        levelBonus: nextLevelBonus
+      };
+    }));
+
+    if (bucketKey && costDelta !== 0) {
+      setSkillPoints((prev) => ({
+        ...prev,
+        [bucketKey]: prev[bucketKey] - costDelta
+      }));
+    }
+
+    if (levelCount > 0) {
+      void fetchCustomSecondarySkillLevelBonus(slotIndex, skillName, levelCount);
+    }
   }
 
   function handleBaseDataChange<Key extends keyof BaseDataState>(key: Key, value: BaseDataState[Key]) {
@@ -1351,6 +1490,52 @@ export default function CreateCharacterLevelUp() {
         }
         const fallbackBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : 0;
         return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: fallbackBonus } : row));
+      });
+    }
+  }
+
+  async function fetchCustomSecondarySkillLevelBonus(slotIndex: number, skillName: string, levelCount: number) {
+    const normalizedName = (skillName ?? '').trim();
+    if (!normalizedName) {
+      return;
+    }
+    const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(normalizedName, levelCount);
+    try {
+      const response = await fetch(endpoint);
+      let bonus = 0;
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = typeof data === 'number' ? data : Number.parseInt(String(data), 10);
+        bonus = Number.isFinite(parsed) ? parsed : 0;
+      } else if (response.status !== 404) {
+        throw new Error(`Failed to load skill level bonus for ${normalizedName}`);
+      }
+
+      setCustomSecondarySkills((prev) => {
+        const currentRow = prev[slotIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const resolvedBonus = levelCount === 0 ? -25 : bonus;
+        return prev.map((row, index) => (index === slotIndex ? { ...row, levelBonus: resolvedBonus } : row));
+      });
+    } catch (error) {
+      console.warn('Failed to fetch custom skill level bonus', error);
+      setCustomSecondarySkills((prev) => {
+        const currentRow = prev[slotIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const fallbackBonus = levelCount === 0 ? -25 : 0;
+        return prev.map((row, index) => (index === slotIndex ? { ...row, levelBonus: fallbackBonus } : row));
       });
     }
   }
@@ -2684,6 +2869,72 @@ export default function CreateCharacterLevelUp() {
                                   className="skill-bonus-input"
                                   value={row.state.specialBonus}
                                   onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'specialBonus', event.target.value)}
+                                />
+                              </td>
+                              <td className="center middle"><strong>{row.totalBonus}</strong></td>
+                            </tr>
+                          ))}
+                          {group.category === 'Secondary skills' && customSecondaryDisplayRows.map((row) => (
+                            <tr key={`custom-secondary-${row.slotIndex}`}>
+                              <td>
+                                <input
+                                  type="text"
+                                  className="skill-bonus-input"
+                                  value={row.state.skillName}
+                                  onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { skillName: event.target.value })}
+                                  placeholder={`Custom skill ${row.slotIndex + 1}`}
+                                />
+                              </td>
+                              <td>
+                                <div className="skill-levels" aria-label={`Custom secondary skill ${row.slotIndex + 1} levels`}>
+                                  {row.state.levels.map((checked, levelIndex) => {
+                                    const inputId = `custom-secondary-${row.slotIndex}-level-${levelIndex}`;
+                                    const isNewLevel = !checked;
+                                    const shouldDisable = isNewLevel && isCategoryDepleted;
+                                    return (
+                                      <label key={levelIndex} htmlFor={inputId}>
+                                        <input
+                                          id={inputId}
+                                          type="checkbox"
+                                          checked={checked}
+                                          disabled={shouldDisable}
+                                          onChange={(event) => handleCustomSecondarySkillLevelToggle(row.slotIndex, levelIndex, event.target.checked)}
+                                          aria-label={`Level ${levelIndex + 1}`}
+                                        />
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </td>
+                              <td className="center">{row.state.levelBonus}</td>
+                              <td>
+                                <select
+                                  className="skill-bonus-input"
+                                  value={row.state.attributeKey}
+                                  onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { attributeKey: event.target.value as AttributeKey | '' })}
+                                >
+                                  {attributeBonusOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="center">0</td>
+                              <td className="center">
+                                <input
+                                  type="number"
+                                  className="skill-bonus-input"
+                                  value={row.state.itemBonus}
+                                  onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { itemBonus: event.target.value })}
+                                />
+                              </td>
+                              <td className="center">
+                                <input
+                                  type="number"
+                                  className="skill-bonus-input"
+                                  value={row.state.specialBonus}
+                                  onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { specialBonus: event.target.value })}
                                 />
                               </td>
                               <td className="center middle"><strong>{row.totalBonus}</strong></td>

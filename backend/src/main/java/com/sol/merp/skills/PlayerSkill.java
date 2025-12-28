@@ -18,7 +18,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "player_skills", uniqueConstraints = @UniqueConstraint(columnNames = {"player_id", "skill_definition_id"}))
+@Table(
+        name = "player_skills",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"player_id", "skill_definition_id"}),
+                @UniqueConstraint(columnNames = {"player_id", "custom_slot_index"})
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,9 +39,18 @@ public class PlayerSkill {
     @JoinColumn(name = "player_id")
     private Player player;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "skill_definition_id")
     private SkillDefinition skillDefinition;
+
+    @Column(name = "custom_name", length = 120)
+    private String customName;
+
+    @Column(name = "custom_attribute_key", length = 32)
+    private String customAttributeKey;
+
+    @Column(name = "custom_slot_index")
+    private Integer customSlotIndex;
 
     @Column(nullable = false)
     private int levelBonus = 0;

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { post } from '../api/client';
-import { saveEarlyYearsProfile, type EarlyYearsProfileDto, type BonusAdjustmentDto, type SkillRowDto as EarlyYearsSkillRowDto } from '../api/earlyYears';
+import { saveEarlyYearsProfile, type EarlyYearsProfileDto, type BonusAdjustmentDto, type SkillRowDto as EarlyYearsSkillRowDto, type CustomSecondarySkillRowDto } from '../api/earlyYears';
 
 const COLORS = {
   primary: '#2f5597',
@@ -15,6 +15,7 @@ const ATTRIBUTE_KEYS = ['STR', 'DEX', 'CON', 'IQ', 'IT', 'CH'] as const;
 type AttributeKey = (typeof ATTRIBUTE_KEYS)[number];
 const SKILL_LEVEL_COUNT = 30;
 const HP_MAX_SKILL_NAME = 'HP max';
+const CUSTOM_SECONDARY_SKILL_ROW_COUNT = 5;
 
 type SkillAttributeKey = AttributeKey | 'XX';
 type SkillCategory =
@@ -231,6 +232,15 @@ type SkillRowState = {
   manualLevelInput: string;
 };
 
+type CustomSecondarySkillRowState = {
+  skillName: string;
+  attributeKey: AttributeKey | '';
+  levels: boolean[];
+  itemBonus: string;
+  specialBonus: string;
+  levelBonus: number;
+};
+
 type ChildhoodMetaState = {
   spellLearningChancePercent: number | null;
   languageLevels: number | null;
@@ -383,6 +393,16 @@ export default function CreateCharacterEarlyYears() {
         manualLevelInput: isHpMax ? '0' : String(zeroLevelBonus)
       };
     })
+  );
+  const [customSecondarySkills, setCustomSecondarySkills] = useState<CustomSecondarySkillRowState[]>(() =>
+    Array.from({ length: CUSTOM_SECONDARY_SKILL_ROW_COUNT }, () => ({
+      skillName: '',
+      attributeKey: '',
+      levels: Array.from({ length: SKILL_LEVEL_COUNT }, () => false),
+      itemBonus: '0',
+      specialBonus: '0',
+      levelBonus: -25
+    }))
   );
   const characterLevel = 1;
   const [childhoodMeta, setChildhoodMeta] = useState<ChildhoodMetaState>(() => createEmptyChildhoodMeta());
@@ -644,6 +664,37 @@ export default function CreateCharacterEarlyYears() {
     });
   }, [attributeRowMap, skillRows]);
 
+  const attributeBonusOptions = useMemo(() => {
+    return [
+      { value: '', label: 'Select…' },
+      ...ATTRIBUTE_KEYS.map((key) => {
+        const row = attributeRowMap.get(key);
+        const bonus = row ? row.totalBonus ?? row.normalBonus ?? 0 : 0;
+        return { value: key, label: `${key} (${formatSigned(bonus)})` };
+      })
+    ];
+  }, [attributeRowMap]);
+
+  const customSecondaryDisplayRows = useMemo(() => {
+    return customSecondarySkills.map((row, slotIndex) => {
+      const attributeRow = row.attributeKey ? attributeRowMap.get(row.attributeKey) : undefined;
+      const attributeBonus = attributeRow ? attributeRow.totalBonus ?? attributeRow.normalBonus ?? 0 : 0;
+      const levelCount = row.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+      const itemBonus = parseBonusInput(row.itemBonus);
+      const specialBonus = parseBonusInput(row.specialBonus);
+      const totalBonus = row.levelBonus + attributeBonus + itemBonus + specialBonus;
+      return {
+        slotIndex,
+        state: row,
+        attributeBonus,
+        levelCount,
+        itemBonus,
+        specialBonus,
+        totalBonus
+      };
+    });
+  }, [attributeRowMap, customSecondarySkills]);
+
   const manaBonusRow = useMemo(() => {
     const magicSchool = baseData.magicSchool?.trim();
     const manaAttributeKey: AttributeKey | null = magicSchool === 'channeling'
@@ -796,6 +847,22 @@ export default function CreateCharacterEarlyYears() {
     });
   }
 
+  function buildCustomSecondarySkills(): CustomSecondarySkillRowDto[] {
+    return customSecondaryDisplayRows.map((row) => ({
+      slotIndex: row.slotIndex,
+      skillName: row.state.skillName || null,
+      attributeKey: row.state.attributeKey || null,
+      levelBonus: row.state.levelBonus,
+      levelCount: row.levelCount,
+      levelsMask: buildLevelsMask(row.state.levels),
+      attributeBonus: row.attributeBonus,
+      classBonus: 0,
+      itemBonus: row.itemBonus,
+      specialBonus: row.specialBonus,
+      totalBonus: row.totalBonus
+    }));
+  }
+
   function buildEarlyYearsProfileDto(): EarlyYearsProfileDto {
     const attributes = attributeRows.map((row) => ({
       attributeKey: row.attribute,
@@ -843,8 +910,44 @@ export default function CreateCharacterEarlyYears() {
       spellLists: spellListsDto,
       languages: languagesDto,
       bonusAdjustments: buildEarlyYearsBonusAdjustments(),
-      skills: buildEarlyYearsSkills()
+      skills: buildEarlyYearsSkills(),
+      customSecondarySkills: buildCustomSecondarySkills()
     };
+  }
+
+  function handleCustomSecondarySkillChange(slotIndex: number, changes: Partial<CustomSecondarySkillRowState>) {
+    setCustomSecondarySkills((prev) => prev.map((row, idx) => {
+      if (idx !== slotIndex) return row;
+      return { ...row, ...changes };
+    }));
+  }
+
+  function handleCustomSecondarySkillLevelToggle(slotIndex: number, levelIndex: number, checked: boolean) {
+    const currentRow = customSecondarySkills[slotIndex];
+    if (!currentRow) {
+      return;
+    }
+
+    const skillName = (currentRow.skillName ?? '').trim();
+    if (!skillName && checked) {
+      return;
+    }
+
+    const nextLevels = [...currentRow.levels];
+    nextLevels[levelIndex] = checked;
+    const levelCount = nextLevels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+
+    setCustomSecondarySkills((prev) => prev.map((row, idx) => {
+      if (idx !== slotIndex) return row;
+      const nextLevelBonus = levelCount === 0 ? -25 : row.levelBonus;
+      return {
+        ...row,
+        levels: nextLevels,
+        levelBonus: nextLevelBonus
+      };
+    }));
+
+    void fetchCustomSecondarySkillLevelBonus(slotIndex, skillName, levelCount);
   }
 
   function handleMdBonusChange(index: number, key: 'itemBonus' | 'specialBonus', value: string) {
@@ -975,6 +1078,52 @@ export default function CreateCharacterEarlyYears() {
         }
         const fallbackBonus = levelCount === 0 ? getZeroLevelBonus(skillName) : 0;
         return prev.map((row, index) => (index === skillIndex ? { ...row, levelBonus: fallbackBonus } : row));
+      });
+    }
+  }
+
+  async function fetchCustomSecondarySkillLevelBonus(slotIndex: number, skillName: string, levelCount: number) {
+    const normalizedName = (skillName ?? '').trim();
+    if (!normalizedName) {
+      return;
+    }
+    const endpoint = SKILL_LEVEL_BONUS_ENDPOINT(normalizedName, levelCount);
+    try {
+      const response = await fetch(endpoint);
+      let bonus = 0;
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = typeof data === 'number' ? data : Number.parseInt(String(data), 10);
+        bonus = Number.isFinite(parsed) ? parsed : 0;
+      } else if (response.status !== 404) {
+        throw new Error(`Failed to load skill level bonus for ${normalizedName}`);
+      }
+
+      setCustomSecondarySkills((prev) => {
+        const currentRow = prev[slotIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const resolvedBonus = levelCount === 0 ? -25 : bonus;
+        return prev.map((row, index) => (index === slotIndex ? { ...row, levelBonus: resolvedBonus } : row));
+      });
+    } catch (error) {
+      console.warn('Failed to fetch custom skill level bonus', error);
+      setCustomSecondarySkills((prev) => {
+        const currentRow = prev[slotIndex];
+        if (!currentRow) {
+          return prev;
+        }
+        const currentCount = currentRow.levels.reduce((total, selected) => (selected ? total + 1 : total), 0);
+        if (currentCount !== levelCount) {
+          return prev;
+        }
+        const fallbackBonus = levelCount === 0 ? -25 : 0;
+        return prev.map((row, index) => (index === slotIndex ? { ...row, levelBonus: fallbackBonus } : row));
       });
     }
   }
@@ -2267,6 +2416,66 @@ export default function CreateCharacterEarlyYears() {
                               className="skill-bonus-input"
                               value={row.state.specialBonus}
                               onChange={(event) => handleSkillBonusChange(row.definition.stateIndex, 'specialBonus', event.target.value)}
+                            />
+                          </td>
+                          <td className="center middle"><strong>{row.totalBonus}</strong></td>
+                        </tr>
+                      ))}
+                      {group.category === 'Secondary skills' && customSecondaryDisplayRows.map((row) => (
+                        <tr key={`custom-secondary-${row.slotIndex}`}>
+                          <td>
+                            <input
+                              type="text"
+                              className="skill-bonus-input"
+                              value={row.state.skillName}
+                              onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { skillName: event.target.value })}
+                              placeholder={`Custom skill ${row.slotIndex + 1}`}
+                            />
+                          </td>
+                          <td>
+                            <div className="skill-levels" aria-label={`Custom secondary skill ${row.slotIndex + 1} levels`}>
+                              {row.state.levels.map((checked, levelIndex) => (
+                                <label key={levelIndex} htmlFor={`custom-secondary-${row.slotIndex}-level-${levelIndex}`}>
+                                  <input
+                                    id={`custom-secondary-${row.slotIndex}-level-${levelIndex}`}
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) => handleCustomSecondarySkillLevelToggle(row.slotIndex, levelIndex, event.target.checked)}
+                                    aria-label={`Level ${levelIndex + 1}`}
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="center">{row.state.levelBonus}</td>
+                          <td>
+                            <select
+                              className="skill-bonus-input"
+                              value={row.state.attributeKey}
+                              onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { attributeKey: event.target.value as AttributeKey | '' })}
+                            >
+                              {attributeBonusOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="center">0</td>
+                          <td className="center">
+                            <input
+                              type="number"
+                              className="skill-bonus-input"
+                              value={row.state.itemBonus}
+                              onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { itemBonus: event.target.value })}
+                            />
+                          </td>
+                          <td className="center">
+                            <input
+                              type="number"
+                              className="skill-bonus-input"
+                              value={row.state.specialBonus}
+                              onChange={(event) => handleCustomSecondarySkillChange(row.slotIndex, { specialBonus: event.target.value })}
                             />
                           </td>
                           <td className="center middle"><strong>{row.totalBonus}</strong></td>

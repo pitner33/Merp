@@ -7,6 +7,7 @@ export type EarlyYearsProfileDto = {
   languages?: LanguageDto[];
   bonusAdjustments?: BonusAdjustmentDto[];
   skills?: SkillRowDto[];
+  customSecondarySkills?: CustomSecondarySkillRowDto[];
 };
 
 export type BaseDataDto = {
@@ -77,6 +78,20 @@ export type SkillRowDto = {
   specialBonus?: number | null;
   totalBonus?: number | null;
   manualLevelInput?: number | null;
+};
+
+export type CustomSecondarySkillRowDto = {
+  slotIndex?: number | null;
+  skillName?: string | null;
+  attributeKey?: string | null;
+  levelBonus?: number | null;
+  levelCount?: number | null;
+  levelsMask?: string | null;
+  attributeBonus?: number | null;
+  classBonus?: number | null;
+  itemBonus?: number | null;
+  specialBonus?: number | null;
+  totalBonus?: number | null;
 };
 
 export async function fetchEarlyYearsProfile(playerId: number) {

@@ -71,6 +71,7 @@ public class EarlyYearsProfileService {
         replaceAttributeTotals(player, payload.getAttributes());
         replaceBonusAdjustments(player, payload.getBonusAdjustments());
         updateSkillRows(player, payload.getSkills());
+        updateCustomSecondarySkills(player, payload.getCustomSecondarySkills());
 
         applyAggregatedStats(player, payload);
 
@@ -152,11 +153,14 @@ public class EarlyYearsProfileService {
                         .build())
                 .toList();
 
-        List<EarlyYearsProfileDto.SkillRowDto> skills = playerSkillRepository.findByPlayer_Id(playerId)
+        List<PlayerSkill> allPlayerSkills = playerSkillRepository.findByPlayer_Id(playerId);
+
+        List<EarlyYearsProfileDto.SkillRowDto> skills = allPlayerSkills
                 .stream()
+                .filter(entity -> entity.getSkillDefinition() != null)
                 .map(entity -> EarlyYearsProfileDto.SkillRowDto.builder()
-                        .skillDefinitionId(entity.getSkillDefinition() != null ? entity.getSkillDefinition().getId() : null)
-                        .skillName(entity.getSkillDefinition() != null ? entity.getSkillDefinition().getName() : null)
+                        .skillDefinitionId(entity.getSkillDefinition().getId())
+                        .skillName(entity.getSkillDefinition().getName())
                         .levelBonus(entity.getLevelBonus())
                         .levelCount(entity.getLevelCount())
                         .levelsMask(entity.getLevelsMask())
@@ -169,6 +173,26 @@ public class EarlyYearsProfileService {
                         .build())
                 .toList();
 
+        List<EarlyYearsProfileDto.CustomSecondarySkillRowDto> customSecondarySkills = allPlayerSkills
+                .stream()
+                .filter(entity -> entity.getSkillDefinition() == null)
+                .filter(entity -> entity.getCustomSlotIndex() != null)
+                .sorted(Comparator.comparing(PlayerSkill::getCustomSlotIndex))
+                .map(entity -> EarlyYearsProfileDto.CustomSecondarySkillRowDto.builder()
+                        .slotIndex(entity.getCustomSlotIndex())
+                        .skillName(trimToNull(entity.getCustomName()))
+                        .attributeKey(trimToNull(entity.getCustomAttributeKey()))
+                        .levelBonus(entity.getLevelBonus())
+                        .levelCount(entity.getLevelCount())
+                        .levelsMask(entity.getLevelsMask())
+                        .attributeBonus(entity.getAttributeBonus())
+                        .classBonus(entity.getClassBonus())
+                        .itemBonus(entity.getItemBonus())
+                        .specialBonus(entity.getSpecialBonus())
+                        .totalBonus(entity.getTotalBonus())
+                        .build())
+                .toList();
+
         return EarlyYearsProfileDto.builder()
                 .baseData(baseData)
                 .spellLists(spellLists)
@@ -176,6 +200,7 @@ public class EarlyYearsProfileService {
                 .attributes(attributes)
                 .bonusAdjustments(bonusAdjustments)
                 .skills(skills)
+                .customSecondarySkills(customSecondarySkills)
                 .build();
     }
 
@@ -627,6 +652,75 @@ public class EarlyYearsProfileService {
             skill.setTotalBonus(defaultValue(row.getTotalBonus()));
             skill.setManualLevelInput(row.getManualLevelInput());
             toSave.add(skill);
+        }
+        if (!toSave.isEmpty()) {
+            playerSkillRepository.saveAll(toSave);
+        }
+    }
+
+    private void updateCustomSecondarySkills(Player player, List<EarlyYearsProfileDto.CustomSecondarySkillRowDto> rows) {
+        if (player == null) {
+            return;
+        }
+        List<PlayerSkill> existingSkills = playerSkillRepository.findByPlayer_Id(player.getId());
+        Map<Integer, PlayerSkill> existingBySlot = existingSkills.stream()
+                .filter(skill -> skill.getSkillDefinition() == null)
+                .filter(skill -> skill.getCustomSlotIndex() != null)
+                .collect(Collectors.toMap(PlayerSkill::getCustomSlotIndex, skill -> skill, (a, b) -> a));
+
+        if (rows == null || rows.isEmpty()) {
+            // If nothing is submitted, keep existing custom skills as-is (LevelUp can send partial payloads)
+            return;
+        }
+
+        List<PlayerSkill> toDelete = new ArrayList<>();
+        List<PlayerSkill> toSave = new ArrayList<>();
+
+        for (EarlyYearsProfileDto.CustomSecondarySkillRowDto row : rows) {
+            if (row == null) {
+                continue;
+            }
+
+            Integer slotIndex = row.getSlotIndex();
+            if (slotIndex == null || slotIndex < 0 || slotIndex > 4) {
+                continue;
+            }
+
+            String name = trimToNull(row.getSkillName());
+            String attributeKey = trimToNull(row.getAttributeKey());
+
+            PlayerSkill entity = existingBySlot.get(slotIndex);
+            if (name == null) {
+                if (entity != null) {
+                    toDelete.add(entity);
+                }
+                continue;
+            }
+
+            if (entity == null) {
+                entity = PlayerSkill.builder()
+                        .player(player)
+                        .skillDefinition(null)
+                        .customSlotIndex(slotIndex)
+                        .build();
+            }
+
+            entity.setCustomName(name);
+            entity.setCustomAttributeKey(attributeKey);
+            entity.setLevelBonus(defaultValue(row.getLevelBonus()));
+            entity.setLevelCount(defaultValue(row.getLevelCount()));
+            entity.setLevelsMask(trimToEmpty(row.getLevelsMask()));
+            entity.setAttributeBonus(defaultValue(row.getAttributeBonus()));
+            entity.setClassBonus(defaultValue(row.getClassBonus()));
+            entity.setItemBonus(defaultValue(row.getItemBonus()));
+            entity.setSpecialBonus(defaultValue(row.getSpecialBonus()));
+            entity.setTotalBonus(defaultValue(row.getTotalBonus()));
+            entity.setManualLevelInput(null);
+            toSave.add(entity);
+        }
+
+        if (!toDelete.isEmpty()) {
+            playerSkillRepository.deleteAll(toDelete);
         }
         if (!toSave.isEmpty()) {
             playerSkillRepository.saveAll(toSave);
