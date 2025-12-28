@@ -515,7 +515,9 @@ public class PlayerServiceImpl implements PlayerService {
                 break;
             case dualWield: {
                 int baseMain;
-                if (player.getCritType() == CritType.blunt) {
+                if (player.getCritType() == CritType.crushing) {
+                    baseMain = player.getTbUnarmed();
+                } else if (player.getCritType() == CritType.blunt) {
                     baseMain = player.getTb1HBlunt();
                 } else {
                     baseMain = player.getTb1HSlashing();

@@ -63,6 +63,7 @@ const SKILL_DEFINITIONS: readonly SkillDefinitionEntry[] = [
   { name: 'Tracking', category: 'General Skills', attributeKey: 'IQ' },
   { name: 'Backstab', category: 'Thief Skills', attributeKey: 'XX' },
   { name: 'Stealth', category: 'Thief Skills', attributeKey: 'DEX' },
+  { name: 'Pickpocket / Steal', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Lockpicking', category: 'Thief Skills', attributeKey: 'IQ' },
   { name: 'Disarm Traps', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Runes', category: 'Magic Skills', attributeKey: 'IQ' },
@@ -1202,33 +1203,35 @@ export default function CreateCharacterEarlyYears() {
           throw new Error(`Failed to load class bonuses for ${classKey}`);
         }
 
-        const data = await response.json() as Record<string, unknown>;
-        const normalized = new Map<string, number>();
-        Object.entries(data).forEach(([key, value]) => {
-          const normalizedKey = key.trim().toUpperCase();
-          if (!normalizedKey) return;
-          let numeric: number;
-          if (typeof value === 'number') {
-            numeric = value;
-          } else if (typeof value === 'string') {
-            const parsed = Number.parseInt(value, 10);
-            numeric = Number.isFinite(parsed) ? parsed : 0;
-          } else {
-            const parsed = Number.parseInt(String(value), 10);
-            numeric = Number.isFinite(parsed) ? parsed : 0;
-          }
-          normalized.set(normalizedKey, Math.round(numeric));
-        });
+        const data = await response.json() as unknown;
+        const valuesArray = Array.isArray(data)
+          ? data
+          : typeof data === 'object' && data != null
+            ? Object.values(data as Record<string, unknown>)
+            : [];
 
-        setSkillRows((prev) => prev.map((row, index) => {
-          const definition = SKILL_DEFINITIONS_WITH_INDEX[index];
-          const lookupKey = definition.name.trim().toUpperCase();
-          const bonus = normalized.get(lookupKey) ?? 0;
-          return {
-            ...row,
-            classBonus: bonus
-          };
-        }));
+        const parseNumeric = (value: unknown): number => {
+          if (typeof value === 'number') {
+            return Number.isFinite(value) ? Math.round(value) : 0;
+          }
+          if (typeof value === 'string') {
+            const parsed = Number.parseInt(value, 10);
+            return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+          }
+          const parsed = Number.parseInt(String(value ?? ''), 10);
+          return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+        };
+
+        const getBonusBySkillIndex = (skillIndex: number): number => {
+          const col = skillIndex + 1;
+          const value = valuesArray[col - 1];
+          return parseNumeric(value);
+        };
+
+        setSkillRows((prev) => prev.map((row, index) => ({
+          ...row,
+          classBonus: getBonusBySkillIndex(index)
+        })));
       } catch (error) {
         console.warn('Failed to fetch class bonuses', error);
         if (!cancelled) {

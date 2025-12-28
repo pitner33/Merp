@@ -71,6 +71,7 @@ const SKILL_DEFINITIONS: readonly SkillDefinitionEntry[] = [
   { name: 'Tracking', category: 'General Skills', attributeKey: 'IQ' },
   { name: 'Backstab', category: 'Thief Skills', attributeKey: 'XX' },
   { name: 'Stealth', category: 'Thief Skills', attributeKey: 'DEX' },
+  { name: 'Pickpocket / Steal', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Lockpicking', category: 'Thief Skills', attributeKey: 'IQ' },
   { name: 'Disarm Traps', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Runes', category: 'Magic Skills', attributeKey: 'IQ' },
@@ -137,6 +138,7 @@ function getZeroLevelBonus(skillName: string): number {
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api';
 const API_ROOT = API_BASE.replace(/\/$/, '');
+const CLASS_BONUS_ENDPOINT = (classKey: string) => `${API_ROOT}/attributes/class-bonuses/${encodeURIComponent(classKey)}`;
 const SKILL_LEVEL_BONUS_ENDPOINT = (skillName: string, levelCount: number) =>
   `${API_ROOT}/skills/level-bonus?skillName=${encodeURIComponent(skillName)}&levels=${levelCount}`;
 
@@ -565,6 +567,81 @@ export default function CreateCharacterLevelUp() {
       ignore = true;
     };
   }, [playerId]);
+
+  useEffect(() => {
+    const classKey = baseData.playerClass?.trim();
+    if (!classKey) {
+      setSkillRows((prev) => prev.map((row) => ({
+        ...row,
+        classBonus: 0
+      })));
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch(CLASS_BONUS_ENDPOINT(classKey));
+        if (cancelled) return;
+
+        if (response.status === 404) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            classBonus: 0
+          })));
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to load class bonuses for ${classKey}`);
+        }
+
+        const data = await response.json() as unknown;
+        const valuesArray = Array.isArray(data)
+          ? data
+          : typeof data === 'object' && data != null
+            ? Object.values(data as Record<string, unknown>)
+            : [];
+
+        const parseNumeric = (value: unknown): number => {
+          if (typeof value === 'number') {
+            return Number.isFinite(value) ? Math.round(value) : 0;
+          }
+          if (typeof value === 'string') {
+            const parsed = Number.parseInt(value, 10);
+            return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+          }
+          const parsed = Number.parseInt(String(value ?? ''), 10);
+          return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+        };
+
+        const getBonusBySkillIndex = (skillIndex: number): number => {
+          // GS-CHAR_CLASSBONUS columns are 1-based.
+          const col = skillIndex + 1;
+          const value = valuesArray[col - 1];
+          return parseNumeric(value);
+        };
+
+        setSkillRows((prev) => prev.map((row, index) => ({
+          ...row,
+          classBonus: getBonusBySkillIndex(index)
+        })));
+      } catch (error) {
+        console.warn('Failed to fetch class bonuses', error);
+        if (!cancelled) {
+          setSkillRows((prev) => prev.map((row) => ({
+            ...row,
+            classBonus: 0
+          })));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseData.playerClass]);
 
   useEffect(() => {
     let ignore = false;

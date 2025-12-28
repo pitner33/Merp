@@ -72,7 +72,9 @@ public class FightServiceImpl implements FightService {
                 return p.getTbUnarmed();
             case dualWield:
                 int baseMain;
-                if (p.getCritType() == CritType.blunt) {
+                if (p.getCritType() == CritType.crushing) {
+                    baseMain = p.getTbUnarmed();
+                } else if (p.getCritType() == CritType.blunt) {
                     baseMain = p.getTb1HBlunt();
                 } else {
                     baseMain = p.getTb1HSlashing();

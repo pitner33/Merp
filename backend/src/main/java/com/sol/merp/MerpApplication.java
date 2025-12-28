@@ -155,7 +155,7 @@ public class MerpApplication implements CommandLineRunner {
             // One-handed
             weaponRepository.save(new Weapon("Dagger", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.piercing, WeaponType.oneHanded,"C", "C", 0));
             weaponRepository.save(new Weapon("Hatchet", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded,"C", "C", 0));
-            weaponRepository.save(new Weapon("Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.blunt, WeaponType.oneHanded,"C", "C", 0));
+            weaponRepository.save(new Weapon("Club", PlayerActivity._3PhisicalAttackOrMovement, AttackType.blunt, CritType.blunt, WeaponType.oneHanded,"C", "C", 0));
             weaponRepository.save(new Weapon("One-handed Sword", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
             weaponRepository.save(new Weapon("One-handed Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.slashing, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
             weaponRepository.save(new Weapon("One-handed Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.blunt, CritType.blunt, WeaponType.oneHanded, "E", "E", 0));
@@ -175,23 +175,29 @@ public class MerpApplication implements CommandLineRunner {
             weaponRepository.save(new Weapon("1H Axe/1H Axe", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.slashing, WeaponType.oneHanded, "E", "E", 0));
             weaponRepository.save(new Weapon("1H Mace/1H Mace", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.blunt, WeaponType.oneHanded, "E", "E", 0));
             // Unarmed
-            weaponRepository.save(new Weapon("Unarmed-Crushing-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Crushing-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Crushing-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Crushing-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "E", "E", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Crushing-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "A", "A", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Crushing-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "B", "B", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Crushing-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "C", "C", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Crushing-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "D", "D", 0, 0, 0D));
             weaponRepository.save(new Weapon("Unarmed-Crushing-Master", PlayerActivity._3PhisicalAttackOrMovement, AttackType.clawsAndFangs, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 150, 150, "E", "E", 0, 0, 0D));
 
-            weaponRepository.save(new Weapon("Unarmed-Grapple-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Grapple-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Grapple-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Grapple-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "E", "E", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Grapple-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "A", "A", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Grapple-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "B", "B", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Grapple-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "C", "C", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Grapple-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "D", "D", 0, 0, 0D));
             weaponRepository.save(new Weapon("Unarmed-Grapple-Master", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.grab, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 150, 150, "E", "E", 0, 0, 0D));
 
-            weaponRepository.save(new Weapon("Unarmed-Balance-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Balance-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Balance-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "E", "E", 0, 0, 0D));
-            weaponRepository.save(new Weapon("Unarmed-Balance-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "E", "E", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Balance-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "A", "A", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Balance-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "B", "B", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Balance-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "C", "C", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-Balance-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "D", "D", 0, 0, 0D));
             weaponRepository.save(new Weapon("Unarmed-Balance-Master", PlayerActivity._3PhisicalAttackOrMovement, AttackType.grabOrBalance, CritType.balance, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 150, 150, "E", "E", 0, 0, 0D));
+
+            weaponRepository.save(new Weapon("Unarmed-DualWield-Novice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 90, 90, "A", "A", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-DualWield-Apprentice", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 105, 105, "B", "B", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-DualWield-Adept", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 120, 120, "C", "C", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-DualWield-Expert", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 135, 135, "D", "D", 0, 0, 0D));
+            weaponRepository.save(new Weapon("Unarmed-DualWield-Master", PlayerActivity._3PhisicalAttackOrMovement, AttackType.dualWield, CritType.crushing, CritType.none, WeaponType.melee, WeaponSpecType.normal, 0, 0, 150, 150, "E", "E", 0, 0, 0D));
         }
 
         inventoryService.ensureDefaultWeaponsForAllPlayers();

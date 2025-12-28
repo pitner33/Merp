@@ -36,8 +36,13 @@ export function computeTbPair(
       main = p.tbUnarmed ?? 0;
       break;
     case 'dualWield': {
-      const isBlunt = (p.critType as string | undefined) === 'blunt';
-      const base1H = isBlunt ? (p.tb1HBlunt ?? 0) : (p.tb1HSlashing ?? 0);
+      const crit = (p.critType as string | undefined) ?? 'none';
+      const base1H =
+        crit === 'crushing'
+          ? (p.tbUnarmed ?? 0)
+          : crit === 'blunt'
+            ? (p.tb1HBlunt ?? 0)
+            : (p.tb1HSlashing ?? 0);
       main = computeDualWieldMainTb(base1H, p.dualWield);
       off = computeDualWieldOffHandTb(base1H, p.dualWield);
       break;

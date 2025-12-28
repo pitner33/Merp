@@ -41,21 +41,28 @@ public class SkillDefinitionInitializer {
     }
 
     private void seedSkillDefinitions() {
-        if (repository.count() > 0) {
-            return;
-        }
-
         try (InputStream in = new ClassPathResource(SKILLS_RESOURCE_PATH).getInputStream()) {
             List<SkillSeedRow> seeds = objectMapper.readValue(in, new TypeReference<List<SkillSeedRow>>() {});
-            seeds.stream()
-                .filter(seed -> seed.getName() != null && !seed.getName().isBlank())
-                .map(seed -> SkillDefinition.builder()
-                    .name(seed.getName().trim())
-                    .category(seed.getCategory() != null ? seed.getCategory().trim() : "General")
-                    .attributeKey(seed.getAttributeKey() != null ? seed.getAttributeKey().trim() : null)
-                    .build())
-                .forEach(repository::save);
-            LOGGER.info("Seeded {} skill definitions.", repository.count());
+            long created = 0;
+            for (SkillSeedRow seed : seeds) {
+                if (seed == null || seed.getName() == null || seed.getName().isBlank()) {
+                    continue;
+                }
+                String name = seed.getName().trim();
+                if (repository.findByNameIgnoreCase(name).isPresent()) {
+                    continue;
+                }
+                SkillDefinition entity = SkillDefinition.builder()
+                        .name(name)
+                        .category(seed.getCategory() != null ? seed.getCategory().trim() : "General")
+                        .attributeKey(seed.getAttributeKey() != null ? seed.getAttributeKey().trim() : null)
+                        .build();
+                repository.save(entity);
+                created++;
+            }
+            if (created > 0) {
+                LOGGER.info("Seeded {} new skill definitions (total now {}).", created, repository.count());
+            }
         } catch (IOException e) {
             LOGGER.error("Failed to seed skill definitions from {}", SKILLS_RESOURCE_PATH, e);
         }

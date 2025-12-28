@@ -598,6 +598,7 @@ export default function Landing() {
           .table thead th { position: sticky; top: 0; background: #2f5597; color: #ffffff; z-index: 1; }
           .table th button { background: none; border: none; cursor: pointer; padding: 0; font: inherit; color: inherit; }
           .actions-cell { white-space: nowrap; }
+          .name-col { min-width: 120px; text-align: left; }
           .center { text-align: center; }
           .right { text-align: right; }
           @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -612,7 +613,7 @@ export default function Landing() {
             <th rowSpan={2}>Actions</th>
             <th rowSpan={2} className="center">Play</th>
             <th rowSpan={2}><button onClick={() => toggleSort('characterId')}>ID {sortKey==='characterId' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
-            <th rowSpan={2}><button onClick={() => toggleSort('name')}>Name {sortKey==='name' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
+            <th rowSpan={2} className="name-col"><button onClick={() => toggleSort('name')}>Name {sortKey==='name' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('gender' as keyof Player)}>Gender {sortKey==='gender' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('race' as keyof Player)}>Race {sortKey==='race' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>
             <th rowSpan={2}><button onClick={() => toggleSort('playerClass' as keyof Player)}>Class {sortKey==='playerClass' ? (sortDir==='asc'?'▲':'▼') : ''}</button></th>

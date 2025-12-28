@@ -92,6 +92,7 @@ public class Player {
     private Integer runes; //runaolvasas
     private Integer influence; //befolyasolas
     private Integer stealth; //lopakodas/rejtozkodes
+    private Integer pockPocketStealth; //zsebtolvajlas/lopas
     private Integer climbing = 0;
     private Integer riding = 0;
     private Integer swimming = 0;
