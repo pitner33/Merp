@@ -64,6 +64,7 @@ const FIELD_DEFS: readonly FieldDefBase[] = [
   { key: 'mmPlate', label: 'Plate', type: 'number', numberKind: 'int' },
   { key: 'agilityBonus', label: 'Agility Bonus', type: 'number', numberKind: 'int' },
   { key: 'stealth', label: 'Stealth', type: 'number', numberKind: 'int' },
+  { key: 'sleightOfHand', label: 'Sleight of hand', type: 'number', numberKind: 'int' },
   { key: 'perception', label: 'Perception', type: 'number', numberKind: 'int' },
   { key: 'tracking', label: 'Tracking', type: 'number', numberKind: 'int' },
   { key: 'lockPicking', label: 'Lockpicking', type: 'number', numberKind: 'int' },

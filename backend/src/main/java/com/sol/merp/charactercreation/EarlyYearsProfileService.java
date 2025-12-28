@@ -273,8 +273,8 @@ public class EarlyYearsProfileService {
         if (influence != null) player.setInfluence(influence);
         Integer stealth = skillTotals.get("STEALTH");
         if (stealth != null) player.setStealth(stealth);
-        Integer pickpocketSteal = skillTotals.get("PICKPOCKET / STEAL");
-        if (pickpocketSteal != null) player.setPockPocketStealth(pickpocketSteal);
+        Integer sleightOfHand = skillTotals.get("SLEIGHT OF HAND");
+        if (sleightOfHand != null) player.setSleightOfHand(sleightOfHand);
 
         Integer climbing = skillTotals.get("CLIMBING");
         if (climbing != null) player.setClimbing(climbing);

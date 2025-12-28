@@ -57,6 +57,7 @@ export type Player = {
   runes?: number;
   influence?: number;
   stealth?: number;
+  sleightOfHand?: number;
 };
 
 export type Weapon = {

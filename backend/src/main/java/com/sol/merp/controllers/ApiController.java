@@ -547,6 +547,7 @@ public class ApiController {
         if (incoming.getRunes() == null) incoming.setRunes(0);
         if (incoming.getInfluence() == null) incoming.setInfluence(0);
         if (incoming.getStealth() == null) incoming.setStealth(0);
+        if (incoming.getSleightOfHand() == null) incoming.setSleightOfHand(0);
         if (incoming.getClimbing() == null) incoming.setClimbing(0);
         if (incoming.getRiding() == null) incoming.setRiding(0);
         if (incoming.getSwimming() == null) incoming.setSwimming(0);
@@ -735,6 +736,7 @@ public class ApiController {
                     existing.setRunes(updated.getRunes());
                     existing.setInfluence(updated.getInfluence());
                     existing.setStealth(updated.getStealth());
+                    existing.setSleightOfHand(updated.getSleightOfHand());
                     existing.setClimbing(updated.getClimbing());
                     existing.setRiding(updated.getRiding());
                     existing.setSwimming(updated.getSwimming());

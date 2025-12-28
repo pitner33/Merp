@@ -73,7 +73,7 @@ const SKILL_DEFINITIONS: readonly SkillDefinitionEntry[] = [
   { name: 'Tracking', category: 'General Skills', attributeKey: 'IQ' },
   { name: 'Backstab', category: 'Thief Skills', attributeKey: 'XX' },
   { name: 'Stealth', category: 'Thief Skills', attributeKey: 'DEX' },
-  { name: 'Pickpocket / Steal', category: 'Thief Skills', attributeKey: 'DEX' },
+  { name: 'Sleight of hand', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Lockpicking', category: 'Thief Skills', attributeKey: 'IQ' },
   { name: 'Disarm Traps', category: 'Thief Skills', attributeKey: 'DEX' },
   { name: 'Runes', category: 'Magic Skills', attributeKey: 'IQ' },
