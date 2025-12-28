@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { get } from '../api/client';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import {
   fetchEarlyYearsProfile,
   saveEarlyYearsProfile,
@@ -434,6 +436,7 @@ export default function CreateCharacterLevelUp() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const [meta, setMeta] = useState<MetaOptions>({ genders: [], races: [], playerClasses: [], armorTypes: [] });
   const [baseData, setBaseData] = useState<BaseDataState>(() => ({
@@ -844,6 +847,156 @@ export default function CreateCharacterLevelUp() {
     }
   }
 
+  async function handleExportPdf() {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const element = document.getElementById('pdf-export-root') ?? document.documentElement;
+      const elementRect = element.getBoundingClientRect();
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: Math.max(2, Math.ceil(window.devicePixelRatio || 1)),
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          const clonedElement = element === document.documentElement
+            ? (clonedDoc.documentElement as HTMLElement)
+            : (clonedDoc.getElementById('pdf-export-root') as HTMLElement | null);
+          if (!clonedElement) return;
+
+          if (element !== document.documentElement) {
+            clonedElement.style.width = `${Math.ceil(elementRect.width)}px`;
+            clonedElement.style.boxSizing = 'border-box';
+          }
+
+          const exportStyle = clonedDoc.createElement('style');
+          exportStyle.textContent = `
+            #pdf-export-root .skill-table { table-layout: fixed; width: 100%; }
+            #pdf-export-root .skill-table th, #pdf-export-root .skill-table td { overflow: hidden; }
+            #pdf-export-root .skill-table input, #pdf-export-root .skill-table select, #pdf-export-root .skill-table textarea { max-width: 100%; }
+            #pdf-export-root .skill-table td > div { max-width: 100%; }
+          `;
+          clonedDoc.head.appendChild(exportStyle);
+
+          const toReplace = Array.from(clonedElement.querySelectorAll('input, select, textarea')) as Array<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+          >;
+
+          toReplace.forEach((node) => {
+            if (node instanceof HTMLInputElement) {
+              const type = (node.getAttribute('type') || '').toLowerCase();
+              if (type === 'checkbox' || type === 'radio' || type === 'button' || type === 'submit' || type === 'reset' || type === 'file') {
+                return;
+              }
+            }
+
+            const computed = clonedDoc.defaultView?.getComputedStyle(node);
+            const valueText = node instanceof HTMLSelectElement
+              ? (node.selectedOptions[0]?.textContent ?? '')
+              : (node as HTMLInputElement | HTMLTextAreaElement).value ?? '';
+
+            const replacement = clonedDoc.createElement('div');
+            replacement.textContent = valueText;
+
+            if (computed) {
+              replacement.style.display = computed.display === 'inline' ? 'inline-block' : computed.display;
+              replacement.style.boxSizing = computed.boxSizing;
+              replacement.style.width = computed.width;
+              replacement.style.height = computed.height;
+              replacement.style.minHeight = computed.minHeight;
+              replacement.style.minWidth = '0px';
+              replacement.style.maxWidth = '100%';
+              replacement.style.padding = computed.padding;
+              replacement.style.border = computed.border;
+              replacement.style.borderRadius = computed.borderRadius;
+              replacement.style.font = computed.font;
+              replacement.style.fontSize = computed.fontSize;
+              replacement.style.fontWeight = computed.fontWeight;
+              replacement.style.lineHeight = computed.lineHeight;
+              replacement.style.letterSpacing = computed.letterSpacing;
+              replacement.style.color = computed.color;
+              replacement.style.backgroundColor = computed.backgroundColor;
+              replacement.style.textAlign = computed.textAlign;
+              replacement.style.whiteSpace = 'pre-wrap';
+              replacement.style.overflow = 'hidden';
+            }
+
+            node.replaceWith(replacement);
+          });
+        },
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidthMm = pageWidth;
+      const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width;
+
+      // Multi-page support by re-adding the same full image with a negative Y offset.
+      let remainingHeight = imgHeightMm;
+      let offsetY = 0;
+      while (remainingHeight > 0) {
+        pdf.addImage(imgData, 'PNG', 0, offsetY, imgWidthMm, imgHeightMm, undefined, 'FAST');
+        remainingHeight -= pageHeight;
+        if (remainingHeight > 0) {
+          pdf.addPage();
+          offsetY -= pageHeight;
+        }
+      }
+
+      const filenameBase = (baseData.characterId?.trim() || baseData.name?.trim() || 'character-level-up')
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .trim();
+      const filename = `${filenameBase || 'character-level-up'}.pdf`;
+
+      const pdfBytes = pdf.output('arraybuffer');
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+      const hasPicker = typeof (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker === 'function';
+      if (hasPicker) {
+        const picker = (window as unknown as {
+          showSaveFilePicker: (options: {
+            suggestedName?: string;
+            types?: { description?: string; accept: Record<string, string[]> }[];
+          }) => Promise<{ createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }> }>;
+        }).showSaveFilePicker;
+
+        const handle = await picker({
+          suggestedName: filename,
+          types: [
+            {
+              description: 'PDF Document',
+              accept: { 'application/pdf': ['.pdf'] }
+            }
+          ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(pdfBlob);
+        await writable.close();
+      } else {
+        // Fallback: standard browser download.
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.warn('Failed to export PDF', e);
+      setSaveFeedback({ type: 'error', message: 'Failed to export PDF' });
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   async function loadLevellingSkillPoints(preserveSpellsAndLanguages: boolean) {
     const classKey = baseData.playerClass?.trim();
     if (!classKey) {
@@ -943,6 +1096,14 @@ export default function CreateCharacterLevelUp() {
     { value: '', label: 'Select…' },
     ...([...(meta.armorTypes ?? [])].reverse().map((value) => ({ value, label: formatOptionLabel(value) })))
   ], [meta.armorTypes]);
+
+  const armorSelectWidthCh = useMemo(() => {
+    const maxLabelLength = armorOptions.reduce((max, option) => {
+      const label = typeof option.label === 'string' ? option.label : '';
+      return Math.max(max, label.length);
+    }, 0);
+    return Math.max(0, maxLabelLength + 4);
+  }, [armorOptions]);
 
   const attributeRowMap = useMemo(() => {
     const map = new Map<AttributeKey, AttributeRow>();
@@ -1774,7 +1935,27 @@ export default function CreateCharacterLevelUp() {
   }
 
   return (
-    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 24, position: 'relative' }}>
+      <button
+        type="button"
+        onClick={handleExportPdf}
+        style={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          padding: '6px 12px',
+          background: COLORS.primary,
+          color: '#fff',
+          border: 'none',
+          borderRadius: 6,
+          cursor: exportingPdf ? 'default' : 'pointer',
+          opacity: exportingPdf ? 0.8 : 1,
+          zIndex: 10
+        }}
+        disabled={exportingPdf}
+      >
+        {exportingPdf ? 'Exporting…' : 'Export PDF'}
+      </button>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <h1 style={{ margin: 0, textAlign: 'center', color: '#ffffff', textShadow: '0 0 6px rgba(0,0,0,0.35)' }}>
           Character Creation – Level Up
@@ -1826,14 +2007,15 @@ export default function CreateCharacterLevelUp() {
           </p>
         )}
       </div>
-      {loading && (
-        <p style={{ textAlign: 'center', color: COLORS.textPrimary }}>Loading Early Years profile...</p>
-      )}
-      {error && !loading && (
-        <p style={{ textAlign: 'center', color: COLORS.danger, fontWeight: 600 }}>{error}</p>
-      )}
-      <style>
-        {`
+      <div id="pdf-export-root">
+        {loading && (
+          <p style={{ textAlign: 'center', color: COLORS.textPrimary }}>Loading Early Years profile...</p>
+        )}
+        {error && !loading && (
+          <p style={{ textAlign: 'center', color: COLORS.danger, fontWeight: 600 }}>{error}</p>
+        )}
+        <style>
+          {`
           .early-years-section {
             background: #fff;
             border-radius: 8px;
@@ -1843,6 +2025,18 @@ export default function CreateCharacterLevelUp() {
             display: flex;
             flex-direction: column;
             gap: 16px;
+          }
+          .early-years-section.early-years-section-compact {
+            padding: 12px;
+            gap: 12px;
+          }
+          .early-years-section.early-years-section-compact .panel {
+            padding: 10px;
+            gap: 6px;
+          }
+          .early-years-section.early-years-section-compact .panel th,
+          .early-years-section.early-years-section-compact .panel td {
+            padding: 4px 6px;
           }
           .early-years-title {
             margin: 0;
@@ -1941,6 +2135,34 @@ export default function CreateCharacterLevelUp() {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            --base-data-label-width: 12ch;
+          }
+          .base-data-form .field {
+            flex-direction: row;
+            align-items: center;
+            gap: 0;
+          }
+          .base-data-form .field label {
+            margin: 0;
+            width: var(--base-data-label-width);
+            flex: 0 0 var(--base-data-label-width);
+            white-space: nowrap;
+          }
+          .base-data-form .field label::after {
+            content: ':\xA0';
+          }
+          .base-data-form .field label[for="base-gender"],
+          .base-data-form .field label[for="base-class"],
+          .base-data-form .field label[for="base-age"],
+          .base-data-form .field label[for="base-weight"],
+          .base-data-form .field label[for="base-eyes"] {
+            padding-left: 1ch;
+          }
+          .base-data-form .field input,
+          .base-data-form .field select {
+            flex: 1 1 auto;
+            width: 100%;
+            min-width: 0;
           }
           .base-data-row {
             display: flex;
@@ -2015,7 +2237,7 @@ export default function CreateCharacterLevelUp() {
           .spell-table th,
           .spell-table td {
             border: 1px solid ${COLORS.border};
-            padding: 4px 6px;
+            padding: 2px 4px;
             background: #fff;
             color: ${COLORS.textPrimary};
           }
@@ -2023,17 +2245,17 @@ export default function CreateCharacterLevelUp() {
             background: ${COLORS.primary};
             color: #fff;
             text-transform: uppercase;
-            font-size: 12px;
+            font-size: 11px;
             letter-spacing: 0.03em;
           }
           .spell-table input[type="text"],
           .spell-table input[type="number"] {
             width: 100%;
             box-sizing: border-box;
-            padding: 4px 6px;
-            border-radius: 6px;
+            padding: 2px 4px;
+            border-radius: 4px;
             border: 1px solid ${COLORS.border};
-            font-size: 14px;
+            font-size: 13px;
             color: ${COLORS.textPrimary};
             background: ${COLORS.surface};
             text-align: center;
@@ -2048,7 +2270,7 @@ export default function CreateCharacterLevelUp() {
           .languages-table th,
           .languages-table td {
             border: 1px solid ${COLORS.border};
-            padding: 8px;
+            padding: 4px 6px;
             background: #fff;
             color: ${COLORS.textPrimary};
           }
@@ -2063,10 +2285,10 @@ export default function CreateCharacterLevelUp() {
           .languages-table input[type="number"] {
             width: 100%;
             box-sizing: border-box;
-            padding: 6px 8px;
-            border-radius: 6px;
+            padding: 4px 6px;
+            border-radius: 4px;
             border: 1px solid ${COLORS.border};
-            font-size: 14px;
+            font-size: 13px;
             color: ${COLORS.textPrimary};
             background: ${COLORS.surface};
             text-align: center;
@@ -2078,7 +2300,7 @@ export default function CreateCharacterLevelUp() {
           .skill-table th,
           .skill-table td {
             border: 1px solid ${COLORS.border};
-            padding: 4px 6px;
+            padding: 0px 4px;
             background: #fff;
             color: ${COLORS.textPrimary};
             vertical-align: top;
@@ -2121,7 +2343,8 @@ export default function CreateCharacterLevelUp() {
           .skill-levels {
             display: flex;
             flex-wrap: wrap;
-            gap: 3px;
+            gap: 2px;
+            align-items: center;
           }
           .skill-levels label {
             width: 16px;
@@ -2179,12 +2402,11 @@ export default function CreateCharacterLevelUp() {
             color: ${COLORS.primary};
           }
         `}
-      </style>
+        </style>
 
-      {profile && (
-        <>
+        {profile && (
+          <>
           <section className="early-years-section">
-            <h2 className="early-years-title">Foundational Information</h2>
             <div className="panel-grid cols-3">
               <section className="panel">
                 <h3>Character Base Data</h3>
@@ -2260,7 +2482,7 @@ export default function CreateCharacterLevelUp() {
                   </div>
                   <div className="base-data-row">
                     <div className="field">
-                      <label htmlFor="base-magic-school">Magic School</label>
+                      <label htmlFor="base-magic-school">Magic Type</label>
                       <select
                         id="base-magic-school"
                         value={baseData.magicSchool}
@@ -2521,8 +2743,7 @@ export default function CreateCharacterLevelUp() {
             </div>
           </section>
 
-          <section className="early-years-section">
-            <h2 className="early-years-title">Progression Metrics</h2>
+          <section className="early-years-section early-years-section-compact">
             <div className="panel-grid cols-2">
               <section className="panel">
                 <h3>Attributes &amp; Bonuses</h3>
@@ -2555,7 +2776,13 @@ export default function CreateCharacterLevelUp() {
                 <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
                   <div className="field field-inline" style={{ gap: 8 }}>
                     <label htmlFor="summary-level" style={{ minWidth: 72 }}>Level</label>
-                    <input id="summary-level" type="number" value={displayLevel} readOnly style={{ background: '#f0f3f8' }} />
+                    <input
+                      id="summary-level"
+                      type="number"
+                      value={displayLevel}
+                      readOnly
+                      style={{ background: '#f0f3f8', width: 100, flex: '0 0 100px' }}
+                    />
                   </div>
                   <div className="field field-inline">
                     <label htmlFor="summary-xp" style={{ minWidth: 32 }}>XP</label>
@@ -2571,6 +2798,8 @@ export default function CreateCharacterLevelUp() {
                           color: canUseLevelUp ? '#111' : COLORS.textPrimary,
                           fontWeight: canUseLevelUp ? 800 : 400,
                           cursor: canUseLevelUp ? 'pointer' : 'default',
+                          width: 150,
+                          flex: '0 0 150px',
                           paddingRight: canUseLevelUp ? 24 : undefined
                         }}
                       />
@@ -2603,20 +2832,21 @@ export default function CreateCharacterLevelUp() {
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="field field-inline" style={{ gap: 8 }}>
-                  <label htmlFor="summary-armor" style={{ minWidth: 72 }}>Armor</label>
-                  <select
-                    id="summary-armor"
-                    value={baseData.armorType}
-                    onChange={(event) => handleBaseDataChange('armorType', event.target.value)}
-                  >
-                    {armorOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="field field-inline" style={{ gap: 8 }}>
+                    <label htmlFor="summary-armor" style={{ minWidth: 72 }}>Armor</label>
+                    <select
+                      id="summary-armor"
+                      value={baseData.armorType}
+                      onChange={(event) => handleBaseDataChange('armorType', event.target.value)}
+                      style={{ width: `${armorSelectWidthCh}ch`, flex: '0 0 auto' }}
+                    >
+                      {armorOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <table className="panel-table level-summary-table">
                   <thead>
@@ -2690,7 +2920,6 @@ export default function CreateCharacterLevelUp() {
           </section>
 
           <section className="early-years-section">
-            <h2 className="early-years-title">Skill Progression</h2>
             <div className="panel-grid">
               <section className="panel">
                 <div
@@ -2796,7 +3025,7 @@ export default function CreateCharacterLevelUp() {
                           {rowsForGroup.map((row) => (
                             <tr key={row.definition.name}>
                               <td>{row.definition.name}</td>
-                              <td>
+                              <td className="middle">
                                 {isSkillLocked(row.definition.name) ? (
                                   <span aria-hidden="true">—</span>
                                 ) : (
@@ -2953,8 +3182,9 @@ export default function CreateCharacterLevelUp() {
               </section>
             </div>
           </section>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
